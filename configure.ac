@@ -101,7 +101,6 @@ AC_CHECK_HEADERS([ \
 ])
 
 AC_CONFIG_FILES([Makefile
-        	bin/Makefile
 		Thirdparty/Makefile
 		Util/Makefile
 		SQG/Makefile
