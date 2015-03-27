@@ -25,7 +25,6 @@ libutil_a_SOURCES = \
 		BitVector.h BitVector.cpp \
         CorrectionThresholds.h CorrectionThresholds.cpp \
         KmerDistribution.h KmerDistribution.cpp \
-        ClusterReader.h ClusterReader.cpp \
         MultiAlignment.h MultiAlignment.cpp \
 		StdAlnTools.h StdAlnTools.cpp \
         QualityTable.h QualityTable.cpp \
