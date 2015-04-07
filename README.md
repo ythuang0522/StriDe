@@ -1,10 +1,23 @@
 # StriDe
-The StriDe Assembler integrates string and de Bruijn graph by decomposing reads within error-prone regions, while extending paire-end read into long reads for assembly through repetitive regions. The entire implementation is done by revising Simpson's SGA components, porting Li's ropebwt2 for FM-index construction, and adding key components of this assembler. The program can be executed all-in-one or step-by-step, depending on the commands specified.
+The StriDe Assembler integrates string and de Bruijn graph by decomposing reads within error-prone regions, while extending paire-end read into long reads for assembly through repetitive regions. The entire implementation is done by revising Simpson's SGA components, porting Li's ropebwt2 for FM-index construction, and adding key components of this assembler. 
+
+# Compile
+To compile StriDe assembler, simply type 
+1. ./autogen.sh 
+2. ./configure
+3. make
+
+An executable program called stride will be found under the StriDe folder.
+
+# Execution
+The program can be executed in all-in-one mode or step-by-step mode, depending on the commands specified.
 
 All-in-one Commands:
+
       all	  Perform error correction, long-read generation, overlap computation, and assembly in one run
 
 Step-by-step Commands:
+
       preprocess  filter and quality-trim reads
       index       build FM-index for a set of reads
       correct     correct sequencing errors in reads 
@@ -14,6 +27,7 @@ Step-by-step Commands:
       assemble    generate contigs from an assembly graph
 
 Other Commands:
+
       merge	merge multiple BWT/FM-index files into a single index
 
 For instance, given two pair-end reads fastq (A_R1.fq, A_R2.fq, B_R1.fq, B_R2.fq), simply type
