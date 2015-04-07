@@ -3,9 +3,10 @@ The StriDe Assembler integrates string and de Bruijn graph by decomposing reads 
 
 # Compile
 To compile StriDe assembler, simply type 
-1. ./autogen.sh 
-2. ./configure
-3. make
+
+      1. ./autogen.sh 
+      2. ./configure
+      3. make
 
 An executable program called stride will be found under the StriDe folder.
 
