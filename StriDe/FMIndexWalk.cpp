@@ -245,7 +245,6 @@ void parseFMWalkOptions(int argc, char** argv)
 {
 	optind=1;	//reset getopt
     std::string algo_str;
-    bool bDiscardReads = false;
     bool die = false;
     for (char c; (c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1;)
     {
@@ -265,7 +264,6 @@ void parseFMWalkOptions(int argc, char** argv)
             case 'm': arg >> opt::minOverlap; break;
             case 'M': arg >> opt::maxOverlap; break;
             case OPT_LEARN: opt::bLearnKmerParams = true; break;
-            case OPT_DISCARD: bDiscardReads = true; break;
             case OPT_HELP:
                 std::cout << CORRECT_USAGE_MESSAGE;
                 exit(EXIT_SUCCESS);

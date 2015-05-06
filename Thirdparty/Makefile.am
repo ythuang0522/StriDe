@@ -1,3 +1,4 @@
+AUTOMAKE_OPTIONS = subdir-objects
 noinst_LIBRARIES = libthirdparty.a
 
 libthirdparty_a_CPPFLAGS = \
