@@ -72,7 +72,7 @@ fi
 AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Werror -Wno-unknown-pragmas")
 AC_SUBST(CXXFLAGS, "-O3")
 AC_SUBST(CFLAGS, "-O3")
-AC_SUBST(CPPFLAGS, "$CPPFLAGS $openmp_cppflags $sparsehash_include $bamtools_include")
+AC_SUBST(CPPFLAGS, "$CPPFLAGS $openmp_cppflags $sparsehash_include")
 AC_SUBST(LDFLAGS, "$openmp_cppflags $external_malloc_ldflags $LDFLAGS")
 
 
