@@ -226,6 +226,19 @@ class OverlapAlgorithm
         
         // Optional parameter to limit the amount of branching that is performed
         int m_maxSeeds; 
+		
+		// a wrapper of BWTIntervalPair with additional overlap/error information
+		struct BWTOverlapInfo{
+			BWTOverlapInfo(){
+				overlapLength=0;
+				mismatch=0;
+				errorRate=0;
+			};
+			BWTIntervalPair pair;
+			int overlapLength;
+			int mismatch;
+			double errorRate;
+		};
 };
 
 #endif
