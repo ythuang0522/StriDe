@@ -36,7 +36,7 @@ class OverlapAlgorithm
 		//exact overlap constructor
         OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,
                          SuffixArray* pFwdSAI, SuffixArray* pRevSAI,
-						 ReadInfoTable* pQueryRIT,ReadInfoTable* pTargetRIT) : 
+						 ReadInfoTable* pQueryRIT, ReadInfoTable* pTargetRIT) : 
 										m_pBWT(pBWT), 
                                         m_pRevBWT(pRevBWT),
 										m_pFwdSAI(pFwdSAI),
@@ -56,24 +56,43 @@ class OverlapAlgorithm
 		{
 			delete m_SuperRepeat;
 		}
-										
-		OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,  
-                         double er, int seedLen, int seedStride, bool irrOnly, int maxSeeds = -1) : 
+		
+		// Inexact overlap constructor
+        OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,
+                         SuffixArray* pFwdSAI, SuffixArray* pRevSAI,
+						 ReadInfoTable* pQueryRIT, ReadInfoTable* pTargetRIT, double errorRate) : 
 										m_pBWT(pBWT), 
-                                         m_pRevBWT(pRevBWT),
-                                         m_errorRate(er),
-                                         m_seedLength(seedLen),
-                                         m_seedStride(seedStride),
-                                         m_bIrreducible(irrOnly),
-                                         m_exactModeOverlap(false),
-                                         m_exactModeIrreducible(false),
-                                         m_maxSeeds(maxSeeds)
-										 {
+                                        m_pRevBWT(pRevBWT),
+										m_pFwdSAI(pFwdSAI),
+										m_pRevSAI(pRevSAI),
+										m_pQueryRIT(pQueryRIT),
+										m_pTargetRIT(pTargetRIT),                                         
+                                        m_errorRate(errorRate),
+										m_bIrreducible(true),
+										m_exactModeOverlap(false),
+                                        m_exactModeIrreducible(false)
+										{
 										 	//Maintain a hashset for reducing edges of repeat vertices,by YTH
 											m_SuperRepeat=new DenseHashSet<std::string,StringHasher>();
 											m_SuperRepeat->set_empty_key("");
 										}
 
+		OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,  
+		 double er, int seedLen, int seedStride, bool irrOnly, int maxSeeds = -1) : 
+						m_pBWT(pBWT), 
+						 m_pRevBWT(pRevBWT),
+						 m_errorRate(er),
+						 m_seedLength(seedLen),
+						 m_seedStride(seedStride),
+						 m_bIrreducible(irrOnly),
+						 m_exactModeOverlap(false),
+						 m_exactModeIrreducible(false),
+						 m_maxSeeds(maxSeeds)
+						 {
+							//Maintain a hashset for reducing edges of repeat vertices,by YTH
+							m_SuperRepeat=new DenseHashSet<std::string,StringHasher>();
+							m_SuperRepeat->set_empty_key("");
+						}
 		
         // Perform the overlap
         // This function is threaded so everything must be const

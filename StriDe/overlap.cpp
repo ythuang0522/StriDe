@@ -36,12 +36,6 @@ typedef std::tr1::hash<std::string> StringHasher;
 #define DenseHashSet google::dense_hash_set
 typedef DenseHashSet<std::string, StringHasher> ReadHashSet;
 typedef ReadHashSet::iterator ReadHashSetIter;
-#include <time.h>
-#include <omp.h>
-/*Tatsuki include */
-
-
-
 
 
 //
@@ -68,9 +62,9 @@ void convertHitsToASQGedgeParallel(const std::string hitsFilename, std::ostream*
 #define SUBPROGRAM "overlap"
 static const char *OVERLAP_VERSION_MESSAGE =
 SUBPROGRAM " Version " PACKAGE_VERSION "\n"
-"Written by Jared Simpson.\n"
+"Originally written by Jared Simpson and revised by Yao-Ting Huang.\n"
 "\n"
-"Copyright 2009 Wellcome Trust Sanger Institute\n";
+"Copyright 2015 National Chung Cheng University\n";
 
 static const char *OVERLAP_USAGE_MESSAGE =
 "Usage: " PACKAGE_NAME " " SUBPROGRAM " [OPTION] ... READSFILE\n"
@@ -206,7 +200,14 @@ int overlapMain(int argc, char** argv)
 	else
 		pTargetRIT = pQueryRIT;
 
-	OverlapAlgorithm* pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT);
+	OverlapAlgorithm* pOverlapper;
+	
+	// Activate the inexact overlap algorithm
+	if(opt::errorRate > 0)
+		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT, opt::errorRate);
+	// Activate the exact overlap algorithm
+	else
+		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT);
 	
 	Timer* pTimer = new Timer(PROGRAM_IDENT);
 
