@@ -16,7 +16,7 @@ An executable program called stride will be found under the StriDe folder.
 # Execution
 The program can be executed in all-in-one mode or step-by-step mode, depending on the commands specified.
 
-All-in-one Commands (still under testing):
+All-in-one Commands (experimental):
 
       all	  Perform error correction, long-read generation, overlap computation, and assembly in one run
 
@@ -30,11 +30,24 @@ Step-by-step Commands:
       overlap     compute overlaps between reads
       assemble    generate contigs from an assembly graph
 
-For instance, given two pair-end reads data sets in fastq format (A_R1.fq, A_R2.fq, B_R1.fq, B_R2.fq), simply type
+For instance, given two pair-end reads data sets in fastq format (A_R1.fq, A_R2.fq), simply type
 
-      stride all A_R1.fq A_R2.fq B_R1.fq B_R2.fq
+      stride all A_R1.fq A_R2.fq
 
 The entire preprocess, index, correction, fmwalk/decomposition, ... will be performed.
+
+Example of a Step-by-step script
+
+      stride preprocess --discard-quality -p 1 A_R1.fq A_R2.fq -o reads.fa
+      stride index -a ropebwt2 -t 30 reads.fa
+      stride correct -a overlap -t 30 -k 31 -x 3 reads.fa -o READ.ECOLr.fasta
+      stride index  -t 30 READ.ECOLr.fasta
+      stride fmwalk -m 80 -M 95 -t 30 -L 32 -I 400 -k 31 -p READ.ECOLr READ.ECOLr.fasta
+      cat READ.ECOLr.merge.fa READ.ECOLr.kmerized.fa >merged.fa
+      stride index -t 30 merged.fa
+      stride filter -t 30 --no-kmer-check merged.fa
+      stride overlap -m 30 -t 30 merged.filter.pass.fa
+      stride assemble -k 31 -t 3 -p READ.ECOLr -r 100 -i 200 merged.filter.pass.asqg.gz
 
 [1]: https://github.com/jts/sga
 [2]: https://github.com/lh3/ropebwt2
