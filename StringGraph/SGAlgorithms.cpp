@@ -75,6 +75,7 @@ Edge* SGAlgorithms::createEdgesFromOverlap(StringGraph* pGraph, const Overlap& o
         {
             EdgeDir dir = o.match.coord[idx].isLeftExtreme() ? ED_ANTISENSE : ED_SENSE;
             const SeqCoord& coord = o.match.coord[idx];
+			// This allocator is not thread-safe
             //pEdges[idx] = new(pGraph->getEdgeAllocator()) Edge(pVerts[1 - idx], dir, comp, coord,c);
 			pEdges[idx] = new Edge(pVerts[1 - idx], dir, comp, coord,c);
         }
@@ -98,9 +99,12 @@ Edge* SGAlgorithms::createEdgesFromOverlap(StringGraph* pGraph, const Overlap& o
         for(size_t idx = 0; idx < 2; ++idx)
         {
             const SeqCoord& coord = o.match.coord[idx];
-            pEdges[idx] = new(pGraph->getEdgeAllocator()) Edge(pVerts[1 - idx], ED_SENSE, comp, coord,c);
-            pEdges[idx + 2] = new(pGraph->getEdgeAllocator()) Edge(pVerts[1 - idx], ED_ANTISENSE, comp, coord,c);
-        }
+			// This allocator is not thread-safe
+            // pEdges[idx] = new(pGraph->getEdgeAllocator()) Edge(pVerts[1 - idx], ED_SENSE, comp, coord,c);
+            // pEdges[idx + 2] = new(pGraph->getEdgeAllocator()) Edge(pVerts[1 - idx], ED_ANTISENSE, comp, coord,c);
+			pEdges[idx] = new Edge(pVerts[1 - idx], ED_SENSE, comp, coord,c);
+            pEdges[idx + 2] = new Edge(pVerts[1 - idx], ED_ANTISENSE, comp, coord,c);
+		}
         
         // Twin the edges and add them to the graph
         pEdges[0]->setTwin(pEdges[1]);
@@ -139,7 +143,7 @@ void SGAlgorithms::remodelVertexForExcision(StringGraph* pGraph, Vertex* pVertex
     for(EdgeDescOverlapMap::iterator iter = addMap.begin();
         iter != addMap.end(); ++iter)
     {
-        std::cout << "Adding edge " << iter->second << " during removal of " << pDeleteEdge->getEndID() << "\n";
+        // std::cout << "Adding edge " << iter->second << " during removal of " << pDeleteEdge->getEndID() << "\n";
         createEdgesFromOverlap(pGraph, iter->second, false);
     }
 

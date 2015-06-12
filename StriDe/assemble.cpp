@@ -83,7 +83,7 @@ namespace opt
 	static int maxIndelLength = 9;
 
 	//
-	static bool bExact = true;
+	static bool bExact = false;
 
 	//FM index files
 	BWTIndexSet indices;
@@ -180,8 +180,8 @@ int assemble()
 	
 	pGraph=SGUtil::loadASQGEdge(opt::asqgFile, opt::minOverlap, true, opt::maxEdges, pGraph);
 
-	if(opt::bExact)
-		pGraph->setExactMode(true);
+	// if(opt::bExact)
+	pGraph->setExactMode(opt::bExact);
 	//pGraph->printMemSize();
 
 	// // Pre-assembly graph stats
@@ -194,14 +194,15 @@ int assemble()
 	// Remove containments from the graph
 	std::cout << "Removing contained vertices from graph\n";
 	SGContainRemoveVisitor containVisit;
-	if(pGraph->hasContainment())
+	while(pGraph->hasContainment())
 		pGraph->visit(containVisit);
 
 	/*---Remove Transitive Edges---*/
-	//std::cout << "Removing transitive edges\n";
-	//SGTransitiveReductionVisitor trVisit;
-	//pGraph->visit(trVisit);
+	std::cout << "Removing transitive edges\n";
+	SGTransitiveReductionVisitor trVisit;
+	pGraph->visit(trVisit);
 	/*---Remove Transitive Edges---*/
+	// getchar();
 
 	// Compact together unbranched chains of vertices
 	std::cout << "Start to simplify unipaths ...\n";

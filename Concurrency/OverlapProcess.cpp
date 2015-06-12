@@ -31,6 +31,9 @@ OverlapResult OverlapProcess::process(const SequenceWorkItem& workItem)
 {
 	//compute overlap of workItem.read with results stored in m_blockList, where each block stores SA intervals of overlapping reads
     OverlapResult result = m_pOverlapper->overlapRead(workItem.read, m_minOverlap, &m_blockList);
+	
+	// Give up substring overlap
+	if(result.isSubstring) return result;
 
 	//Convert list of overlap blocks into Edges
     OverlapBlockList::iterator it = m_blockList.begin();

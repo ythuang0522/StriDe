@@ -102,7 +102,7 @@ namespace opt
 	static std::string targetFile;
 	static std::string outFile;
 	
-	static double errorRate = 0.0f;
+	static double errorRate = -1.0f;
 	static unsigned int minOverlap = DEFAULT_MIN_OVERLAP;
 	static int seedLength = 0;
 	static int seedStride = 0;
@@ -153,7 +153,7 @@ int overlapMain(int argc, char** argv)
 	headerRecord.setOverlapTag(opt::minOverlap);
 	headerRecord.setErrorRateTag(opt::errorRate);
 	headerRecord.setInputFileTag(opt::readsFile);
-	headerRecord.setContainmentTag(false); // containments are always present
+	headerRecord.setContainmentTag(true); // containments are always present
 	headerRecord.setTransitiveTag(!opt::bIrreducibleOnly);
 	headerRecord.write(*pASQGWriter);
 
@@ -203,7 +203,7 @@ int overlapMain(int argc, char** argv)
 	OverlapAlgorithm* pOverlapper;
 	
 	// Activate the inexact overlap algorithm
-	if(opt::errorRate > 0)
+	if(opt::errorRate >= 0)
 		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT, opt::errorRate);
 	// Activate the exact overlap algorithm
 	else
@@ -531,8 +531,8 @@ void parseOverlapOptions(int argc, char** argv)
 	}
 
 	// Validate parameters
-	if(opt::errorRate <= 0)
-	opt::errorRate = 0.0f;
+	// if(opt::errorRate <= 0)
+	// opt::errorRate = 0.0f;
 	
 	if(opt::seedLength < 0)
 	opt::seedLength = 0;

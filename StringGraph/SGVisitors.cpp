@@ -203,11 +203,13 @@ void SGContainRemoveVisitor::previsit(StringGraph* pGraph)
 bool SGContainRemoveVisitor::visit(StringGraph* pGraph, Vertex* pVertex)
 {
 	if(!pVertex->isContained())
-	return false;
+		return false;
+		
 	// Add any new irreducible edges that exist when pToRemove is deleted
 	// from the graph
 	EdgePtrVec neighborEdges = pVertex->getEdges();
 
+	// std::cout << pGraph->hasTransitive() << pGraph->isExactMode();
 	// If the graph has been transitively reduced, we have to check all
 	// the neighbors to see if any new edges need to be added. If the graph is a
 	// complete overlap graph we can just remove the edges to the deletion vertex
