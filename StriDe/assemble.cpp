@@ -47,7 +47,7 @@ static const char *ASSEMBLE_USAGE_MESSAGE =
 "      -t, --kmer-threshold=N           filter average kmer frequency vertex less than N (default: 3)\n"
 "      -x, --max-chimera=LEN            maximum chimera length (default: read length(R)*2 )\n"
 "      -c, --credible-overlap=LEN       credible overlap length (default: 80) \n"
-"      -l, --min-branch-length=LEN      remove terminal branches only if they are less than LEN bases in length (default: 200)\n"
+"      -T, --min-overlap-ratio=double      min-overlap-ratio in double (default: 0.8)\n"
 "  -v, --verbose                        display verbose output\n"
 "      --help                           display this help and exit\n"
 "\nOther minor control options:\n"
@@ -111,7 +111,6 @@ static const struct option longopts[] = {
 	{ "prefix",                required_argument, NULL, 'p' },
 	{ "min-overlap",           required_argument, NULL, 'm' },
 	{ "min-overlap-ratio",           required_argument, NULL, 'T' },
-	{ "min-branch-length",     required_argument, NULL, 'l' },
 	{ "max-indel",             required_argument, NULL, OPT_MAXINDEL },
 	{ "max-edges",             required_argument, NULL, OPT_MAXEDGES },
 	{ "kmer-length",           required_argument, NULL, 'k' },

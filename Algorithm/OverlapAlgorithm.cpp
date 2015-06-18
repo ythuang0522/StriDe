@@ -926,6 +926,7 @@ void OverlapAlgorithm::_processIrreducibleBlocksExactIterative(const BWT* pBWT, 
 							pOBFinal->erase(--pOBFinal->end());
 							tlbIter--;
 						}
+						// jump to split blocks
 						goto SARightExtension;
                         // std::cerr << "Error: substring read found during overlap computation.\n";
                         // std::cerr << "Please run sga rmdup before sga overlap\n";
@@ -967,6 +968,7 @@ void OverlapAlgorithm::_processIrreducibleBlocksExactIterative(const BWT* pBWT, 
                 }
                 else
                 {
+					// the substring blocks with $ will be discarded
                     for(size_t idx = 0; idx < DNA_ALPHABET_SIZE; ++idx)
                     {
                         char b = ALPHABET[idx];
