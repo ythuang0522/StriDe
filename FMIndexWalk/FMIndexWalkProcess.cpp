@@ -41,6 +41,9 @@ FMIndexWalkResult FMIndexWalkProcess::MergeAndKmerize(const SequenceWorkItemPair
 	seqFirst = trimRead(seqFirst, m_params.kmerLength, threshold, m_params.indices);
 	seqSecond = trimRead(seqSecond, m_params.kmerLength, threshold, m_params.indices);
 	
+	if(seqFirst.length()<(size_t)m_params.minOverlap || seqSecond.length()<(size_t)m_params.minOverlap)
+		return result;
+
 	std::string firstKRstr = seqFirst.substr(0, m_params.minOverlap);
 	std::string secondKRstr  = seqSecond.substr(0, m_params.minOverlap);
 	if( isSuitableForFMWalk(firstKRstr, secondKRstr) )
@@ -86,12 +89,6 @@ FMIndexWalkResult FMIndexWalkProcess::MergeAndKmerize(const SequenceWorkItemPair
 			result.correctSequence = (SAITree1.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq1:mergedseq2 ;
 			return result;
 		}
-		// else if( !mergedseq1.empty() && !mergedseq2.empty() && (std::abs( (int)mergedseq1.length() - (int)mergedseq2.length()) <= 3))
-		// {
-			// 30~40% are chimera and often mixed with repeats leading to many leaves when walking from both ends
-			// std::cout << ">" << SAITree.getKmerCoverage()<< "\n" << mergedseq << "\n>" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n";
-			// std::cout << SAITree.getMaxUsedLeaves() << "\t" << SAITree.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
-		// }
     }
 	
 	
@@ -156,8 +153,11 @@ FMIndexWalkResult FMIndexWalkProcess::MergePairedReads(const SequenceWorkItemPai
 	std::string seqFirst = trimRead(seqFirstOriginal, m_params.kmerLength, threshold,m_params.indices);
 	std::string seqSecond = trimRead(seqSecondOriginal, m_params.kmerLength, threshold,m_params.indices);
 
-	if(isSuitableForFMWalk(seqFirst, seqSecond))
-    {
+	if(seqFirst.length()<(size_t)m_params.minOverlap || seqSecond.length()<(size_t)m_params.minOverlap)
+		return result;
+		
+	// if(isSuitableForFMWalk(seqFirst, seqSecond))
+    // {
 		//extract prefix of seqFirst
 		std::string firstKRstr = seqFirst.substr(0, m_params.minOverlap);	
 		//extract suffix of seqSecond
@@ -181,25 +181,18 @@ FMIndexWalkResult FMIndexWalkProcess::MergePairedReads(const SequenceWorkItemPai
 		//Unipath from 1st end but no path from 2nd end
 		if(!mergedseq.empty() && mergedseq2.empty() )
 		{
-			if(SAITree.getMaxUsedLeaves()>1 || SAITree2.getMaxUsedLeaves()>1){
-				// std::cout << ">First"  << "\n" << mergedseq <<  "\n";
-			}else if(mergedseq.length()>maxOverlap){
-				//uniq path
 				result.merge = true ;
 				result.correctSequence = mergedseq ;
 				return result;
-			}
+			
 		//Unipath from 2nd end but no path from 1st end
 		}
 		else if(mergedseq.empty() && !mergedseq2.empty() )
-		{
-			if(SAITree.getMaxUsedLeaves()>1 || SAITree2.getMaxUsedLeaves()>1){
-				// std::cout << ">Second"  << "\n" << mergedseq2 <<  "\n";
-			}else if(mergedseq2.length()>maxOverlap){
-				result.merge = true ;
+		{				
+			result.merge = true ;
 				result.correctSequence = mergedseq2 ;
 				return result;
-			}
+			
 		}
 		else if( !mergedseq.empty() && !mergedseq2.empty() && (mergedseq.length()==mergedseq2.length())  )	//mergedseq.length()-mergedseq2.length()<=3
 		{
@@ -207,24 +200,13 @@ FMIndexWalkResult FMIndexWalkProcess::MergePairedReads(const SequenceWorkItemPai
 				// std::cout << ">" << mergedseq.length() << "\n" << mergedseq << "\n";
 				// getchar();
 			// }
-			if(mergedseq.length()>maxOverlap){
+			// if(mergedseq.length()>maxOverlap){
 				result.merge = true ;
 				result.correctSequence = (SAITree.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq:mergedseq2 ;
 				return result;
-			}
+			// }
 		}
-		else if(!mergedseq.empty() && !mergedseq2.empty() )
-		{
-			// std::cout << "Complex walks\t" << mergedseq.length() << "\t" <<mergedseq2.length() << "\n" ;
-			// std::cout << ">" << SAITree.getMaxUsedLeaves()<< "\n" << mergedseq << "\n";
-			// std::cout << ">" << SAITree2.getMaxUsedLeaves()  << "\n" << mergedseq2 <<  "\n";
-			// getchar();
-		}
-		else	//failure FMwalk
-		{
-			// std::cout << mergedFlag1 << ":" << mergedFlag2 <<"\n";
-		}
-    }//end of length > min overlap
+    // }//end of length > min overlap
 	// else
 		// std::cout << ">First\n" << seqFirstOriginal << "\n>Second\n" << seqSecondOriginal<< "\n";
 	
@@ -232,30 +214,45 @@ FMIndexWalkResult FMIndexWalkProcess::MergePairedReads(const SequenceWorkItemPai
 }
 
 //
-FMIndexWalkResult FMIndexWalkProcess::process(const SequenceWorkItem& workItem)
+FMIndexWalkResult FMIndexWalkProcess::KmerizeReads(const SequenceWorkItem& workItem)
 {
-	FMIndexWalkResult result = correct(workItem);
-	return result;
-}
-
-FMIndexWalkResult FMIndexWalkProcess::correct(const SequenceWorkItem& /*workItem*/)
-{
-	switch(m_params.algorithm)
-	{
-	// case FMW_KMERIZE:
-		// {
-			// return kmerizeLowKmerReadCorrection(workItem);
-			// break;
-		// }
-	default:
-		{
-			assert(false);
-		}
-	}
 	FMIndexWalkResult result;
+
+	//get parameters
+	size_t kmerLength = m_params.kmerLength ;
+	size_t threshold = (size_t)CorrectionThresholds::Instance().getRequiredSupport(0)-1;
+
+	std::string seqFirst  = workItem.read.seq.toString() ;
+	if(seqFirst.length()<kmerLength) return result;
+
+	//Trim head and tail from both ends if there is low-frequency kmer
+	// seqFirst = trimRead(seqFirst, m_params.kmerLength, threshold, m_params.indices);
+	
+	//Compute kmer freq of each kmer
+	KmerContext seqFirstKC(seqFirst, kmerLength, m_params.indices);
+
+	std::vector<std::string> firstKR ;
+	int firstMainIdx=-1;
+
+	if(seqFirst.length()>=(size_t) kmerLength) 
+		firstMainIdx = splitRead( seqFirstKC, firstKR, threshold, m_params.indices);
+
+    /*** write kmernized results***/
+	if (!firstKR.empty()) result.kmerize =true ;
+	
+	for (int i = 0 ; i<(int)firstKR.size() ; i ++ )
+	{
+		std::string kmerRead = firstKR.at(i);
+		// float GCratio =0 ;
+		// if ( isLowComplexity (kmerRead,GCratio) ) continue;
+		// if ( maxCon(kmerRead)*3 > kmerRead.length() ) continue;
+		if (i==firstMainIdx)  result.correctSequence = kmerRead ;
+		else
+			result.kmerizedReads.push_back(kmerRead);
+	}
+	
 	return result;
 }
-
 
 //check necessary conditions for FM-index walk
 bool FMIndexWalkProcess::isSuitableForFMWalk(std::string& seqFirst, std::string& seqSecond)

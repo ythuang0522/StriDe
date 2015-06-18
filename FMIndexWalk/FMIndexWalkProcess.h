@@ -155,8 +155,8 @@ class FMIndexWalkProcess
         FMIndexWalkProcess(const FMIndexWalkParameters params);
         ~FMIndexWalkProcess();
 
-        FMIndexWalkResult process(const SequenceWorkItem& item);
-        FMIndexWalkResult correct(const SequenceWorkItem& item);
+        // FMIndexWalkResult process(const SequenceWorkItem& item);
+        // FMIndexWalkResult correct(const SequenceWorkItem& item);
 
 		FMIndexWalkResult kmerTrimCorrection(const SequenceWorkItem& workItem);
 		FMIndexWalkResult kmerizeLowKmerReadCorrection(const SequenceWorkItem& workItem);
@@ -165,7 +165,6 @@ class FMIndexWalkProcess
 
 		FMIndexWalkResult process(const SequenceWorkItemPair& workItemPair)
 		{
-			// return mergePairEndCorrection(workItemPair);
 			switch(m_params.algorithm)
 			{
 				case FMW_HYBRID:
@@ -180,6 +179,7 @@ class FMIndexWalkProcess
 				}
 				default:
 				{
+						std::cout << "Unsupported algorithm\n";
 						assert(false);
 				}
 			}
@@ -187,8 +187,27 @@ class FMIndexWalkProcess
 			return result;
 		}
 		
+		FMIndexWalkResult process(const SequenceWorkItem& workItem)
+		{
+			switch(m_params.algorithm)
+			{
+				case FMW_KMERIZE:
+				{
+						return KmerizeReads(workItem);
+						break;
+				}
+				default:
+				{
+					std::cout << "Unsupported algorithm\n";
+					assert(false);
+				}
+			}
+			FMIndexWalkResult result;
+			return result;
+		}		
 		FMIndexWalkResult MergeAndKmerize(const SequenceWorkItemPair& workItemPair);
 		FMIndexWalkResult MergePairedReads(const SequenceWorkItemPair& workItemPair);
+		FMIndexWalkResult KmerizeReads(const SequenceWorkItem& workItem);
 
     private:		
 		//check necessary conditions for FM-index walk

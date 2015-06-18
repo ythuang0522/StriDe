@@ -46,8 +46,8 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -p, --prefix=PREFIX              use PREFIX for the names of the index files (default: prefix of the input file)\n"
 "      -o, --outfile=FILE               write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
 "      -t, --threads=NUM                use NUM threads for the computation (default: 1)\n"
-"      -a, --algorithm=STR              specify the walking algorithm. STR must be hybrid (merge and kmerize) or merge. (default: hybrid)\n"
-"\nMerge parameters:\n"
+"      -a, --algorithm=STR              specify the walking algorithm. STR must be hybrid (merge and kmerize), merge, or kmerize. (default: hybrid)\n"
+"\nAlgorithm parameters:\n"
 "      -k, --kmer-size=N                The length of the kmer to use. (default: 31)\n"
 "      -x, --kmer-threshold=N           Attempt to correct kmers that are seen less than N times. (default: 3)\n"
 "      -L, --max-leaves=N               Number of maximum leaves in the search tree (default: 32)\n"
@@ -310,6 +310,8 @@ void parseFMWalkOptions(int argc, char** argv)
             opt::algorithm = FMW_MERGE;
 		else if(algo_str == "hybrid")
             opt::algorithm = FMW_HYBRID;
+		else if(algo_str == "kmerize")
+			opt::algorithm = FMW_KMERIZE;
 		else
         {
             std::cerr << SUBPROGRAM << ": unrecognized -a,--algorithm parameter: " << algo_str << "\n";
