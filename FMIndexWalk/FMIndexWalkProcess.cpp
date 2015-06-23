@@ -308,9 +308,9 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	// if(!mergedseq1.empty() && mergedseq2.empty() && SAITree1.getMaxUsedLeaves()<=1 && SAITree2.getMaxUsedLeaves()<=1)
 	if(!mergedseq1.empty() && mergedseq2.empty())
 	{
-		std::cout << ">" << SAITree1.getKmerCoverage()<< "\n" << mergedseq1 << "\n" ;
-		std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\n";
-		getchar();
+		// std::cout << ">" << SAITree1.getKmerCoverage()<< "\n" << mergedseq1 << "\n" ;
+		// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\n";
+		// getchar();
 		result.merge = true ;
 		result.correctSequence = mergedseq1 ;
 		return result;
@@ -318,9 +318,9 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	// }else if( mergedseq1.empty() && !mergedseq2.empty() && SAITree2.getMaxUsedLeaves()<=1 && SAITree1.getMaxUsedLeaves() <=1)
 	}else if( !mergedseq2.empty() && mergedseq2.empty())
 	{
-		std::cout << ">" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n" ;
-		std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\n";
-		getchar();
+		// std::cout << ">" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n" ;
+		// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\n";
+		// getchar();
 
 		result.merge = true ;
 		result.correctSequence = mergedseq2 ;
@@ -328,9 +328,9 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	}
 	else if( !mergedseq1.empty() && !mergedseq2.empty() && (mergedseq1.length()==mergedseq2.length()) )
 	{
-		std::cout << ">" << SAITree1.getKmerCoverage()<< "\n" << mergedseq1 << "\n>" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n";
-		std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
-		getchar();
+		// std::cout << ">" << SAITree1.getKmerCoverage()<< "\n" << mergedseq1 << "\n>" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n";
+		// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
+		// getchar();
 		result.merge = true ;
 		result.correctSequence = (SAITree1.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq1:mergedseq2 ;
 		return result;
