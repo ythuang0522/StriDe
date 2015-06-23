@@ -139,6 +139,43 @@ SAIntervalTree::SAIntervalTree(const std::string* pQuery,
 	//getchar();
 }
 
+// Class: SAIntervalTree
+SAIntervalTree::SAIntervalTree(const std::string* pQuery,
+                               size_t minOverlap,
+							   size_t maxOverlap,
+                               size_t MaxLength,
+                               size_t MaxLeaves,
+                               BWTIndexSet indices,
+                               size_t SA_threshold,
+                               bool KmerMode) :
+                               m_pQuery(pQuery), m_minOverlap(minOverlap), m_maxOverlap(maxOverlap), m_MaxLength(MaxLength),
+                               m_MaxLeaves(MaxLeaves), m_indices(indices), 
+                               m_min_SA_threshold(SA_threshold),
+                                m_kmerMode(KmerMode), m_maxKmerCoverage(0), m_maxUsedLeaves(0), m_isBubbleCollapsed(false)
+{
+    // Create the root node containing the seed string
+	std::string beginningkmer = pQuery->substr(0, m_minOverlap);
+    m_pRootNode = new SAIntervalNode(&beginningkmer, NULL);
+    m_pRootNode->computeInitial(beginningkmer);   //store initial str of root
+    m_leaves.push_back(m_pRootNode);
+
+    m_currentLength=beginningkmer.length();
+	m_currentKmerSize=m_minOverlap;
+
+	//beginning kmer is a suffix of first read
+    //initialize the beginning kmer SA intervals with kmer length=m_minOverlap
+    m_pRootNode->fwdInterval=BWTAlgorithms::findInterval( m_indices.pRBWT, reverse(beginningkmer));
+    m_pRootNode->rvcInterval=BWTAlgorithms::findInterval( m_indices.pBWT, reverseComplement(beginningkmer));
+
+	//ending kmer is a prefix of second read
+    //initialize the ending SA intervals with kmer length=m_minOverlap
+    std::string endingkmer = pQuery->substr(pQuery->length()-m_minOverlap);
+    m_fwdTerminatedInterval=BWTAlgorithms::findInterval( m_indices.pRBWT, reverse(endingkmer));
+    m_rvcTerminatedInterval=BWTAlgorithms::findInterval( m_indices.pBWT, reverseComplement(endingkmer));
+
+	//std::cout << m_minOverlap << ":" << beginningkmer << ":" << endingkmer << "\n";
+	//getchar();
+}
 //
 SAIntervalTree::~SAIntervalTree()
 {
@@ -154,6 +191,73 @@ int SAIntervalTree::mergeTwoReads(std::string &mergedseq)
     if( isTwoReadsOverlap(mergedseq))
 		return 1;
 
+	//BFS search from 1st to 2nd read via FM-index walk
+    while(!m_leaves.empty() && m_leaves.size() <= m_MaxLeaves && m_currentLength <=m_MaxLength)
+    {
+        // ACGT-extend the leaf nodes via updating existing SA interval
+        extendLeaves();
+				
+		if(m_leaves.size()>m_maxUsedLeaves)	 m_maxUsedLeaves=m_leaves.size();
+		// std::cout << m_currentKmerSize << ":" << m_currentLength << ":" << m_leaves.size() << "\n";	
+
+		//see if terminating string is reached
+		if(isTerminated(results))
+			break;		
+    }
+		
+	//find the path with maximum kmer coverage
+	if( results.size()>0 )
+	{
+		//if multiple paths are bubbles collapsing all together at terminal
+		if(results.size()==m_leaves.size()) 
+		{
+			// std::cout << m_maxUsedLeaves << "\t" << results.size() <<"\n" << results[0].thread << "\n";
+			m_isBubbleCollapsed=true;
+		}
+		std::string tmpseq;
+		for (size_t i = 0 ; i < results.size() ;i++){
+			//bug fix: m_secondread may be shorter than m_minOverlap
+			if(m_secondread.length()>m_minOverlap)
+				tmpseq=results[i].thread+m_secondread.substr(m_minOverlap);
+			else
+				tmpseq=results[i].thread;
+			
+			size_t cov = calculateKmerCoverage (tmpseq, m_minOverlap, m_indices.pBWT);
+			// size_t cov=results[i].SAICoverage;
+			if (  cov > m_maxKmerCoverage )
+			{
+				mergedseq=tmpseq;
+				m_maxKmerCoverage=cov;
+			}			
+		}
+				
+		// std::cout << ">\n" << *m_pQuery << "\n>\n" << reverseComplement(m_secondread);
+		// std::cout << mergedseq.length() << "\t" << m_maxKmerCoverage <<  "\t" << (double)m_maxKmerCoverage/mergedseq.length()  << "\n";
+		return 1;
+    }
+
+	// if(m_leaves.size() > 512){
+		// std::cout << m_leaves.size() << "\t" << m_currentLength<< "\t" << m_currentLength-m_pQuery->length()<< "\n";
+		// printAll();
+		// getchar();
+	// }
+	
+    //Did not reach the terminal kmer
+    if(m_leaves.empty())
+        return -1;	//high error
+    else if(m_currentLength>m_MaxLength)
+        return -2;	//exceed search depth
+    else if(m_leaves.size() > m_MaxLeaves)
+        return -3;	//too much repeats
+	else
+		return -4;
+}
+
+// validate if each kmer in the read is suuported by at least m_minOverlap overlap 
+int SAIntervalTree::validate(std::string &mergedseq)
+{
+    SAIntervalNodeResultVector results;
+	
 	//BFS search from 1st to 2nd read via FM-index walk
     while(!m_leaves.empty() && m_leaves.size() <= m_MaxLeaves && m_currentLength <=m_MaxLength)
     {

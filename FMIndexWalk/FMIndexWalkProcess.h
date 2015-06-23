@@ -25,7 +25,8 @@ enum FMIndexWalkAlgorithm
 {
 	FMW_KMERIZE,
 	FMW_MERGE,
-	FMW_HYBRID
+	FMW_HYBRID,	//merge and kmerize of paired end reads
+	FMW_VALIDATE	////merge and kmerize of single end reads
 };
 
 
@@ -38,28 +39,28 @@ enum NextKmerDir
 // Parameter object for the error corrector
 struct FMIndexWalkParameters
 {
-    FMIndexWalkAlgorithm algorithm;
-    BWTIndexSet indices;
+	FMIndexWalkAlgorithm algorithm;
+	BWTIndexSet indices;
 
-    int numKmerRounds;
-    int kmerLength;
+	int numKmerRounds;
+	int kmerLength;
 
-    // output options
-    bool printOverlaps;
+	// output options
+	bool printOverlaps;
 
 	int maxLeaves;
 	int maxInsertSize;
-    int minOverlap;
+	int minOverlap;
 	int maxOverlap;
 	
-	KmerDistribution	 kd;
+	KmerDistribution kd;
 
 };
 
 
 struct KmerContext
 {
-	public:
+public:
 
 	//empty
 	KmerContext()
@@ -130,118 +131,125 @@ struct KmerContext
 
 class FMIndexWalkResult
 {
-    public:
-        FMIndexWalkResult()
-		: kmerize(false),kmerize2(false),merge(false),merge2(false) {}
+public:
+	FMIndexWalkResult()
+	: kmerize(false),kmerize2(false),merge(false),merge2(false) {}
 
-        DNAString correctSequence;
-		DNAString correctSequence2;
+	DNAString correctSequence;
+	DNAString correctSequence2;
 
-		bool kmerize;
-		bool kmerize2;
-		bool merge;
-		bool merge2;
+	bool kmerize;
+	bool kmerize2;
+	bool merge;
+	bool merge2;
 
-		size_t kmerLength;
-		std::vector<DNAString> kmerizedReads ;
-		std::vector<DNAString> kmerizedReads2 ;
+	size_t kmerLength;
+	std::vector<DNAString> kmerizedReads ;
+	std::vector<DNAString> kmerizedReads2 ;
 
 };
 
 //
 class FMIndexWalkProcess
 {
-    public:
-        FMIndexWalkProcess(const FMIndexWalkParameters params);
-        ~FMIndexWalkProcess();
+public:
+	FMIndexWalkProcess(const FMIndexWalkParameters params);
+	~FMIndexWalkProcess();
 
-        // FMIndexWalkResult process(const SequenceWorkItem& item);
-        // FMIndexWalkResult correct(const SequenceWorkItem& item);
+	// FMIndexWalkResult process(const SequenceWorkItem& item);
+	// FMIndexWalkResult correct(const SequenceWorkItem& item);
 
-		FMIndexWalkResult kmerTrimCorrection(const SequenceWorkItem& workItem);
-		FMIndexWalkResult kmerizeLowKmerReadCorrection(const SequenceWorkItem& workItem);
+	FMIndexWalkResult kmerTrimCorrection(const SequenceWorkItem& workItem);
+	FMIndexWalkResult kmerizeLowKmerReadCorrection(const SequenceWorkItem& workItem);
 
-		/***************************************************************************/
+	/***************************************************************************/
 
-		FMIndexWalkResult process(const SequenceWorkItemPair& workItemPair)
+	FMIndexWalkResult process(const SequenceWorkItemPair& workItemPair)
+	{
+		switch(m_params.algorithm)
 		{
-			switch(m_params.algorithm)
+		case FMW_HYBRID:
 			{
-				case FMW_HYBRID:
-					{
-						return MergeAndKmerize(workItemPair);
-						break;
-					}
-				case FMW_MERGE:
-				{
-					return MergePairedReads(workItemPair);
-					break;
-				}
-				default:
-				{
-						std::cout << "Unsupported algorithm\n";
-						assert(false);
-				}
+				return MergeAndKmerize(workItemPair);
+				break;
 			}
-			FMIndexWalkResult result;
-			return result;
+		case FMW_MERGE:
+			{
+				return MergePairedReads(workItemPair);
+				break;
+			}
+		default:
+			{
+				std::cout << "Unsupported algorithm\n";
+				assert(false);
+			}
 		}
-		
-		FMIndexWalkResult process(const SequenceWorkItem& workItem)
+		FMIndexWalkResult result;
+		return result;
+	}
+	
+	FMIndexWalkResult process(const SequenceWorkItem& workItem)
+	{
+		switch(m_params.algorithm)
 		{
-			switch(m_params.algorithm)
+		case FMW_KMERIZE:
 			{
-				case FMW_KMERIZE:
-				{
-						return KmerizeReads(workItem);
-						break;
-				}
-				default:
-				{
-					std::cout << "Unsupported algorithm\n";
-					assert(false);
-				}
+				return KmerizeReads(workItem);
+				break;
 			}
-			FMIndexWalkResult result;
-			return result;
-		}		
-		FMIndexWalkResult MergeAndKmerize(const SequenceWorkItemPair& workItemPair);
-		FMIndexWalkResult MergePairedReads(const SequenceWorkItemPair& workItemPair);
-		FMIndexWalkResult KmerizeReads(const SequenceWorkItem& workItem);
+		case FMW_VALIDATE:
+			{
+				return ValidateReads(workItem);
+				break;
+			}
 
-    private:		
-		//check necessary conditions for FM-index walk
-		bool isSuitableForFMWalk(std::string& seqFirst, std::string& seqSecond);
-		
-		std::string getReliableInterval(std::string& seq, KmerContext& kc);
+		default:
+			{
+				std::cout << "Unsupported algorithm\n";
+				assert(false);
+			}
+		}
+		FMIndexWalkResult result;
+		return result;
+	}		
+	FMIndexWalkResult MergeAndKmerize(const SequenceWorkItemPair& workItemPair);
+	FMIndexWalkResult MergePairedReads(const SequenceWorkItemPair& workItemPair);
+	FMIndexWalkResult KmerizeReads(const SequenceWorkItem& workItem);
+	FMIndexWalkResult ValidateReads(const SequenceWorkItem& workItem);
 
-		size_t numNextKmer(std::string kmer , NextKmerDir dir ,BWTIndexSet & index, size_t threshold);
-		bool isSimple (std::string Lkmer, std::string Rkmer, BWTIndexSet & index, size_t threshold) ;
+private:		
+	//check necessary conditions for FM-index walk
+	bool isSuitableForFMWalk(std::string& seqFirst, std::string& seqSecond);
+	
+	std::string getReliableInterval(std::string& seq, KmerContext& kc);
 
-		bool existStrongLink (std::string Lkmer,std::string Rkmer,BWTIndexSet & index,size_t threshold) ;
-		bool existNextStrongKmer(std::string kmer , NextKmerDir dir ,BWTIndexSet & index,size_t threshold) ;
-		bool isIntervalExistStrongKmer (std::pair<size_t,size_t> interval,std::vector<size_t> & countQualified);
-		bool isPathReliable(std::pair<size_t,size_t> intervalX, std::pair<size_t,size_t> intervalY,std::vector<size_t> & countQualified);
-		bool isIntervalMerge (std::vector< std::pair<size_t,size_t> > & intervals , std::vector<size_t> & countQualified );
+	size_t numNextKmer(std::string kmer , NextKmerDir dir ,BWTIndexSet & index, size_t threshold);
+	bool isSimple (std::string Lkmer, std::string Rkmer, BWTIndexSet & index, size_t threshold) ;
 
-		//trim dead-end by de Bruijn graph using FM-index
-        std::string trimRead ( std::string readSeq ,size_t kmerLength ,size_t threshold ,BWTIndexSet & index);
-		
-		int splitRead (KmerContext& seq, std::vector<std::string> & kmerReads ,size_t threshold, BWTIndexSet & index);
+	bool existStrongLink (std::string Lkmer,std::string Rkmer,BWTIndexSet & index,size_t threshold) ;
+	bool existNextStrongKmer(std::string kmer , NextKmerDir dir ,BWTIndexSet & index,size_t threshold) ;
+	bool isIntervalExistStrongKmer (std::pair<size_t,size_t> interval,std::vector<size_t> & countQualified);
+	bool isPathReliable(std::pair<size_t,size_t> intervalX, std::pair<size_t,size_t> intervalY,std::vector<size_t> & countQualified);
+	bool isIntervalMerge (std::vector< std::pair<size_t,size_t> > & intervals , std::vector<size_t> & countQualified );
 
-		// bool hasPESupport (std::string r1,std::string r2
-	                     // , BWTIndexSet & index , ReadInfoTable*  pRIT
-						 // , size_t firstK , size_t secondK);
+	//trim dead-end by de Bruijn graph using FM-index
+	std::string trimRead ( std::string readSeq ,size_t kmerLength ,size_t threshold ,BWTIndexSet & index);
+	
+	int splitRead (KmerContext& seq, std::vector<std::string> & kmerReads ,size_t threshold, BWTIndexSet & index);
+
+	// bool hasPESupport (std::string r1,std::string r2
+	// , BWTIndexSet & index , ReadInfoTable*  pRIT
+	// , size_t firstK , size_t secondK);
 
 
-		int getMainSeed (KmerContext seq, std::vector<KmerContext> & kmerReads ,size_t threshold,BWTIndexSet & index);
-		//split read to kmers
-		std::vector<size_t> splitRead( KmerContext seq ,size_t threshold ,BWTIndexSet & index ,size_t singleThreshld =0 );
+	int getMainSeed (KmerContext seq, std::vector<KmerContext> & kmerReads ,size_t threshold,BWTIndexSet & index);
+	//split read to kmers
+	std::vector<size_t> splitRead( KmerContext seq ,size_t threshold ,BWTIndexSet & index ,size_t singleThreshld =0 );
 
-		bool  isLowComplexity (std::string seq , float & GCratio);
-		size_t maxCon (std::string s);
+	bool  isLowComplexity (std::string seq , float & GCratio);
+	size_t maxCon (std::string s);
 
-        FMIndexWalkParameters m_params;
+	FMIndexWalkParameters m_params;
 
 
 
@@ -251,27 +259,27 @@ class FMIndexWalkProcess
 // Write the results from the overlap step to an ASQG file
 class FMIndexWalkPostProcess
 {
-    public:
-        FMIndexWalkPostProcess(std::ostream* pCorrectedWriter,
-                                std::ostream* pDiscardWriter,
-                                const FMIndexWalkParameters params);
+public:
+	FMIndexWalkPostProcess(std::ostream* pCorrectedWriter,
+	std::ostream* pDiscardWriter,
+	const FMIndexWalkParameters params);
 
-        ~FMIndexWalkPostProcess();
+	~FMIndexWalkPostProcess();
 
-        void process(const SequenceWorkItem& item, const FMIndexWalkResult& result);
-		void process(const SequenceWorkItemPair& itemPair, const FMIndexWalkResult& result);
+	void process(const SequenceWorkItem& item, const FMIndexWalkResult& result);
+	void process(const SequenceWorkItemPair& itemPair, const FMIndexWalkResult& result);
 
-    private:
+private:
 
-        std::ostream* m_pCorrectedWriter;
-        std::ostream* m_pDiscardWriter;
-        std::ostream* m_ptmpWriter;
-		FMIndexWalkParameters m_params;
-        // DenseHashSet<std::string,StringHasher> *m_pCachedRead;
+	std::ostream* m_pCorrectedWriter;
+	std::ostream* m_pDiscardWriter;
+	std::ostream* m_ptmpWriter;
+	FMIndexWalkParameters m_params;
+	// DenseHashSet<std::string,StringHasher> *m_pCachedRead;
 
-		size_t m_kmerizePassed ;
-		size_t m_mergePassed ;
-        size_t m_qcFail;
+	size_t m_kmerizePassed ;
+	size_t m_mergePassed ;
+	size_t m_qcFail;
 
 };
 

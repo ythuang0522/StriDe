@@ -105,12 +105,24 @@ class SAIntervalTree
                        std::string secondread,
                        size_t SA_threshold=3,
                        bool KmerMode=false);
+		
+		//for validation purpose
+		SAIntervalTree(const std::string* pQuery,
+                       size_t minOverlap,
+					   size_t maxOverlap,
+                       size_t MaxLength,
+                       size_t MaxLeaves,
+					   BWTIndexSet indices,
+                       size_t SA_threshold=3,
+                       bool KmerMode=false);
 
         ~SAIntervalTree();
 
         //return the merged string
-        //bool mergeTwoReads(StringVector & mergeReads);
         int mergeTwoReads(std::string &mergedseq);
+		
+		// validate if each kmer in the read is suuported by at least m_minOverlap overlap 
+		int validate(std::string &mergedseq);
 		size_t getKmerCoverage(){return m_maxKmerCoverage;};
 		size_t getMaxUsedLeaves(){return m_maxUsedLeaves;};
 		bool isBubbleCollapsed(){return m_isBubbleCollapsed;}
