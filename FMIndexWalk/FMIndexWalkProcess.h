@@ -236,6 +236,7 @@ private:
 	std::string trimRead ( std::string readSeq ,size_t kmerLength ,size_t threshold ,BWTIndexSet & index);
 	
 	int splitRead (KmerContext& seq, std::vector<std::string> & kmerReads ,size_t threshold, BWTIndexSet & index);
+	int splitRepeat (KmerContext& seq, std::vector<std::string> & kmerReads);
 
 	// bool hasPESupport (std::string r1,std::string r2
 	// , BWTIndexSet & index , ReadInfoTable*  pRIT

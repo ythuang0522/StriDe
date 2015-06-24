@@ -41,8 +41,8 @@ FMIndexWalkResult FMIndexWalkProcess::MergeAndKmerize(const SequenceWorkItemPair
 	seqFirst = trimRead(seqFirst, m_params.kmerLength, threshold, m_params.indices);
 	seqSecond = trimRead(seqSecond, m_params.kmerLength, threshold, m_params.indices);
 	
-	if( (seqFirst.length()<(size_t)m_params.minOverlap && seqFirst.length()>=(size_t)kmerLength) || 
-		(seqSecond.length()<(size_t)m_params.minOverlap && seqSecond.length()>=(size_t)kmerLength) )
+	if( (seqFirst.length()<=(size_t)m_params.minOverlap && seqFirst.length()>=(size_t)kmerLength) || 
+		(seqSecond.length()<=(size_t)m_params.minOverlap && seqSecond.length()>=(size_t)kmerLength) )
 		{
 			result.kmerize =true;
 			result.kmerize2 =true;
@@ -50,7 +50,7 @@ FMIndexWalkResult FMIndexWalkProcess::MergeAndKmerize(const SequenceWorkItemPair
 			result.correctSequence2 = seqSecond ;
 			
 		}
-	else if(seqFirst.length()<(size_t)m_params.minOverlap || seqSecond.length()<(size_t)m_params.minOverlap)
+	else if(seqFirst.length()<(size_t)kmerLength || seqSecond.length()<(size_t)kmerLength)
 		return result;
 
 	std::string firstKRstr = seqFirst.substr(0, m_params.minOverlap);
@@ -280,7 +280,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	// seqFirst = trimRead(seqFirst, m_params.kmerLength, threshold, m_params.indices);
 	// seqSecond = trimRead(seqSecond, m_params.kmerLength, threshold, m_params.indices);
 	
-	if(seqFirst.length()<(size_t)m_params.minOverlap)
+	if(seqFirst.length()<=(size_t)m_params.minOverlap)
 	{
 		result.kmerize=true;
 		result.correctSequence = seqFirst ;
@@ -295,60 +295,66 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	//Walk from the 1st end to 2nd end											
 	SAIntervalTree SAITree1(&seqFirst, m_params.minOverlap, maxOverlap, maxSearchDepth, m_params.maxLeaves,
 							m_params.indices);
-	SAITree1.validate(mergedseq1);
+	int flag1 = SAITree1.validate(mergedseq1);
 
 	//Walk from the 2nd end to 1st end using the other strand
 	std::string secondKRstr=reverseComplement(seqFirst);
 	SAIntervalTree SAITree2(&secondKRstr, m_params.minOverlap, maxOverlap, maxSearchDepth, m_params.maxLeaves,
 							m_params.indices);
 
-	SAITree2.validate(mergedseq2);
+	int flag2 = SAITree2.validate(mergedseq2);
 
-	//Only one successful walk from first end, requiring maxUsedLeaves <=1 in order to avoid walking over chimera PE read.
+	// std::cout << ">" << flag1<< "\n" << mergedseq1 << "\n>" << flag2<< "\n" << mergedseq2 << "\n";
+	// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
+	// getchar();
+
+	double diff1=(double)mergedseq1.length()/seqFirst.length();
+	double diff2=(double)mergedseq2.length()/seqFirst.length();
+	bool isDiff1Acceptable = diff1 < 1.05 && diff1 >0.95;
+	bool isDiff2Acceptable = diff2 < 1.05 && diff2 >0.95;
+	
 	// if(!mergedseq1.empty() && mergedseq2.empty() && SAITree1.getMaxUsedLeaves()<=1 && SAITree2.getMaxUsedLeaves()<=1)
-	if(!mergedseq1.empty() && mergedseq2.empty())
+	if(!mergedseq1.empty() && mergedseq2.empty() && isDiff1Acceptable && flag2!=-2)
 	{
-		// std::cout << ">" << SAITree1.getKmerCoverage()<< "\n" << mergedseq1 << "\n" ;
-		// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\n";
-		// getchar();
+		// std::cout << "Case 1: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
 		result.correctSequence = mergedseq1 ;
 		return result;
-		//Only one successful walk from second end
 	// }else if( mergedseq1.empty() && !mergedseq2.empty() && SAITree2.getMaxUsedLeaves()<=1 && SAITree1.getMaxUsedLeaves() <=1)
-	}else if( !mergedseq2.empty() && mergedseq2.empty())
+	}else if( !mergedseq2.empty() && mergedseq1.empty() && isDiff2Acceptable && flag1!=-2)
 	{
-		// std::cout << ">" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n" ;
-		// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\n";
-		// getchar();
-
+		// std::cout << "Case 2: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
 		result.correctSequence = mergedseq2 ;
 		return result;
 	}
-	else if( !mergedseq1.empty() && !mergedseq2.empty() && (mergedseq1.length()==mergedseq2.length()) )
+	else if( !mergedseq1.empty() && !mergedseq2.empty() && (mergedseq1.length()==mergedseq2.length()) 
+			&& isDiff1Acceptable && isDiff2Acceptable)
 	{
-		// std::cout << ">" << SAITree1.getKmerCoverage()<< "\n" << mergedseq1 << "\n>" << SAITree2.getKmerCoverage()<< "\n" << mergedseq2 << "\n";
-		// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
-		// getchar();
 		result.merge = true ;
 		result.correctSequence = (SAITree1.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq1:mergedseq2 ;
 		return result;
 	}
 	
-	// std::cout << ">\n"<< seqFirst << "\n";
-	// getchar();
 	/** Case 3: kmerize the remaining reads **/
+	if(seqFirst.length() < (size_t) kmerLength) return result;
+
+	// if(flag1 != -2 || flag2 !=-2) std::cout << "Unexpected reason: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 	//Compute kmer freq of each kmer
 	KmerContext seqFirstKC(seqFirst, kmerLength, m_params.indices);
 
 	std::vector<std::string> firstKR ;
 	int firstMainIdx=-1;
 
-	if(seqFirst.length()>=(size_t) kmerLength) 
-		firstMainIdx = splitRead( seqFirstKC, firstKR, threshold, m_params.indices);
-	// /***trim and kmerize reads***/
+	// FM walk failed due to error kmers
+	firstMainIdx = splitRead( seqFirstKC, firstKR, threshold, m_params.indices);
 
+	// FM walk failed due to large chimera repeats
+	if(!firstKR.empty() && firstKR.at(firstMainIdx).length() == seqFirst.length())
+	{
+		firstKR.clear();
+		firstMainIdx = splitRepeat( seqFirstKC, firstKR);
+	}	
 	/*** write kmernized results***/
 	if (!firstKR.empty()) result.kmerize =true ;
 	
@@ -583,6 +589,60 @@ int FMIndexWalkProcess::splitRead (KmerContext& seq, std::vector<std::string> & 
 	return mainSeedIdx;
 }
 
+
+//Kmerize the read into subreads at potential error bases
+int FMIndexWalkProcess::splitRepeat (KmerContext& seq, std::vector<std::string> & kmerReads)
+{
+	if (seq.empty()) return -1 ;
+	const size_t RepeatKmerFreq = m_params.kd.getMedian(); 
+
+	std::vector<size_t> countQualified (seq.numKmer,0) ;
+	for (size_t i=0 ;i<seq.numKmer;i++)
+	{
+		// std::cout << i << ": " <<seq.kmerFreqs_same.at(i) << "\t" << seq.kmerFreqs_revc.at(i) << "\n";
+		if (seq.kmerFreqs_same.at(i)> RepeatKmerFreq) countQualified[i]++;
+		if (seq.kmerFreqs_revc.at(i)> RepeatKmerFreq) countQualified[i]++;
+	}
+	
+
+	//Split the reads into intervals
+	std::vector< std::pair<size_t,size_t> > intervals ;
+	size_t start = 0 ;
+	size_t end = seq.numKmer-1 ;
+	for (size_t p = 1; p< seq.numKmer ; p++)
+	{
+		if ( (countQualified[p-1]<2 && countQualified[p]==2) 
+			|| (countQualified[p-1]==2 && countQualified[p]<2) ) 
+		{
+			//kmerize read at pos p if the path is not simple
+			intervals.push_back(std::make_pair (start,p-1));
+			start =p;
+		}
+	}
+		
+	intervals.push_back(std::make_pair (start,end));
+	
+
+	size_t maxIntervalNum = 0;
+	int mainSeedIdx = -1 ;
+	for (size_t i=0;i<intervals.size();i++)
+	{
+		if (isIntervalExistStrongKmer(intervals[i],countQualified))
+		{
+			size_t intervalNum = intervals[i].second - intervals[i].first ;
+			if (maxIntervalNum < intervalNum)
+			{
+				maxIntervalNum = intervalNum;
+				mainSeedIdx = i;
+			}
+		}
+
+		std::string k=seq.readSeq.substr(intervals[i].first, intervals[i].second-intervals[i].first+seq.kmerLength);
+		kmerReads.push_back(k);
+	}
+	
+	return mainSeedIdx;
+}
 
 // bool FMIndexWalkProcess::existStrongLink (std::string Lkmer,std::string Rkmer,BWTIndexSet & index,size_t threshold)
 // {
