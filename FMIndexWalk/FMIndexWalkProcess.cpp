@@ -294,13 +294,13 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	std::string mergedseq1, mergedseq2;
 	//Walk from the 1st end to 2nd end											
 	SAIntervalTree SAITree1(&seqFirst, m_params.minOverlap, maxOverlap, maxSearchDepth, m_params.maxLeaves,
-							m_params.indices);
+							m_params.indices, threshold);
 	int flag1 = SAITree1.validate(mergedseq1);
 
 	//Walk from the 2nd end to 1st end using the other strand
 	std::string secondKRstr=reverseComplement(seqFirst);
 	SAIntervalTree SAITree2(&secondKRstr, m_params.minOverlap, maxOverlap, maxSearchDepth, m_params.maxLeaves,
-							m_params.indices);
+							m_params.indices, threshold);
 
 	int flag2 = SAITree2.validate(mergedseq2);
 
@@ -308,31 +308,40 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
 	// getchar();
 
-	double diff1=(double)mergedseq1.length()/seqFirst.length();
-	double diff2=(double)mergedseq2.length()/seqFirst.length();
-	bool isDiff1Acceptable = diff1 < 1.05 && diff1 >0.95;
-	bool isDiff2Acceptable = diff2 < 1.05 && diff2 >0.95;
+	// double diff1=(double)mergedseq1.length()/seqFirst.length();
+	// double diff2=(double)mergedseq2.length()/seqFirst.length();
+	// bool isDiff1Acceptable = diff1 < 1.1 && diff1 >0.9;
+	// bool isDiff2Acceptable = diff2 < 1.1 && diff2 >0.9;
+	// if( (!isDiff1Acceptable && diff1>0) || (!isDiff2Acceptable && diff2>0))
+	// {
+		// std::cout << diff1 << " " <<diff2 << "\n";
+		// getchar();
+		// std::cout << workItem.read.seq.toString() << "\n";
+		// std::cout << ">" << flag1<< "\n" << mergedseq1 << "\n>" << flag2<< "\n" << mergedseq2 << "\n";
+	// }
 	
-	// if(!mergedseq1.empty() && mergedseq2.empty() && SAITree1.getMaxUsedLeaves()<=1 && SAITree2.getMaxUsedLeaves()<=1)
-	if(!mergedseq1.empty() && mergedseq2.empty() && isDiff1Acceptable && flag2!=-2)
+	// if(!mergedseq1.empty() && mergedseq2.empty() && isDiff1Acceptable && flag2!=-2)
+	if(!mergedseq1.empty() && mergedseq2.empty() && flag2!=-2)
 	{
 		// std::cout << "Case 1: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
-		result.correctSequence = mergedseq1 ;
+		result.correctSequence = workItem.read.seq.toString() ;
 		return result;
-	// }else if( mergedseq1.empty() && !mergedseq2.empty() && SAITree2.getMaxUsedLeaves()<=1 && SAITree1.getMaxUsedLeaves() <=1)
-	}else if( !mergedseq2.empty() && mergedseq1.empty() && isDiff2Acceptable && flag1!=-2)
+
+	// }else if( !mergedseq2.empty() && mergedseq1.empty() && isDiff2Acceptable && flag1!=-2)
+	}
+	else if( !mergedseq2.empty() && mergedseq1.empty() && flag1!=-2)
 	{
 		// std::cout << "Case 2: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
-		result.correctSequence = mergedseq2 ;
+		result.correctSequence = workItem.read.seq.toString() ;
 		return result;
 	}
-	else if( !mergedseq1.empty() && !mergedseq2.empty() && (mergedseq1.length()==mergedseq2.length()) 
-			&& isDiff1Acceptable && isDiff2Acceptable)
+	else if( !mergedseq1.empty() && !mergedseq2.empty() )
 	{
 		result.merge = true ;
-		result.correctSequence = (SAITree1.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq1:mergedseq2 ;
+		// result.correctSequence = (SAITree1.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq1:mergedseq2 ;
+		result.correctSequence = workItem.read.seq.toString() ;
 		return result;
 	}
 	
