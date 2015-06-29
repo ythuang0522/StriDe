@@ -140,13 +140,14 @@ void SGAlgorithms::remodelVertexForExcision(StringGraph* pGraph, Vertex* pVertex
     int minLength = pGraph->getMinOverlap();
     
     EdgeDescOverlapMap addMap = RemovalAlgorithm::computeRequiredOverlaps(pVertex, pDeleteEdge, maxER, minLength);
+
     for(EdgeDescOverlapMap::iterator iter = addMap.begin();
         iter != addMap.end(); ++iter)
     {
-        // std::cout << "Adding edge " << iter->second << " during removal of " << pDeleteEdge->getEndID() << "\n";
-        createEdgesFromOverlap(pGraph, iter->second, false);
+        std::cout << "Adding edge " << iter->second << " during removal of " << pDeleteEdge->getEndID() << "\n";
+        // std::cout << iter->second.match.coord[0] << "\n";
+		createEdgesFromOverlap(pGraph, iter->second, false);
     }
-
     /*
     // Set the contain flags based on newly discovered edges
     updateContainFlags(pGraph, pVertex, containMap);
@@ -179,7 +180,10 @@ void SGAlgorithms::updateContainFlags(StringGraph* pGraph, Vertex* pVertex, cons
 // Calculate the error rate between the two vertices
 double SGAlgorithms::calcErrorRate(const Vertex* pX, const Vertex* pY, const Overlap& ovrXY)
 {
-    int num_diffs = ovrXY.match.countDifferences(pX->getSeq().toString(), pY->getSeq().toString());
+	// The strcmp does not work for indel
+    // int num_diffs = ovrXY.match.countDifferences(pX->getSeq().toString(), pY->getSeq().toString());
+	// Approximate by length diff
+	int num_diffs = std::abs( (int)pX->getSeqLen() - (int)pY->getSeqLen());
     return static_cast<double>(num_diffs) / static_cast<double>(ovrXY.match.getMinOverlapLength());
 }
 
@@ -196,6 +200,7 @@ Overlap SGAlgorithms::inferTransitiveOverlap(const Overlap& ovrXY, const Overlap
     // Infer the match_ij based match_i and match_j
     Match match_xz = Match::infer(match_yx, match_yz);
     match_xz.expand();
+	// assert(!match_xz.isContainment());
 
     // Convert the match to an overlap
     Overlap ovr(ovrXY.id[0], ovrYZ.id[1], match_xz);
