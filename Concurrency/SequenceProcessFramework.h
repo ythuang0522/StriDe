@@ -23,7 +23,7 @@
 namespace SequenceProcessFramework
 {
 
-const size_t BUFFER_SIZE = 1000;
+const size_t BUFFER_SIZE = 500;
 
 // Generic function to process n work items from a file.
 // With the default value of -1, n becomes the largest value representable for
