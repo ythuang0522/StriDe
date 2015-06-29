@@ -87,7 +87,10 @@ struct OverlapBlock
                                           rawRanges(rawI),
                                           overlapLen(ol), 
                                           numDiff(nd),
-                                          flags(af), isEliminated(false) {}
+                                          flags(af), isEliminated(false) 
+										  {
+											numInsertion=numDeletion=0;
+										  }
 
     OverlapBlock(BWTIntervalPair r,
                  BWTIntervalPair rawI,
@@ -95,6 +98,22 @@ struct OverlapBlock
                  int nd, 
                  const AlignFlags& af,
                  const SearchHistoryVector& backHist);
+				 
+	OverlapBlock(BWTIntervalPair r,
+			 BWTIntervalPair rawI,
+			 int ol, 
+			 int nd, 
+			 int ni, 
+			 int ndel, 
+			 const AlignFlags& af):ranges(r), 
+								  rawRanges(rawI),
+								  overlapLen(ol), 
+								  numDiff(nd),
+								  numInsertion(ni),
+								  numDeletion(ndel),
+								  flags(af),
+								  isEliminated(false)
+				{}
 
     // Returns the string that corresponds to this overlap block.
     // This is constructed by transforming the original string using the back
@@ -179,6 +198,8 @@ struct OverlapBlock
 
     int overlapLen;
     int numDiff;
+	int numInsertion;
+	int numDeletion;
 
     AlignFlags flags;
     bool isEliminated;

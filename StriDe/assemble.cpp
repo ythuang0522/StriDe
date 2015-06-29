@@ -349,7 +349,7 @@ int assemble()
 	/*** 3. Join islands/tips with PE support using FM-index walk (depth,leaves,minoverlap)=(150, 2000, 19) ***/
 	SGJoinIslandVisitor sgjiv(100, 4000, opt::kmerLength/2+4, min_size_of_islandtip, &tslv, opt::indices, 3);
 	pGraph->visitProgress(sgjiv);
-	graphTrimAndSmooth (pGraph, opt::maxChimeraLength, false);
+	graphTrimAndSmooth (pGraph, opt::maxChimeraLength);
 
 	std::cout << "\n[Stats] Final graph statistic:\n";
 	pGraph->contigStats();

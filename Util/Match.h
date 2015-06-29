@@ -31,6 +31,8 @@ struct Match
     // Calculate the translation offset from coord[0] to coord[1]
     int calculateTranslation() const;
     int calculateInverseTranslation() const;
+	int calculateInverseTranslationEnd() const;
+	int calculateTranslationEnd() const;
 
     // Translate the SeqCoord c from the frame of coord[0] to coord[1]
     SeqCoord translate(const SeqCoord& c) const;

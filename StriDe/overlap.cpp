@@ -70,10 +70,9 @@ static const char *OVERLAP_USAGE_MESSAGE =
 "      -e, --error-rate                 the maximum error rate allowed to consider two sequences aligned (default: exact matches only)\n"
 "      -m, --min-overlap=LEN            minimum overlap required between two reads (default: 45)\n"
 "      -f, --target-file=FILE           perform the overlap queries against the reads in FILE\n"
-"      -p, --paired-overlap             output only paired overlaps\n"
-"      -x, --exhaustive                 output all overlaps, including transitive edges\n"
-"          --exact                      force the use of the exact-mode irreducible block algorithm. This is faster\n"
-"                                       but requires that no substrings are present in the input set.\n"
+//"      -p, --paired-overlap             output only paired overlaps\n"
+"      -x, --exhaustive                 output all overlaps, including transitive edges (default if e>0)\n"
+"          --exact                      output irreducible overlaps (default if e=0)\n"
 "      -l, --maxindel                   maximum indels allowed during overlap computation\n"
 "      -d, --sample-rate=N              sample the symbol counts every N symbols in the FM-index. Higher values use significantly\n"
 "                                       less memory at the cost of higher runtime. This value must be a power of 2 (default: 128)\n"
@@ -94,8 +93,8 @@ namespace opt
 	static double errorRate = -1.0f;
 	static int maxindel = 0;
 	static unsigned int minOverlap = DEFAULT_MIN_OVERLAP;
-	static int seedLength = 0;
-	static int seedStride = 0;
+	// static int seedLength = 0;
+	// static int seedStride = 0;
 	static int sampleRate = BWT::DEFAULT_SAMPLE_RATE_SMALL;
 	static bool bIrreducibleOnly = true;
 	static bool bExactIrreducible = false;
@@ -193,7 +192,7 @@ int overlapMain(int argc, char** argv)
 	
 	// Activate the inexact overlap algorithm
 	if(opt::errorRate >= 0)
-		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT, opt::errorRate, opt::maxindel);
+		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT, opt::errorRate, opt::maxindel, opt::bIrreducibleOnly);
 	// Activate the exact overlap algorithm
 	else
 		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT);
@@ -383,15 +382,17 @@ void parseOverlapOptions(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	// Validate parameters
-	// if(opt::errorRate <= 0)
-	// opt::errorRate = 0.0f;
+	// turn on/off transitive reduction depending on error rates
+	if(opt::errorRate <= 0)
+		opt::bIrreducibleOnly = true;
+	else
+		opt::bIrreducibleOnly = false;
 	
-	if(opt::seedLength < 0)
-	opt::seedLength = 0;
+	// if(opt::seedLength < 0)
+		// opt::seedLength = 0;
 
-	if(opt::seedLength > 0 && opt::seedStride <= 0)
-	opt::seedStride = opt::seedLength;
+	// if(opt::seedLength > 0 && opt::seedStride <= 0)
+		// opt::seedStride = opt::seedLength;
 	
 	// Parse the input filenames
 	opt::readsFile = argv[optind++];

@@ -152,7 +152,7 @@ struct SGSuperRepeatVisitor
 // Smooth out variation in the graph
 struct SGSmoothingVisitor
 {
-    SGSmoothingVisitor(int maxIndelLength, BWT* pBWT, bool bIsGapPrecent=false) : m_numRemovedTotal(0),
+    SGSmoothingVisitor(int maxIndelLength, BWT* pBWT, bool bIsGapPrecent=true) : m_numRemovedTotal(0),
                                              m_maxIndelLength(maxIndelLength), m_pBWT(pBWT), m_bIsGapPrecent(bIsGapPrecent)
 											 {}
 	~SGSmoothingVisitor(){ 

@@ -34,18 +34,26 @@ class OverlapAlgorithm
 
 	// a wrapper of BWTIntervalPair with additional overlap/error information
 	struct BWTOverlapInfo{
-		BWTOverlapInfo(){
+		BWTOverlapInfo(int localRange=31):m_localRange(localRange){
 			overlapLength=0;
 			mismatch=0;
 			insertion=0;
 			deletion=0;
+
+			// number of local errors
+			m_localErrors=0;
+
+			head=0;
+			tail=localRange-1;
+			memset(m_history,0,sizeof(int)*31);
 		};
+		
 		BWTIntervalPair pair;
 		int overlapLength;
 		int mismatch;
 		int insertion;
 		int deletion;
-		
+					
 		// offset to dignal in banded DP
 		int diagonalOffset;
 		
@@ -55,11 +63,57 @@ class OverlapAlgorithm
 			return (double)(getTotalErrors())/overlapLength;
 			else
 			return 0;
-		}
+		}		
+		
 		int getTotalErrors()
 		{
 			return mismatch+insertion+deletion;
 		}
+		
+		int getLocalRange()
+		{
+			return m_localRange;
+		}
+
+		double getLocalErrorRate()
+		{
+			return (double) m_localErrors/m_localRange;
+		}
+
+		int getLocalErrors()
+		{
+			return m_localErrors;
+		}
+		//update local match or mismatch/indels after a mismatch/indel
+		void updateLocalError(int error)
+		{
+			assert(error >= 0);
+			m_localErrors -= dequeue();
+			m_localErrors += error;
+			enqueue(error);
+		}
+
+		private:
+			int m_localRange;
+			int m_localErrors;
+			
+			
+			//circular queue implementation for storing error history
+			int head;
+			int tail;
+			int m_history[31];
+			void enqueue(int data){
+				m_history[tail] = data;
+				tail = (tail+1)%(m_localRange);
+			}
+			 
+			 
+			int dequeue(){
+				int temp;
+				temp = m_history[head];
+				head = (head+1)%(m_localRange);
+				return temp;
+			}
 	};
 
 public:
@@ -91,7 +145,7 @@ public:
 	// Inexact overlap constructor
 	OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,
 	SuffixArray* pFwdSAI, SuffixArray* pRevSAI,
-	ReadInfoTable* pQueryRIT, ReadInfoTable* pTargetRIT, double errorRate, int maxIndels) : 
+	ReadInfoTable* pQueryRIT, ReadInfoTable* pTargetRIT, double errorRate, int maxIndels, bool bIrreducible=false) : 
 	m_pBWT(pBWT), 
 	m_pRevBWT(pRevBWT),
 	m_pFwdSAI(pFwdSAI),
@@ -100,7 +154,7 @@ public:
 	m_pTargetRIT(pTargetRIT),                                         
 	m_errorRate(errorRate),
 	m_maxIndels(maxIndels),
-	m_bIrreducible(true),
+	m_bIrreducible(bIrreducible),
 	m_exactModeOverlap(false),
 	m_exactModeIrreducible(false)
 	{

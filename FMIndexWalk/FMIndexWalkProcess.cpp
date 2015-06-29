@@ -275,10 +275,6 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	size_t threshold = (size_t)CorrectionThresholds::Instance().getRequiredSupport(0)-1;
 
 	std::string seqFirst  = workItem.read.seq.toString() ;
-
-	//Trim head and tail from both ends if there is low-frequency kmer
-	// seqFirst = trimRead(seqFirst, m_params.kmerLength, threshold, m_params.indices);
-	// seqSecond = trimRead(seqSecond, m_params.kmerLength, threshold, m_params.indices);
 	
 	if(seqFirst.length()<=(size_t)m_params.minOverlap)
 	{
@@ -287,6 +283,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 		return result;
 	}
 
+	// std::cout << ">" << workItem.read.id<< "\n" ;
 	//maxOverlap is limited to 90% of read length which aims to prevent over-greedy search
 	const size_t maxOverlap = m_params.maxOverlap!=-1?m_params.maxOverlap:seqFirst.length()*0.9;
 	const size_t maxSearchDepth = seqFirst.length()*1.1;
@@ -308,8 +305,8 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	// std::cout << SAITree1.getMaxUsedLeaves() << "\t" << SAITree1.isBubbleCollapsed() << "\t" << SAITree2.getMaxUsedLeaves() << "\t" << SAITree2.isBubbleCollapsed()<<"\n";
 	// getchar();
 
-	// double diff1=(double)mergedseq1.length()/seqFirst.length();
-	// double diff2=(double)mergedseq2.length()/seqFirst.length();
+	double diff1=(double)mergedseq1.length()/seqFirst.length();
+	double diff2=(double)mergedseq2.length()/seqFirst.length();
 	// bool isDiff1Acceptable = diff1 < 1.1 && diff1 >0.9;
 	// bool isDiff2Acceptable = diff2 < 1.1 && diff2 >0.9;
 	// if( (!isDiff1Acceptable && diff1>0) || (!isDiff2Acceptable && diff2>0))
@@ -325,7 +322,8 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	{
 		// std::cout << "Case 1: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
-		result.correctSequence = workItem.read.seq.toString() ;
+		result.correctSequence = diff1>=1?mergedseq1 : seqFirst;
+		
 		return result;
 
 	// }else if( !mergedseq2.empty() && mergedseq1.empty() && isDiff2Acceptable && flag1!=-2)
@@ -334,36 +332,42 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	{
 		// std::cout << "Case 2: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
-		result.correctSequence = workItem.read.seq.toString() ;
+		result.correctSequence = diff2>=1?mergedseq2 : seqFirst;
 		return result;
 	}
 	else if( !mergedseq1.empty() && !mergedseq2.empty() )
 	{
 		result.merge = true ;
-		// result.correctSequence = (SAITree1.getKmerCoverage()>SAITree2.getKmerCoverage())? mergedseq1:mergedseq2 ;
-		result.correctSequence = workItem.read.seq.toString() ;
+		if(diff1>=1)
+			result.correctSequence = mergedseq1;
+		else if(diff2>=1)
+			result.correctSequence = mergedseq2;
+		else
+			result.correctSequence = seqFirst;
 		return result;
 	}
 	
 	/** Case 3: kmerize the remaining reads **/
 	if(seqFirst.length() < (size_t) kmerLength) return result;
 
-	// if(flag1 != -2 || flag2 !=-2) std::cout << "Unexpected reason: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 	//Compute kmer freq of each kmer
 	KmerContext seqFirstKC(seqFirst, kmerLength, m_params.indices);
-
 	std::vector<std::string> firstKR ;
 	int firstMainIdx=-1;
 
 	// FM walk failed due to error kmers
 	firstMainIdx = splitRead( seqFirstKC, firstKR, threshold, m_params.indices);
-
+	
+	// No strong interval containing good kmer is found
+	// if(firstMainIdx==-1) return result;
+	
 	// FM walk failed due to large chimera repeats
-	if(!firstKR.empty() && firstKR.at(firstMainIdx).length() == seqFirst.length())
+	if(firstMainIdx>=0 && !firstKR.empty() && firstKR.at(firstMainIdx).length() == seqFirst.length())
 	{
 		firstKR.clear();
 		firstMainIdx = splitRepeat( seqFirstKC, firstKR);
 	}	
+	
 	/*** write kmernized results***/
 	if (!firstKR.empty()) result.kmerize =true ;
 	

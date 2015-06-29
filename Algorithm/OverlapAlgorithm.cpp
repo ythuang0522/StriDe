@@ -52,7 +52,7 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 	OverlapBlockList oblPrefixRev;
 
 	// Match the suffix of seq to prefixes
-	// std::cout << seq << "\n"; 
+	// std::cout << read.id << "\n"; 
 	findOverlapBlocksInexact(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
 	// std::cout << complement(seq) << "\n";
@@ -84,7 +84,8 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 	oblPrefixRev.insert(oblPrefixRev.end(), oblRevContain.begin(), oblRevContain.end());
 
 	
-	// Perform the submaximal filter
+	// Perform the submaximal filter, 
+	// bug: Error in resolveOverlap: Overlap blocks with same length do not the have same coordinates
 	removeSubMaximalBlocks(&oblSuffixFwd, m_pBWT, m_pRevBWT);
 	removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
 	removeSubMaximalBlocks(&oblSuffixRev, m_pRevBWT, m_pBWT);
@@ -109,20 +110,16 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 	pOBOut->splice(pOBOut->end(), oblRevContain);
 
 	// Filter out transitive overlap blocks if requested
-	// if(m_bIrreducible)
-	// {
-	// computeIrreducibleBlocks(m_pBWT, m_pRevBWT, &oblSuffixFwd, pOBOut);
-	// computeIrreducibleBlocks(m_pBWT, m_pRevBWT, &oblPrefixFwd, pOBOut);
-	computeIrreducibleBlocks(m_pBWT, m_pRevBWT, &oblSuffixFwd, pOBOut);
-	computeIrreducibleBlocks(m_pBWT, m_pRevBWT, &oblPrefixFwd, pOBOut);
-
-	// // std::cout << pOBOut->size() << "\n";
-	// }
-	// else
-	// {
-	// pOBOut->splice(pOBOut->end(), oblSuffixFwd);
-	// pOBOut->splice(pOBOut->end(), oblPrefixFwd);
-	// }
+	if(m_bIrreducible)
+	{
+		computeIrreducibleBlocks(m_pBWT, m_pRevBWT, &oblSuffixFwd, pOBOut);
+		computeIrreducibleBlocks(m_pBWT, m_pRevBWT, &oblPrefixFwd, pOBOut);
+	}
+	else
+	{
+		pOBOut->splice(pOBOut->end(), oblSuffixFwd);
+		pOBOut->splice(pOBOut->end(), oblPrefixFwd);
+	}
 
 	return result;
 }
@@ -360,9 +357,10 @@ OverlapResult& result) const
 	return;
 }
 
-// Banded-DP overlap detection using FM-index walk
-// Each walk corresponds to one diagonal line in the banded DP.
+// Simulate Banded-DP overlap detection using FM-index walk
+// Each walk corresponds to one possible DP path in the banded DP.
 // The walks are expanded or reduced wrt error rate
+// The starting and ending overlap regions are required to be highly accurate.
 bool OverlapAlgorithm::findOverlapBlocksInexact(const std::string& w, const BWT* pBWT, 
 const BWT* pRevBWT, const AlignFlags& af, int minOverlap,
 OverlapBlockList* pOverlapList, OverlapBlockList* pContainList, 
@@ -384,19 +382,36 @@ OverlapResult& result) const
 		int overlapLen = l - i;
 
 		assert(BWTOverlapInfoVec.size()>0);
-		std::cout << i << "\t"<< w[i] << "\t" << BWTOverlapInfoVec.size() << "\t" 
-		<< BWTOverlapInfoVec.at(0).pair.interval[0].size() <<"\n";
-		getchar();
+		
+		/*** debugging code ***/
+		// std::cout << i << "\t"<< w[i] << "\t" << BWTOverlapInfoVec.size() << "\t" 
+		// << BWTOverlapInfoVec.at(0).pair.interval[0].size() << "\t"<< overlapLen <<"\n";
+
+		// for(size_t j=0; j<BWTOverlapInfoVec.size(); j++)
+			// std::cout << BWTOverlapInfoVec.at(j).getTotalErrors() << "\t" << BWTOverlapInfoVec.at(j).mismatch
+				// <<"\t" <<BWTOverlapInfoVec.at(j).insertion << "\t"<< BWTOverlapInfoVec.at(j).getLocalErrors() <<"\n";
+		// getchar();
 		
 		// Expand the list of SA intervals if w[i] is error or SNP or indel
 		std::vector<BWTOverlapInfo> BWTExpanedVector;
 		for(size_t idx=0; idx < BWTOverlapInfoVec.size(); idx++)
+		{
+			// The list may grow exponentially 
+			// (1) leaving repeat overlap; 
+			bool isTooManyIntervlas = BWTOverlapInfoVec.size()>128 ;
+			bool isAnyLocalError = BWTOverlapInfoVec.at(idx).getLocalErrors()>0;
+			
+			// (2) false SNP/indels after long overlap leading to false intervals (e.g.,1000*0.05=50)
+			// Prone the list according to the local error rate
+			bool isLocalErrorRateNotAcceptable = BWTOverlapInfoVec.at(idx).getLocalErrors() > (int)m_maxIndels+1;
+
+			if( (isTooManyIntervlas && isAnyLocalError) || isLocalErrorRateNotAcceptable) 
+				continue;
+			
+			//Expand the interval wrt SNP or indel
 			expandOverlapInfoList(BWTOverlapInfoVec.at(idx), BWTExpanedVector, w, i, pBWT);
-		
-		// for(size_t idxx=0; idxx<BWTExpanedVector.size(); idxx++)
-			// std::cout << BWTExpanedVector.at(idxx).mismatch << "\t" << BWTExpanedVector.at(idxx).insertion << "\n";
-		// getchar();
-		
+		}
+				
 		if(BWTExpanedVector.empty())
 			return true;
 		
@@ -409,6 +424,9 @@ OverlapResult& result) const
 			{
 				if(BWTExpanedVector.at(idx).getErrorRate() > m_errorRate) continue;
 				
+				// Require high-accurate ending overlap
+				if(BWTExpanedVector.at(idx).getLocalErrors() > 0) continue;
+				
 				// Calculate which of the prefixes that match w[i, l] are terminal
 				// These are the proper prefixes (they are the start of a read)
 				BWTIntervalPair probe = BWTExpanedVector.at(idx).pair;
@@ -418,10 +436,13 @@ OverlapResult& result) const
 				if(probe.isValid())
 				{
 					assert(probe.interval[1].lower > 0);
-					std::cout << "**\t" << BWTExpanedVector.at(idx).mismatch << "\t"<<
-								BWTExpanedVector.at(idx).insertion << "\t"<< 
-								BWTExpanedVector.at(idx).deletion << "\t"<< overlapLen << "\n";
-					pOverlapList->push_back(OverlapBlock(probe, BWTExpanedVector.at(idx).pair, BWTExpanedVector.at(idx).overlapLength, BWTExpanedVector.at(idx).getTotalErrors(), af));
+					// std::cout << i << ":\t" << BWTExpanedVector.at(idx).mismatch << "\t"<<
+								// BWTExpanedVector.at(idx).insertion << "\t"<< 
+								// BWTExpanedVector.at(idx).deletion << "\t"<< overlapLen << "\n";
+
+					pOverlapList->push_back(OverlapBlock(probe, BWTExpanedVector.at(idx).pair, BWTExpanedVector.at(idx).overlapLength, 
+											BWTExpanedVector.at(idx).getTotalErrors(), BWTExpanedVector.at(idx).insertion, 
+											BWTExpanedVector.at(idx).deletion, af));
 				}				
 			}
 		}
@@ -431,25 +452,30 @@ OverlapResult& result) const
 		BWTExpanedVector.clear();
 	}// end of BWT update using w[i]
 
+	// The overlapLen of insertions are not in the right order.
+	pOverlapList->sort(OverlapBlock::sortSizeDescending);
+	
 	// Determine if this sequence is contained and should not be processed further
 	for(size_t idx=0; idx < BWTOverlapInfoVec.size(); idx++)
 	{
+		// Require high-accurate ending overlap
+		if( (BWTOverlapInfoVec.at(idx).getErrorRate() > m_errorRate ) ||
+			(BWTOverlapInfoVec.at(idx).getLocalErrors() > 0) )
+				continue;
+				
 		//update with other chars and increase the error count
 		for(int idx2 = 0; idx2 < 4; ++idx2)
 		{
 			char b = ALPHABET[idx2];
-			if( (b!=w[0] && (double)(BWTOverlapInfoVec.at(idx).mismatch+1)/w.length()>m_errorRate) ||
-					(b==w[0] && (double)(BWTOverlapInfoVec.at(idx).mismatch)/w.length()>m_errorRate) )
-			continue;
+				
 			// std::cout << b << "\t" << BWTOverlapInfoVec.at(idx).mismatch+1 << "\n";
 			
 			// Get the pre-updated SA interval
-			// BWTAlgorithms::updateBothL(BWTOverlapInfoVec.at(idx).pair, w[0], pBWT);
 			BWTIntervalPair ranges = BWTOverlapInfoVec.at(idx).pair;
 			// Compute new SA intervals using prefix b
 			BWTAlgorithms::updateBothL(ranges, b, pBWT);
 			
-			// Case 1 is indicated by the existance of a non-$ left or right hand extension
+			// Case 1 is indicated by the existence of a non-$ left or right hand extension
 			// In this case we return no alignments for the string
 			AlphaCount64 left_ext = BWTAlgorithms::getExtCount(ranges.interval[0], pBWT);
 			AlphaCount64 right_ext = BWTAlgorithms::getExtCount(ranges.interval[1], pRevBWT);
@@ -490,6 +516,7 @@ void OverlapAlgorithm::initOverlapInfoList(std::vector<BWTOverlapInfo>& BWTOverl
 		overlapinfo.mismatch = (b==w[idx])?0:1;
 		overlapinfo.overlapLength=1;
 		overlapinfo.diagonalOffset=0;
+		overlapinfo.updateLocalError(overlapinfo.mismatch);
 		BWTAlgorithms::initIntervalPair(overlapinfo.pair, b, pBWT, pRevBWT);
 		BWTOverlapInfoVec.push_back(overlapinfo);
 	}
@@ -497,19 +524,19 @@ void OverlapAlgorithm::initOverlapInfoList(std::vector<BWTOverlapInfo>& BWTOverl
 	// Initialize insertion candidates
 	// w: AACCCTTTGGG
 	//       CCTTTG--
-	for(size_t i = 1; i <= m_maxIndels; i++)
-	{
-		BWTOverlapInfo overlapinfo;
-		overlapinfo.insertion=i;
-		overlapinfo.overlapLength=1;
-		overlapinfo.diagonalOffset= -i;
+	// for(size_t i = 1; i <= m_maxIndels; i++)
+	// {
+		// BWTOverlapInfo overlapinfo;
+		// overlapinfo.insertion=i;
+		// overlapinfo.overlapLength=1;
+		// overlapinfo.diagonalOffset= -i;
 
-		// we do not consider expanding mismatches right after indels, which is too rare
-		if(idx>=i){
-			BWTAlgorithms::initIntervalPair(overlapinfo.pair, w[idx+overlapinfo.diagonalOffset], pBWT, pRevBWT);
-			BWTOverlapInfoVec.push_back(overlapinfo);
-		}
-	}
+		// // we do not consider expanding mismatches right after indels, which is too rare
+		// if(idx>=i){
+			// BWTAlgorithms::initIntervalPair(overlapinfo.pair, w[idx+overlapinfo.diagonalOffset], pBWT, pRevBWT);
+			// BWTOverlapInfoVec.push_back(overlapinfo);
+		// }
+	// }
 	
 	// Deletion candidates do not need initialization as the initialization of 1st base has included
 	// w: AACCCTTTGGG--
@@ -535,18 +562,33 @@ void OverlapAlgorithm::expandOverlapInfoList(BWTOverlapInfo& currOverlapInfo, st
 		BWTOverlapInfo newOverlapInfo = currOverlapInfo;
 		newOverlapInfo.overlapLength = currOverlapInfo.overlapLength+1;
 		newOverlapInfo.pair = probe;
+		newOverlapInfo.updateLocalError(0);
 		BWTExpanedVector.push_back(newOverlapInfo);
 		// std::cout << b << "\t" << currInfo.mismatch << "\n";
 		
 		// Don't expand the list if w is a feasible extension for all reads in the list
-		if(probe.interval[0].size()==prevSAISize)
+		int64_t currentSize = probe.interval[0].size();
+		if(currentSize == prevSAISize)
+			return;
+		
+		assert(currentSize < prevSAISize);
+		// Skip if the reduction is due to reaching read ends
+		BWTIntervalPair endingProbe = currOverlapInfo.pair;
+		BWTAlgorithms::updateBothL(endingProbe, '$', pBWT);
+		if(endingProbe.isValid()) 
+			currentSize+=endingProbe.interval[0].size();
+			
+		if(currentSize == prevSAISize)
 			return;
 	}
 
 	// Otherwise, expand the list for mismatches, insertions, and deletions
 	expandOverlapInfoListByMismatch(currOverlapInfo, BWTExpanedVector, w, idx, pBWT);
-	expandOverlapInfoListByInsertion(currOverlapInfo, BWTExpanedVector, w, idx, pBWT);
-	expandOverlapInfoListByDeletion(currOverlapInfo, BWTExpanedVector, w, idx, pBWT);
+	if(currOverlapInfo.insertion < (int)m_maxIndels*2)
+		expandOverlapInfoListByInsertion(currOverlapInfo, BWTExpanedVector, w, idx, pBWT);
+	
+	if(currOverlapInfo.deletion < (int)m_maxIndels*2)
+		expandOverlapInfoListByDeletion(currOverlapInfo, BWTExpanedVector, w, idx, pBWT);
 
 }
 
@@ -558,12 +600,12 @@ void OverlapAlgorithm::expandOverlapInfoListByMismatch(BWTOverlapInfo& currOverl
 {
 	// (1) error rate is acceptable if overlap length is enough
 	// (2) the overlap length is too short to reflect error rate, tolerate one error upto maximum possible length	
-	size_t newMistMatch = currOverlapInfo.getTotalErrors()+1;
-	double newErrorRate = (double)newMistMatch/(currOverlapInfo.overlapLength+1);
+	size_t newTotalErrors = currOverlapInfo.getTotalErrors()+1;
+	double newErrorRate = (double)newTotalErrors/(currOverlapInfo.overlapLength+1);
 	
-	int maxOneErrorLength = m_errorRate>0?(double)1/m_errorRate:1;
-	if( (newErrorRate > m_errorRate && currOverlapInfo.overlapLength+1 >= maxOneErrorLength) || 
-			(newMistMatch > 1 && currOverlapInfo.overlapLength+1 < maxOneErrorLength)) return; 
+	// int maxOneErrorLength = m_errorRate>0?(double)1/m_errorRate:1;
+	if(newErrorRate > m_errorRate && currOverlapInfo.overlapLength+1 >= 31) return;
+	if(newTotalErrors > 1 && currOverlapInfo.overlapLength+1 < 31) return; 
 
 	//update with other chars and increase the error count
 	for(int idx2 = 0; idx2 < 4; ++idx2)
@@ -582,9 +624,10 @@ void OverlapAlgorithm::expandOverlapInfoListByMismatch(BWTOverlapInfo& currOverl
 			// Store the new BWTInterval into BWTExpanedVector
 			BWTOverlapInfo newOverlapInfo = currOverlapInfo;
 			// increase the error count
-			newOverlapInfo.mismatch = newMistMatch;
+			newOverlapInfo.mismatch = currOverlapInfo.mismatch+1;
 			newOverlapInfo.overlapLength = currOverlapInfo.overlapLength+1;
 			newOverlapInfo.pair = probe;
+			newOverlapInfo.updateLocalError(1);
 			BWTExpanedVector.push_back(newOverlapInfo);
 			// std::cout << b << "\t" << currInfo.mismatch << "\n";
 		}
@@ -596,15 +639,20 @@ void OverlapAlgorithm::expandOverlapInfoListByMismatch(BWTOverlapInfo& currOverl
 //       CCTTTT-G
 //       CCTTTTG- duplicate?
 // Expand the list for insertions upto m_maxIndels
+// False indels will generate false intervals with lots of mismatches after long overlap
+// This should be avoided by checking local errors after each gap
 void OverlapAlgorithm::expandOverlapInfoListByInsertion(BWTOverlapInfo& currOverlapInfo, std::vector<BWTOverlapInfo>& BWTExpanedVector, const std::string& w, size_t idx, const BWT* pBWT) const
 {
 	for(size_t idx3=1; idx3<=m_maxIndels; idx3++)
 	{
-		size_t newMistMatch = currOverlapInfo.getTotalErrors()+idx3;
-		double newErrorRate = (double)newMistMatch/(currOverlapInfo.overlapLength+idx3);
-		if( (newErrorRate > m_errorRate && currOverlapInfo.overlapLength+idx3 >= 50) || 
-				(newMistMatch > 1 && currOverlapInfo.overlapLength+idx3 < 50)) return; 
-
+		size_t newTotalErrors = currOverlapInfo.getTotalErrors()+idx3;
+		double newErrorRate = (double)newTotalErrors/(currOverlapInfo.overlapLength+idx3);
+		// double newLocalErrorRate = (double)(currOverlapInfo.getLocalErrors()+idx3)/currOverlapInfo.overlapLength+idx3;
+	
+		if( newErrorRate > m_errorRate && currOverlapInfo.overlapLength+idx3 >= 31) return;
+		if( newTotalErrors > 1 && currOverlapInfo.overlapLength+idx3 < 31) return; 
+		// if( newLocalErrorRate > 0.5) return;
+		
 		// Get the pre-updated SA interval
 		BWTIntervalPair probe = currOverlapInfo.pair;
 		// Compute new SA intervals using prefix 
@@ -617,15 +665,16 @@ void OverlapAlgorithm::expandOverlapInfoListByInsertion(BWTOverlapInfo& currOver
 		
 		if(probe.isValid())
 		{
-			std::cout << w[(int)idx + currOverlapInfo.diagonalOffset-idx3] << "\n";
+			// std::cout << w[(int)idx + currOverlapInfo.diagonalOffset-idx3] << "\t" << m_maxIndels <<"\n";
 
 			// Successful extension using b
 			// Store the new BWTInterval into BWTExpanedVector
 			BWTOverlapInfo newOverlapInfo = currOverlapInfo;
-			newOverlapInfo.insertion += idx3;
-			newOverlapInfo.diagonalOffset -= idx3;
-			newOverlapInfo.overlapLength += idx3;
+			newOverlapInfo.insertion = currOverlapInfo.insertion+idx3;
+			newOverlapInfo.diagonalOffset = currOverlapInfo.diagonalOffset-idx3;
+			newOverlapInfo.overlapLength = currOverlapInfo.overlapLength+idx3;
 			newOverlapInfo.pair = probe;
+			newOverlapInfo.updateLocalError(idx3);
 			BWTExpanedVector.push_back(newOverlapInfo);
 		}
 	}
@@ -634,6 +683,9 @@ void OverlapAlgorithm::expandOverlapInfoListByInsertion(BWTOverlapInfo& currOver
 // Expand OverlapInfoList wrt w with deletions
 // w: AACCCTTC--A
 //       CCTTCTGA
+// False indels will generate false intervals with lots of mismatches after long overlap
+// This should be avoided by checking local errors
+
 void OverlapAlgorithm::expandOverlapInfoListByDeletion(BWTOverlapInfo& currOverlapInfo, std::vector<BWTOverlapInfo>& BWTExpanedVector, const std::string& w, size_t idx, const BWT* pBWT) const
 {
 	// Recursively expand the interval list for deletions
@@ -660,11 +712,14 @@ void OverlapAlgorithm::expandOverlapInfoListByDeletion(BWTOverlapInfo& currOverl
 			for(int idx3 = 0; idx3 < 4; ++idx3)
 			{
 				char b = ALPHABET[idx3];				
-				size_t newMistMatch = tmpOverlapInfo.getTotalErrors()+idx1;
-				double newErrorRate = (double)newMistMatch/(tmpOverlapInfo.overlapLength);
-				if( (newErrorRate > m_errorRate && tmpOverlapInfo.overlapLength+1 >= 50) || 
-						(newMistMatch > 1 && tmpOverlapInfo.overlapLength+1 < 50)) break; 
-
+				size_t newTotalErrors = tmpOverlapInfo.getTotalErrors()+idx1;
+				double newErrorRate = (double)newTotalErrors/(tmpOverlapInfo.overlapLength);
+				// double newLocalErrorRate = (double)(tmpOverlapInfo.getLocalErrors()+idx1)/tmpOverlapInfo.overlapLength;
+	
+				if(newErrorRate > m_errorRate && tmpOverlapInfo.overlapLength+1 >= 31) break;
+				if(newTotalErrors > 1 && tmpOverlapInfo.overlapLength+1 < 31) break; 
+				// if(newLocalErrorRate > 0.5) break;
+		
 				// Get the pre-updated SA interval
 				BWTIntervalPair probe = tmpOverlapInfo.pair;
 				// Compute new SA intervals using prefix b
@@ -679,6 +734,7 @@ void OverlapAlgorithm::expandOverlapInfoListByDeletion(BWTOverlapInfo& currOverl
 					newOverlapInfo.deletion = currOverlapInfo.deletion+1;
 					newOverlapInfo.overlapLength = tmpOverlapInfo.overlapLength;
 					newOverlapInfo.pair = probe;
+					newOverlapInfo.updateLocalError(1);
 					BWTDeletionTmpVector.push_back(newOverlapInfo);
 				}
 			}
@@ -703,6 +759,7 @@ void OverlapAlgorithm::expandOverlapInfoListByDeletion(BWTOverlapInfo& currOverl
 					BWTOverlapInfo newOverlapInfo=validateOverlapInfo;
 					newOverlapInfo.overlapLength = validateOverlapInfo.overlapLength+1;
 					newOverlapInfo.pair = probe;
+					// newOverlapInfo.updateLocalError(0);
 					BWTExpanedVector.push_back(newOverlapInfo);
 				}
 				else

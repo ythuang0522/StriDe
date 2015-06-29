@@ -21,6 +21,8 @@ struct SeqCoord
     SeqCoord() : seqlen(0) { setEmpty(); }
     SeqCoord(int s, int e, int l) : interval(s, e), seqlen(l) 
     { 
+		// if(!isValid())
+			// std::cout << s << "\t" << e << "\t" << l << "\n";
         assert(isValid()); 
     }
 
@@ -99,6 +101,8 @@ struct SeqCoord
         int tmp = seqlen - interval.start - 1;
         interval.start = seqlen - interval.end - 1;
         interval.end = tmp;
+		if(interval.start > interval.end)
+			std::cout << interval.start << "\t" << interval.end << "\t" << seqlen;
         assert(interval.start <= interval.end);
     }
 

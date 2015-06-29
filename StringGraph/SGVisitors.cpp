@@ -207,6 +207,7 @@ bool SGContainRemoveVisitor::visit(StringGraph* pGraph, Vertex* pVertex)
 		
 	// Add any new irreducible edges that exist when pToRemove is deleted
 	// from the graph
+	// std::cout << pVertex->getID() << "\n";
 	EdgePtrVec neighborEdges = pVertex->getEdges();
 
 	// std::cout << pGraph->hasTransitive() << pGraph->isExactMode();

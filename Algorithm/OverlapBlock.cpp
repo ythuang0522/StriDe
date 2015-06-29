@@ -126,9 +126,17 @@ Overlap OverlapBlock::toOverlap(const std::string queryID, const std::string tar
     int s1 = queryLen - overlapLen;
     int e1 = s1 + overlapLen - 1;
     SeqCoord sc1(s1, e1, queryLen);
-
-    int s2 = 0; // The start of the second hit must be zero by definition of a prefix/suffix match
-    int e2 = s2 + overlapLen - 1;
+	
+    // int s2 = 0; // The start of the second hit must be zero by definition of a prefix/suffix match
+    // int e2 = s2 + overlapLen - 1;
+    // SeqCoord sc2(s2, e2, targetLen);
+	
+	// The start of the second hit must be zero by definition of a prefix/suffix match
+	int s2 = 0; 
+	// deletion insertion
+	// AT--CC   GGAATT
+	//  TAACCC   G--TTA
+    int e2 = s2 + overlapLen - 1 - numInsertion + numDeletion;	
     SeqCoord sc2(s2, e2, targetLen);
 
     // The coordinates are always with respect to the read, so flip them if
@@ -143,6 +151,7 @@ Overlap OverlapBlock::toOverlap(const std::string queryID, const std::string tar
     }
     bool isRC = flags.isReverseComplement();
 
+	assert(sc1.isExtreme() && sc2.isExtreme());
     Overlap o(queryID, sc1, targetID, sc2, isRC, numDiff);
     return o;
 }
@@ -243,15 +252,16 @@ OverlapBlockList resolveOverlap(const OverlapBlock& A, const OverlapBlock& B, co
             outList.push_back(A);
             return outList;
         }
-        else
-        {
-            std::cerr << "Error in resolveOverlap: Overlap blocks with same length do not "
-            "the have same coordinates\n";
-            assert(false);
-        }    
+		// indels do not satisfy this condition
+        // else
+        // {
+            // std::cerr << "Error in resolveOverlap: Overlap blocks with same length do not "
+            // "the have same coordinates\n";
+            // assert(false);
+        // }    
     }
     // A and B must have different overlap lengths
-    assert(A.overlapLen != B.overlapLen);
+    // assert(A.overlapLen != B.overlapLen);
 
     // Determine which of A and B have a higher overlap
     const OverlapBlock* pHigher;
