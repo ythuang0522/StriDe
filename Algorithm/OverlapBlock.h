@@ -222,7 +222,8 @@ void printBlockList(const OverlapBlockList* pList);
 void removeSubMaximalBlocks(OverlapBlockList* pList, const BWT* pBWT, const BWT* pRevBWT);
 
 // Given the overlapping blocks A and B, construct a list of blocks where the index ranges do not intersect
-OverlapBlockList resolveOverlap(const OverlapBlock& A, const OverlapBlock& B, const BWT* pBWT, const BWT* pRevBWT);
+// OverlapBlockList resolveOverlap(const OverlapBlock& A, const OverlapBlock& B, const BWT* pBWT, const BWT* pRevBWT);
+OverlapBlockList resolveOverlap(OverlapBlock& A, OverlapBlock& B);
 
 // Partition the overlap block list into two lists, 
 // one for the containment overlaps and one for the proper overlaps

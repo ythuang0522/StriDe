@@ -34,7 +34,8 @@ class OverlapAlgorithm
 
 	// a wrapper of BWTIntervalPair with additional overlap/error information
 	struct BWTOverlapInfo{
-		BWTOverlapInfo(int localRange=31):m_localRange(localRange){
+		#define m_localRange 11
+		BWTOverlapInfo(){
 			overlapLength=0;
 			mismatch=0;
 			insertion=0;
@@ -44,8 +45,9 @@ class OverlapAlgorithm
 			m_localErrors=0;
 
 			head=0;
-			tail=localRange-1;
-			memset(m_history,0,sizeof(int)*31);
+			tail=m_localRange-1;
+			memset(m_history,0,sizeof(int)*m_localRange);
+			m_localDeletion=m_localInsertion=m_lastInsertion=0;
 		};
 		
 		BWTIntervalPair pair;
@@ -85,23 +87,80 @@ class OverlapAlgorithm
 			return m_localErrors;
 		}
 		//update local match or mismatch/indels after a mismatch/indel
+		// void updateLocalError(int error)
+		// {
+			// assert(error >= 0);
+			// m_localErrors -= dequeue();
+			// m_localErrors += error;
+			// enqueue(error);
+		// }
+
 		void updateLocalError(int error)
 		{
 			assert(error >= 0);
-			m_localErrors -= dequeue();
-			m_localErrors += error;
+			int pop=dequeue();
+			if(pop==2)
+				m_localInsertion--;
+			else if(pop==3)
+				m_localDeletion--;
+			
+			m_localErrors -= pop>0?1:0;
+			m_localErrors+=error;
 			enqueue(error);
 		}
 
+		void updateLocalInsertion(int error)
+		{
+			assert(error >= 0);
+			int pop=dequeue();
+			if(pop==2)
+				m_localInsertion--;
+			else if(pop==3)
+				m_localDeletion--;
+			m_localErrors -= pop>0?1:0;
+			m_localErrors++;
+			m_localInsertion++;
+			m_lastInsertion=error;
+			enqueue(2);
+		}
+		
+		void updateLocalDeletion(int error)
+		{
+			assert(error >= 0);
+			int pop=dequeue();
+			if(pop==2)
+				m_localInsertion--;
+			else if(pop==3)
+				m_localDeletion--;
+
+			m_localErrors -= pop>0?1:0;
+			m_localErrors++;
+			m_localDeletion++;
+			enqueue(3);
+		}
+		
+		inline bool isLocalIndel()
+		{
+			return m_localDeletion>0 || m_localInsertion>0;
+		}
+
+		inline int getLastInsertion()
+		{
+			return m_lastInsertion;
+		}
+		
 		private:
-			int m_localRange;
+			// int m_localRange;
 			int m_localErrors;
+			int m_localInsertion;
+			int m_localDeletion;
+			int m_lastInsertion;
 			
 			
 			//circular queue implementation for storing error history
 			int head;
 			int tail;
-			int m_history[31];
+			int m_history[m_localRange];
 			void enqueue(int data){
 				m_history[tail] = data;
 				tail = (tail+1)%(m_localRange);
@@ -254,8 +313,12 @@ private:
 	void expandOverlapInfoListByDeletion(BWTOverlapInfo& currOverlapInfo, std::vector<BWTOverlapInfo>& BWTExpanedVector, const std::string& w, size_t idx, const BWT* pBWT) const;
 
 	// Calculate the terminal extension for the contained blocks to make the intervals consistent
-	void terminateContainedBlocks(OverlapBlockList& containedBlocks) const;
+	void terminateContainedBlocks(const std::string& w, const AlignFlags& af, BWTOverlapInfo& currentOverlap, const BWT* pBWT,
+							const BWT* pRevBWT, OverlapBlockList* pContainList, OverlapResult& result) const;
 
+	// Calculate the terminal extension for any overlap block
+	void terminateOverlapBlocks(const AlignFlags& af, BWTOverlapInfo& currentOverlap, const BWT* pBWT, OverlapBlockList* pOverlapList) const;
+							
 	//                    
 	// Irreducible-only processing algorithms
 	//

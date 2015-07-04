@@ -338,6 +338,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	else if( !mergedseq1.empty() && !mergedseq2.empty() )
 	{
 		result.merge = true ;
+		// the longer seq is often the correct one, possibly due to repeat collapse during FM-index walk
 		if(diff1>=1)
 			result.correctSequence = mergedseq1;
 		else if(diff2>=1)
@@ -348,7 +349,8 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	}
 	
 	/** Case 3: kmerize the remaining reads **/
-	if(seqFirst.length() < (size_t) kmerLength) return result;
+	assert(seqFirst.length() >= (size_t) kmerLength);
+	// if(seqFirst.length() < (size_t) kmerLength) return result;
 
 	//Compute kmer freq of each kmer
 	KmerContext seqFirstKC(seqFirst, kmerLength, m_params.indices);
@@ -607,6 +609,7 @@ int FMIndexWalkProcess::splitRead (KmerContext& seq, std::vector<std::string> & 
 int FMIndexWalkProcess::splitRepeat (KmerContext& seq, std::vector<std::string> & kmerReads)
 {
 	if (seq.empty()) return -1 ;
+	//getMedian returns sum of forward and reverse kmers
 	const size_t RepeatKmerFreq = m_params.kd.getMedian(); 
 
 	std::vector<size_t> countQualified (seq.numKmer,0) ;
@@ -624,6 +627,7 @@ int FMIndexWalkProcess::splitRepeat (KmerContext& seq, std::vector<std::string> 
 	size_t end = seq.numKmer-1 ;
 	for (size_t p = 1; p< seq.numKmer ; p++)
 	{
+		// split if p-1 is not repeat and p is repeat or vice versa
 		if ( (countQualified[p-1]<2 && countQualified[p]==2) 
 			|| (countQualified[p-1]==2 && countQualified[p]<2) ) 
 		{

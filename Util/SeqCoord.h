@@ -21,8 +21,8 @@ struct SeqCoord
     SeqCoord() : seqlen(0) { setEmpty(); }
     SeqCoord(int s, int e, int l) : interval(s, e), seqlen(l) 
     { 
-		// if(!isValid())
-			// std::cout << s << "\t" << e << "\t" << l << "\n";
+		if(!isValid())
+			std::cout << s << "\t" << e << "\t" << l << "\n";
         assert(isValid()); 
     }
 

@@ -208,7 +208,11 @@ int overlapMain(int argc, char** argv)
 		outPrefix.append(stripFilename(opt::targetFile));
 	}
 	
-	time_t now = time(NULL);	
+	time_t now = time(NULL);
+	std::cout << "StriDe overlap computation using min ovlerap: " << opt::minOverlap << "\n"
+				<< "Error Rate: " << opt::errorRate << "\n" 
+				<< "Max Indel: " << opt::maxindel << "\n"
+				<< "Transitive reduction: " << opt::bIrreducibleOnly << "\n";
 	std::cout << "\n# start time of overlapping: " << asctime(localtime(&now))<<std::endl;
 	
 	if(opt::numThreads <= 1)

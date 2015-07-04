@@ -57,6 +57,7 @@ OverlapResult OverlapProcess::process(const SequenceWorkItem& workItem)
             // Skip self alignments and non-canonical (where the query read has a lexo. higher name)
             if(queryInfo.id != targetInfo.id)
             {    
+				// std::cout << "##" << queryInfo.id << "\t" << targetInfo.id << "\n";
                 Overlap o = record.toOverlap(queryInfo.id, targetInfo.id, queryInfo.length, targetInfo.length);
 
 				//Don't push edges of target of super repeat vertices and small overlap
