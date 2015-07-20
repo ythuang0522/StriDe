@@ -39,4 +39,5 @@ stride_SOURCES = StriDe.cpp \
 		kmerfreq.h kmerfreq.cpp \
 		grep.h grep.cpp \
 		FMIndexWalk.h FMIndexWalk.cpp \
+		asmlong.h asmlong.cpp \
               SGACommon.h 

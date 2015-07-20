@@ -1,10 +1,10 @@
 //-----------------------------------------------
-// Copyright 2009 Wellcome Trust Sanger Institute
-// Written by Jared Simpson (js18@sanger.ac.uk)
+// Copyright 2015 National Chung Cheng University
+// Written by Yao-Ting Huang
 // Released under the GPL
 //-----------------------------------------------
 //
-// sga - Main assembler driver program
+// StriDe - Main driver program
 //
 #include <string>
 #include <iostream>
@@ -21,6 +21,7 @@
 #include "grep.h"
 #include "FMIndexWalk.h"
 #include "strideall.h"
+#include "asmlong.h"
 
 #define PROGRAM_BIN "stride"
 #define AUTHOR "Yao-Ting Huang"
@@ -46,6 +47,7 @@ static const char *STRIDE_USAGE_MESSAGE =
 "      filter      remove redundant reads from a data set\n"
 "      overlap     compute overlaps between reads\n"
 "      assemble    generate contigs from an assembly graph\n"
+"      asmlong     generate contigs from an assembly graph for long reads\n"
 "\nOther Commands:\n"
 "      merge	merge multiple BWT/FM-index files into a single index\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
@@ -97,6 +99,8 @@ int main(int argc, char** argv)
             grepMain(argc - 1, argv + 1);
         else if(command == "fmwalk")
             FMindexWalkMain(argc - 1, argv + 1);
+        else if(command == "asmlong")
+            asmlongMain(argc - 1, argv + 1);
 
         else
         {
