@@ -278,9 +278,18 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	
 	if(seqFirst.length()<=(size_t)m_params.minOverlap)
 	{
-		result.kmerize=true;
-		result.correctSequence = seqFirst ;
-		return result;
+		float GCratio;
+		if(!isLowComplexity(seqFirst, GCratio))
+		{
+			result.kmerize=true;
+			result.correctSequence = seqFirst ;
+			return result;
+		}
+		else
+		{
+			result.correctSequence = seqFirst ;
+			return result;
+		}
 	}
 
 	// std::cout << ">" << workItem.read.id<< "\n" ;
@@ -307,21 +316,13 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 
 	double diff1=(double)mergedseq1.length()/seqFirst.length();
 	double diff2=(double)mergedseq2.length()/seqFirst.length();
-	// bool isDiff1Acceptable = diff1 < 1.1 && diff1 >0.9;
-	// bool isDiff2Acceptable = diff2 < 1.1 && diff2 >0.9;
-	// if( (!isDiff1Acceptable && diff1>0) || (!isDiff2Acceptable && diff2>0))
-	// {
-		// std::cout << diff1 << " " <<diff2 << "\n";
-		// getchar();
-		// std::cout << workItem.read.seq.toString() << "\n";
-		// std::cout << ">" << flag1<< "\n" << mergedseq1 << "\n>" << flag2<< "\n" << mergedseq2 << "\n";
-	// }
 	
 	// if(!mergedseq1.empty() && mergedseq2.empty() && isDiff1Acceptable && flag2!=-2)
 	if(!mergedseq1.empty() && mergedseq2.empty() && flag2!=-2)
 	{
 		// std::cout << "Case 1: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
+		// the longer seq is often the correct one, possibly due to repeat collapse during FM-index walk
 		result.correctSequence = diff1>=1?mergedseq1 : seqFirst;
 		
 		return result;
@@ -332,6 +333,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	{
 		// std::cout << "Case 2: " << flag1 << "\t"<< flag2 << "\t"<< diff1 << "\t" << diff2 <<"\n";
 		result.merge = true ;
+		// the longer seq is often the correct one, possibly due to repeat collapse during FM-index walk
 		result.correctSequence = diff2>=1?mergedseq2 : seqFirst;
 		return result;
 	}
@@ -350,25 +352,23 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	
 	/** Case 3: kmerize the remaining reads **/
 	assert(seqFirst.length() >= (size_t) kmerLength);
-	// if(seqFirst.length() < (size_t) kmerLength) return result;
 
 	//Compute kmer freq of each kmer
-	KmerContext seqFirstKC(seqFirst, kmerLength, m_params.indices);
+	// KmerContext seqFirstKC(seqFirst, kmerLength, m_params.indices);
 	std::vector<std::string> firstKR ;
 	int firstMainIdx=-1;
 
 	// FM walk failed due to error kmers
-	firstMainIdx = splitRead( seqFirstKC, firstKR, threshold, m_params.indices);
+	// firstMainIdx = splitRead( seqFirstKC, firstKR, threshold, m_params.indices);
 	
-	// No strong interval containing good kmer is found
-	// if(firstMainIdx==-1) return result;
-	
-	// FM walk failed due to large chimera repeats
-	if(firstMainIdx>=0 && !firstKR.empty() && firstKR.at(firstMainIdx).length() == seqFirst.length())
-	{
-		firstKR.clear();
-		firstMainIdx = splitRepeat( seqFirstKC, firstKR);
-	}	
+	// If FM walk failed due to large chimera repeats, the read may not be splitted
+	// if(firstMainIdx>=0 && !firstKR.empty() && firstKR.at(firstMainIdx).length() == seqFirst.length())
+	// {
+		// firstKR.clear();
+		// firstMainIdx = splitRepeat( seqFirstKC, firstKR);
+	// }	
+
+	firstMainIdx = splitRead( seqFirst, firstKR, threshold, m_params.indices);
 	
 	/*** write kmernized results***/
 	if (!firstKR.empty()) result.kmerize =true ;
@@ -376,6 +376,9 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	for (int i = 0 ; i<(int)firstKR.size() ; i ++ )
 	{
 		std::string kmerRead = firstKR.at(i);
+		float GCratio =0 ;
+		if ( isLowComplexity (kmerRead,GCratio) ) continue;
+		
 		if (i==firstMainIdx)  
 			result.correctSequence = kmerRead ;
 		else
@@ -547,7 +550,7 @@ bool FMIndexWalkProcess::isIntervalMerge (std::vector< std::pair<size_t,size_t> 
 }
 
 
-//Kmerize the read into subreads at potential error bases
+// Split the read into subreads at potential error bases
 int FMIndexWalkProcess::splitRead (KmerContext& seq, std::vector<std::string> & kmerReads, size_t threshold, BWTIndexSet & index)
 {
 	if (seq.empty()) return -1 ;
@@ -598,6 +601,119 @@ int FMIndexWalkProcess::splitRead (KmerContext& seq, std::vector<std::string> & 
 		}
 
 		std::string k=seq.readSeq.substr(intervals[i].first, intervals[i].second-intervals[i].first+seq.kmerLength);
+		kmerReads.push_back(k);
+	}
+	
+	return mainSeedIdx;
+}
+
+// Faster kmerize algorithm using BWT Intervals
+// Kmerize the read into subreads at potential error bases
+int FMIndexWalkProcess::splitRead (std::string& seq, std::vector<std::string> & kmerReads, size_t threshold, BWTIndexSet & index)
+{
+	if ((int)seq.length()<m_params.kmerLength) return -1 ;
+
+	std::vector<size_t> countQualified (seq.length()-m_params.kmerLength+1,0);
+	std::string startingKmer=seq.substr(0,m_params.kmerLength);
+	BWTInterval fwdInterval = BWTAlgorithms::findInterval(index.pRBWT, reverse(startingKmer));
+	BWTInterval rvcInterval = BWTAlgorithms::findInterval(index.pBWT, reverseComplement(startingKmer));
+	
+	size_t currKmerSize=m_params.kmerLength;
+	size_t currKmerFreq=0;
+	currKmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
+	currKmerFreq += rvcInterval.isValid()?rvcInterval.size():0;
+
+	for (size_t i=0 ;i<=seq.length()-m_params.kmerLength;i++)
+	{
+		if(currKmerFreq >= threshold)
+		{
+			countQualified[i]++;
+			
+			if(i<seq.length()-m_params.kmerLength)
+			{
+				char b = seq.at(i+m_params.kmerLength);
+				if(fwdInterval.isValid())
+					BWTAlgorithms::updateInterval(fwdInterval, b, index.pRBWT);
+					
+				if(rvcInterval.isValid())
+					BWTAlgorithms::updateInterval(rvcInterval, complement(b), index.pBWT);
+
+				currKmerSize++;
+				currKmerFreq = 0;
+				currKmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
+				currKmerFreq += rvcInterval.isValid()?rvcInterval.size():0;
+			}
+			continue;
+		}
+		// unsatisfied due to too large kmer
+		else if((int)currKmerSize > m_params.kmerLength && currKmerFreq<threshold) 
+		{
+			// Recompute BWTInterval
+			std::string newKmer = seq.substr(i, m_params.kmerLength);
+			fwdInterval = BWTAlgorithms::findInterval(index.pRBWT, reverse(newKmer));
+			rvcInterval = BWTAlgorithms::findInterval(index.pBWT, reverseComplement(newKmer));
+
+			currKmerSize = m_params.kmerLength;
+			currKmerFreq = 0;
+			currKmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
+			currKmerFreq += rvcInterval.isValid()?rvcInterval.size():0;
+			
+			// Rerun this iteration using the new kmer
+			i--;
+			continue;
+		}
+		// Bad kmer at i, continue to i++
+		else if((int)currKmerSize == m_params.kmerLength && currKmerFreq<threshold)
+		{
+			if(i<seq.length()-m_params.kmerLength) 
+			{
+				// Recompute BWTInterval for next i
+				std::string newKmer = seq.substr(i+1, m_params.kmerLength);
+				fwdInterval = BWTAlgorithms::findInterval(index.pRBWT, reverse(newKmer));
+				rvcInterval = BWTAlgorithms::findInterval(index.pBWT, reverseComplement(newKmer));
+
+				currKmerSize = m_params.kmerLength;
+				currKmerFreq = 0;
+				currKmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
+				currKmerFreq += rvcInterval.isValid()?rvcInterval.size():0;			
+			}
+		}
+		else
+			assert(false);
+	}
+	
+
+	//Split the reads into intervals
+	std::vector< std::pair<size_t,size_t> > intervals ;
+	size_t start = 0 ;
+	size_t end = seq.length()-m_params.kmerLength;
+	for (size_t p = 1; p < seq.length()-m_params.kmerLength+1 ; p++)
+	{
+		//don't split if both strands have kmer feq >= threshold
+		if (countQualified[p-1]==1 && countQualified[p]==1) continue;
+		
+		//kmerize read at pos p if the path is not simple
+		if ( !isSimple(seq.substr(p-1, m_params.kmerLength), seq.substr(p, m_params.kmerLength), index, 1) )
+		{
+			intervals.push_back(std::make_pair (start,p-1));
+			start =p;
+		}
+	}
+		
+	intervals.push_back(std::make_pair (start,end));
+	
+	size_t maxIntervalSize = 0;
+	int mainSeedIdx = -1 ;
+	for (size_t i=0;i<intervals.size();i++)
+	{
+		size_t intervalSize = intervals[i].second - intervals[i].first ;
+		if (maxIntervalSize < intervalSize)
+		{
+			maxIntervalSize = intervalSize;
+			mainSeedIdx = i;
+		}
+
+		std::string k=seq.substr(intervals[i].first, intervals[i].second-intervals[i].first+m_params.kmerLength);
 		kmerReads.push_back(k);
 	}
 	
@@ -757,10 +873,11 @@ bool FMIndexWalkProcess::isSimple (std::string Lkmer, std::string Rkmer, BWTInde
 {
 	size_t LKmerPathCount = numNextKmer(Lkmer, NK_END, index, threshold);
 	size_t RKmerPathCount = numNextKmer(Rkmer, NK_START, index, threshold);
+
 	if ( LKmerPathCount == 1 &&   RKmerPathCount == 1 )  
-	return true;
+		return true;
 	else 
-	return false;
+		return false;
 	
 	// if( (LKmerPathCount > 1 && LCount == 0) || (RKmerPathCount>1 && RCount == 0) )
 	// return false;
@@ -787,7 +904,8 @@ m_kmerizePassed(0),
 m_mergePassed(0),
 m_qcFail(0)
 {
-	//m_ptmpWriter = createWriter("NoPESupport.fa");
+	if(params.algorithm == FMW_VALIDATE)
+		m_pLowComplexWriter = createWriter("LowComplexityReads.fa");
 }
 
 //
@@ -803,7 +921,7 @@ FMIndexWalkPostProcess::~FMIndexWalkPostProcess()
 void FMIndexWalkPostProcess::process(const SequenceWorkItem& item, const FMIndexWalkResult& result)
 {
 	// Determine if the read should be discarded
-	bool readQCPass = true;
+	bool readQCPass = result.kmerize || result.merge;
 	if (result.kmerize)
 		m_kmerizePassed += 1;
 	else if (result.merge)
@@ -828,7 +946,7 @@ void FMIndexWalkPostProcess::process(const SequenceWorkItem& item, const FMIndex
 	// for validate and kmerize algorithms
 	else if (result.kmerize)
 	{
-		assert(!result.correctSequence.empty() || !result.kmerizedReads.empty());
+		// assert(!result.correctSequence.empty() || !result.kmerizedReads.empty());
 		if (!result.correctSequence.empty())
 			record.write(*m_pDiscardWriter);
 	
@@ -844,7 +962,7 @@ void FMIndexWalkPostProcess::process(const SequenceWorkItem& item, const FMIndex
 	}
 	else
 	{
-		record.write(*m_pDiscardWriter);
+		record.write(*m_pLowComplexWriter);
 	}
 
 }

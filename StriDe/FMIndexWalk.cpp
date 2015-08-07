@@ -35,7 +35,7 @@ static const char *CORRECT_VERSION_MESSAGE =
 SUBPROGRAM " Version " PACKAGE_VERSION "\n"
 "Written by Yao-Ting Huang.\n"
 "\n"
-"Copyright 2014 National Chung Cheng University\n";
+"Copyright 2015 National Chung Cheng University\n";
 
 static const char *CORRECT_USAGE_MESSAGE =
 "Usage: " PACKAGE_NAME " " SUBPROGRAM " [OPTION] ... READSFILE\n"

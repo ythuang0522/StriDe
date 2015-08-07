@@ -236,6 +236,7 @@ private:
 	std::string trimRead ( std::string readSeq ,size_t kmerLength ,size_t threshold ,BWTIndexSet & index);
 	
 	int splitRead (KmerContext& seq, std::vector<std::string> & kmerReads ,size_t threshold, BWTIndexSet & index);
+	int splitRead (std::string& seq, std::vector<std::string> & kmerReads ,size_t threshold, BWTIndexSet & index);
 	int splitRepeat (KmerContext& seq, std::vector<std::string> & kmerReads);
 
 	// bool hasPESupport (std::string r1,std::string r2
@@ -265,6 +266,7 @@ public:
 	std::ostream* pDiscardWriter,
 	const FMIndexWalkParameters params);
 
+
 	~FMIndexWalkPostProcess();
 
 	void process(const SequenceWorkItem& item, const FMIndexWalkResult& result);
@@ -274,9 +276,9 @@ private:
 
 	std::ostream* m_pCorrectedWriter;
 	std::ostream* m_pDiscardWriter;
+	std::ostream* m_pLowComplexWriter;
 	std::ostream* m_ptmpWriter;
 	FMIndexWalkParameters m_params;
-	// DenseHashSet<std::string,StringHasher> *m_pCachedRead;
 
 	size_t m_kmerizePassed ;
 	size_t m_mergePassed ;
