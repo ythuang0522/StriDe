@@ -1,7 +1,10 @@
 //-----------------------------------------------
-// Copyright 2009 Wellcome Trust Sanger Institute
-// Written by Jared Simpson (js18@sanger.ac.uk)
-// Released under the GPL license
+// Copyright 2015 National Chung Cheng University
+// Written by Yao-Ting Huang
+// Revised from Jared Simpson's overlap block
+// Implement new submaximal filtration for indel overlap
+// New data structure for indel overlap
+// Released under the GPL
 //-----------------------------------------------
 //
 // OverlapBlock - Data structures holding
@@ -99,6 +102,7 @@ struct OverlapBlock
                  const AlignFlags& af,
                  const SearchHistoryVector& backHist);
 				 
+	// Real overlap blocks for indel overlap
 	OverlapBlock(BWTIntervalPair r,
 			 BWTIntervalPair rawI,
 			 int ol, 
@@ -112,7 +116,9 @@ struct OverlapBlock
 								  numInsertion(ni),
 								  numDeletion(ndel),
 								  flags(af),
-								  isEliminated(false)
+								  isEliminated(false),
+								  isQuerySubstring(false),
+								  isTargetSubstring(false)
 				{}
 
     // Returns the string that corresponds to this overlap block.
@@ -204,6 +210,8 @@ struct OverlapBlock
     AlignFlags flags;
     bool isEliminated;
 
+	bool isQuerySubstring;
+	bool isTargetSubstring;
     // The sequence of divergent bases during the backward and forward search steps
     SearchHistoryVector backHistory;
     SearchHistoryVector forwardHistory;
@@ -233,6 +241,9 @@ void partitionBlockList(int readLen, OverlapBlockList* pCompleteList,
 
 // Remove containment blocks from the list
 void removeContainmentBlocks(int readLen, OverlapBlockList* pList);
+
+// Detect substring blocks after submaximal removal
+bool containSubstringBlocks(OverlapBlockList* pList, int querylength);
 
 // Convert an overlap block list into a multiple overlap
 MultiOverlap blockListToMultiOverlap(const SeqRecord& record, OverlapBlockList& blockList);

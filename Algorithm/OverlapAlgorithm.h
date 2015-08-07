@@ -192,19 +192,16 @@ public:
 	m_exactModeOverlap(true),
 	m_exactModeIrreducible(true)
 	{
-		//Maintain a hashset for reducing edges of repeat vertices,by YTH
-		m_SuperRepeat=new DenseHashSet<std::string,StringHasher>();
-		m_SuperRepeat->set_empty_key("");
+
 	}
 	~OverlapAlgorithm()
 	{
-		delete m_SuperRepeat;
 	}
 	
 	// Inexact overlap constructor
 	OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,
 	SuffixArray* pFwdSAI, SuffixArray* pRevSAI,
-	ReadInfoTable* pQueryRIT, ReadInfoTable* pTargetRIT, double errorRate, int maxIndels, bool bIrreducible=false) : 
+	ReadInfoTable* pQueryRIT, ReadInfoTable* pTargetRIT, double errorRate, int maxIndels, std::string algorithm) : 
 	m_pBWT(pBWT), 
 	m_pRevBWT(pRevBWT),
 	m_pFwdSAI(pFwdSAI),
@@ -213,16 +210,14 @@ public:
 	m_pTargetRIT(pTargetRIT),                                         
 	m_errorRate(errorRate),
 	m_maxIndels(maxIndels),
-	m_bIrreducible(bIrreducible),
+	m_algorithm(algorithm),
+	m_bIrreducible(false),
 	m_exactModeOverlap(false),
 	m_exactModeIrreducible(false)
 	{
-		//Maintain a hashset for reducing edges of repeat vertices,by YTH
-		m_SuperRepeat=new DenseHashSet<std::string,StringHasher>();
-		m_SuperRepeat->set_empty_key("");
+
 	}
 
-	///Testeetsetet
 	OverlapAlgorithm(const BWT* pBWT, const BWT* pRevBWT,  
 	double er, int seedLen, int seedStride, bool irrOnly, int maxSeeds = -1) : 
 	m_pBWT(pBWT), 
@@ -235,9 +230,7 @@ public:
 	m_exactModeIrreducible(false),
 	m_maxSeeds(maxSeeds)
 	{
-		//Maintain a hashset for reducing edges of repeat vertices,by YTH
-		m_SuperRepeat=new DenseHashSet<std::string,StringHasher>();
-		m_SuperRepeat->set_empty_key("");
+
 	}
 	
 	// Perform the overlap
@@ -246,6 +239,9 @@ public:
 	
 	// Perform an irreducible overlap
 	OverlapResult overlapReadExact(const SeqRecord& read, int minOverlap, OverlapBlockList* pOBOut) const;
+
+	// Perform an inexact overlap using FM-index walk
+    OverlapResult overlapReadInexactFMWalk(const SeqRecord& read, int minOverlap, OverlapBlockList* pOBOut) const;
 
 	// Find duplicate blocks for this read
 	OverlapResult alignReadDuplicate(const SeqRecord& read, OverlapBlockList* pOBOut) const;
@@ -273,29 +269,25 @@ public:
 	const SuffixArray* getRevSAI() const { return m_pRevSAI; }
 	const ReadInfoTable* getQueryRIT() const { return m_pQueryRIT; }
 	const ReadInfoTable* getTargetRIT() const { return m_pTargetRIT; }
-	bool isSuperRepeatVertex(std::string vstr) const { 
-		DenseHashSet<std::string,StringHasher>::const_iterator found;
-		#pragma omp critical (SuperRepeat)
-		{
-			found  = m_SuperRepeat->find(vstr);
-		}
-		if(found!= m_SuperRepeat->end()) return true;
-		else return false;
-		
-	}
+	
 	
 private:
 
 	// Calculate the ranges in pBWT that contain a prefix of at least minOverlap basepairs that
 	// overlaps with a suffix of w.
 	void findOverlapBlocksExact(const std::string& w, const BWT* pBWT, const BWT* pRevBWT, 
-								const AlignFlags& af, const int minOverlap, OverlapBlockList* pOBTemp, 
-								OverlapBlockList* pOBFinal, OverlapResult& result) const;
+								const AlignFlags& af, const int minOverlap, OverlapBlockList* pOverlapList, 
+								OverlapBlockList* pContainList, OverlapResult& result) const;
 
-	// Same as above while allowing mismatches
+	// Implement inexact overlap using approximate banded DP via FM-index walk
 	bool findOverlapBlocksInexact(const std::string& w, const BWT* pBWT, const BWT* pRevBWT, 
-								const AlignFlags& af, const int minOverlap, OverlapBlockList* pOBList, 
-								OverlapBlockList* pOBFinal, OverlapResult& result) const;
+								const AlignFlags& af, const int minOverlap, OverlapBlockList* pOverlapList, 
+								OverlapBlockList* pContainList, OverlapResult& result) const;
+
+	// Implement inexact overlap using locality-sensitive backward search via FM-index walk
+	bool findOverlapBlocksInexactFMIndexWalk(const std::string& w, const BWT* pBWT, const BWT* pRevBWT, 
+								const AlignFlags& af, const int minOverlap, OverlapBlockList* pOverlapList, 
+								OverlapBlockList* pContainList, OverlapResult& result) const;
 
 	bool TrimOBLInterval(OverlapBlockList* pOverlapList, int MaxInterval) const;
 
@@ -363,11 +355,13 @@ private:
 	ReadInfoTable* m_pQueryRIT;
 	ReadInfoTable* m_pTargetRIT;
 
-	DenseHashSet<std::string,StringHasher>* m_SuperRepeat;
+	// DenseHashSet<std::string,StringHasher>* m_SuperRepeat;
 
 	double m_errorRate;
 	size_t m_maxIndels;
 	
+	std::string m_algorithm;
+
 	int m_seedLength;
 	int m_seedStride;
 	bool m_bIrreducible;

@@ -27,15 +27,11 @@
 #include <sys/stat.h>
 
 /*Tatsuki include */
-#include <tr1/unordered_map>
-#include <tr1/unordered_set>
-#define HashMap std::tr1::unordered_map
-#define HashSet std::tr1::unordered_set
-typedef std::tr1::hash<std::string> StringHasher;
-#include <sparsehash/dense_hash_set>
-#define DenseHashSet google::dense_hash_set
-typedef DenseHashSet<std::string, StringHasher> ReadHashSet;
-typedef ReadHashSet::iterator ReadHashSetIter;
+// #include <tr1/unordered_map>
+// #include <tr1/unordered_set>
+// #define HashMap std::tr1::unordered_map
+// #define HashSet std::tr1::unordered_set
+// typedef std::tr1::hash<std::string> StringHasher;
 
 
 //
@@ -70,12 +66,10 @@ static const char *OVERLAP_USAGE_MESSAGE =
 "      -e, --error-rate                 the maximum error rate allowed to consider two sequences aligned (default: exact matches only)\n"
 "      -m, --min-overlap=LEN            minimum overlap required between two reads (default: 45)\n"
 "      -f, --target-file=FILE           perform the overlap queries against the reads in FILE\n"
-//"      -p, --paired-overlap             output only paired overlaps\n"
+"      -a, --algorithm=FILE             LSSF: locality-sensitive search by FM-index (default), or ADPF: approximate dynamic programming by FM-index\n"
 "      -x, --exhaustive                 output all overlaps, including transitive edges (default if e>0)\n"
 "          --exact                      output irreducible overlaps (default if e=0)\n"
-"      -l, --maxindel                   maximum indels allowed during overlap computation\n"
-"      -d, --sample-rate=N              sample the symbol counts every N symbols in the FM-index. Higher values use significantly\n"
-"                                       less memory at the cost of higher runtime. This value must be a power of 2 (default: 128)\n"
+"      -l, --maxindel                   maximum indels allowed during inexact overlap computation\n"
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
 static const char* PROGRAM_IDENT =
@@ -93,15 +87,17 @@ namespace opt
 	static double errorRate = -1.0f;
 	static int maxindel = 0;
 	static unsigned int minOverlap = DEFAULT_MIN_OVERLAP;
+	
+	static std::string algorithm = "LSSF";
+
 	// static int seedLength = 0;
 	// static int seedStride = 0;
 	static int sampleRate = BWT::DEFAULT_SAMPLE_RATE_SMALL;
 	static bool bIrreducibleOnly = true;
 	static bool bExactIrreducible = false;
-	static bool bIsPairedOverlapOnly  = false;
 }
 
-static const char* shortopts = "m:d:e:t:l:o:f:vixp";
+static const char* shortopts = "m:d:e:t:l:o:f:a:p:vx";
 
 enum { OPT_HELP = 1, OPT_VERSION, OPT_EXACT };
 
@@ -115,8 +111,8 @@ static const struct option longopts[] = {
 	{ "prefix",      required_argument, NULL, 'p' },
 	{ "error-rate",  required_argument, NULL, 'e' },
 	{ "maxindel", required_argument, NULL, 'l' },
+	{ "algorithm", required_argument, NULL, 'a' },
 	{ "exhaustive",  no_argument,       NULL, 'x' },
-	{ "paired-overlap",no_argument,     NULL, 'p' },
 	{ "exact",       no_argument,       NULL, OPT_EXACT },
 	{ "help",        no_argument,       NULL, OPT_HELP },
 	{ "version",     no_argument,       NULL, OPT_VERSION },
@@ -192,7 +188,7 @@ int overlapMain(int argc, char** argv)
 	
 	// Activate the inexact overlap algorithm
 	if(opt::errorRate >= 0)
-		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT, opt::errorRate, opt::maxindel, opt::bIrreducibleOnly);
+		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT, opt::errorRate, opt::maxindel, opt::algorithm);
 	// Activate the exact overlap algorithm
 	else
 		pOverlapper = new OverlapAlgorithm(pBWT, pRBWT, pFwdSAI, pRevSAI, pQueryRIT, pTargetRIT);
@@ -209,10 +205,12 @@ int overlapMain(int argc, char** argv)
 	}
 	
 	time_t now = time(NULL);
-	std::cout << "StriDe overlap computation using min ovlerap: " << opt::minOverlap << "\n"
+	std::cout << "StriDe overlap computation using min overlap: " << opt::minOverlap << "\n"
 				<< "Error Rate: " << opt::errorRate << "\n" 
 				<< "Max Indel: " << opt::maxindel << "\n"
-				<< "Transitive reduction: " << opt::bIrreducibleOnly << "\n";
+				<< "Transitive reduction: " << opt::bIrreducibleOnly << "\n"
+				<< "Algorithm: " << opt::algorithm << "\n";
+				
 	std::cout << "\n# start time of overlapping: " << asctime(localtime(&now))<<std::endl;
 	
 	if(opt::numThreads <= 1)
@@ -343,9 +341,9 @@ void parseOverlapOptions(int argc, char** argv)
 		case 'l': arg >> opt::maxindel; break;
 		case 'd': arg >> opt::sampleRate; break;
 		case 'f': arg >> opt::targetFile; break;
+		case 'a': arg >> opt::algorithm; break;
 		case OPT_EXACT: opt::bExactIrreducible = true; break;
 		case 'x': opt::bIrreducibleOnly = false; break;
-		case 'p': opt::bIsPairedOverlapOnly = true;  opt::bIrreducibleOnly = false; break;
 		case '?': die = true; break;
 		case 'v': opt::verbose++; break;
 		case OPT_HELP:

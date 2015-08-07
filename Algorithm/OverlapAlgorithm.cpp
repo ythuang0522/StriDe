@@ -1,12 +1,14 @@
-//-----------------------------------------------
-// Copyright 2009 Wellcome Trust Sanger Institute
-// Written by Jared Simpson (js18@sanger.ac.uk)
+//----------------------------------------------
+// Copyright 2015 National Chung Cheng University
+// Written by Yao-Ting Huang, revised from Simpson's overlap structure
 // Released under the GPL
 //-----------------------------------------------
+
 #include "OverlapAlgorithm.h"
 #include "ASQG.h"
 #include <tr1/unordered_set>
 #include <math.h>
+#include <SAIOverlapTree.h>
 
 // Collect the complete set of overlaps in pOBOut
 static const AlignFlags sufPreAF(false, false, false);
@@ -25,9 +27,19 @@ OverlapResult OverlapAlgorithm::overlapRead(const SeqRecord& read, int minOverla
 	return r;
 
 	if(!m_exactModeOverlap)
-	r = overlapReadInexact(read, minOverlap, pOutList);
+	{
+		if(m_algorithm=="LSSF")
+			r = overlapReadInexactFMWalk(read, minOverlap, pOutList);
+		else if(m_algorithm=="ADPF")
+			r = overlapReadInexact(read, minOverlap, pOutList);
+		else
+		{
+			std::cout << "Unknown algorithm!!\n";
+			assert(false);
+		}
+	}
 	else
-	r = overlapReadExact(read, minOverlap, pOutList);
+		r = overlapReadExact(read, minOverlap, pOutList);
 	return r;
 }
 
@@ -55,13 +67,19 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 	// std::cout << read.id << "\n"; 
 	findOverlapBlocksInexact(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
+	
+	// getchar();
 	// std::cout << complement(seq) << "\n";
 	findOverlapBlocksInexact(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result);
 	if(result.isSubstring) return result;
+	
 	// Match the prefix of seq to suffixes
+	// getchar();
 	// std::cout << reverseComplement(seq) << "\n";
 	findOverlapBlocksInexact(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
+	
+	// getchar();
 	// std::cout << reverse(seq) << "\n";
 	findOverlapBlocksInexact(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result);
 	if(result.isSubstring) return result;
@@ -79,26 +97,36 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 	TrimOBLInterval(&oblPrefixFwd, seq.length());
 	TrimOBLInterval(&oblPrefixRev, seq.length());
 
-
 	// Perform the submaximal filter, 
 	// bug: Error in resolveOverlap: Overlap blocks with same length do not the have same coordinates
+	// std::cout << oblSuffixFwd.size() << "\n";
 	removeSubMaximalBlocks(&oblSuffixFwd, m_pBWT, m_pRevBWT);
+	if(containSubstringBlocks(&oblSuffixFwd, seq.length()))
+		result.isSubstring=true;
+		
 	removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
+	if(containSubstringBlocks(&oblPrefixFwd, seq.length()))
+		result.isSubstring=true;
+		
 	removeSubMaximalBlocks(&oblSuffixRev, m_pRevBWT, m_pBWT);
+	if(containSubstringBlocks(&oblSuffixRev, seq.length()))
+		result.isSubstring=true;
+		
 	removeSubMaximalBlocks(&oblPrefixRev, m_pRevBWT, m_pBWT);
+	if(containSubstringBlocks(&oblPrefixRev, seq.length()))
+		result.isSubstring=true;
 
-	// Remove the contain blocks from the suffix/prefix lists
+	if(result.isSubstring) return result;
+	
+	// Remove the contain blocks from the suffix/prefix lists for transitive reduction
+	// However, transitive reduction algorithm can't be applied for indel overlap
 	removeContainmentBlocks(seq.length(), &oblSuffixFwd);
 	removeContainmentBlocks(seq.length(), &oblPrefixFwd);
 	removeContainmentBlocks(seq.length(), &oblSuffixRev);
 	removeContainmentBlocks(seq.length(), &oblPrefixRev);
 
-
-	// Join the suffix and prefix lists
-	oblSuffixFwd.splice(oblSuffixFwd.end(), oblSuffixRev);
-	oblPrefixFwd.splice(oblPrefixFwd.end(), oblPrefixRev);
-
-	// Move the containments to the output list
+	
+	// Move the containments to the output list first
 	pOBOut->splice(pOBOut->end(), oblFwdContain);
 	pOBOut->splice(pOBOut->end(), oblRevContain);
 
@@ -113,6 +141,103 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 		pOBOut->splice(pOBOut->end(), oblSuffixFwd);
 		pOBOut->splice(pOBOut->end(), oblPrefixFwd);
 	}
+
+	return result;
+}
+
+OverlapResult OverlapAlgorithm::overlapReadInexactFMWalk(const SeqRecord& read, int minOverlap, OverlapBlockList* pOBOut) const
+{
+	OverlapResult result;
+	// The complete set of overlap blocks are collected in obWorkingList
+	// The filtered set (containing only irreducible overlaps) are placed into pOBOut
+	// by calculateIrreducibleHits
+	OverlapBlockList obWorkingList;
+	std::string seq = read.seq.toString();
+
+	// We store the various overlap blocks using a number of lists, one for the containments
+	// in the forward and reverse index and one for each set of overlap blocks
+	OverlapBlockList oblFwdContain;
+	OverlapBlockList oblRevContain;
+	
+	OverlapBlockList oblSuffixFwd;
+	OverlapBlockList oblSuffixRev;
+	OverlapBlockList oblPrefixFwd;
+	OverlapBlockList oblPrefixRev;
+
+	// Match the suffix of seq to prefixes
+	// std::cout << read.id << "\n"; 
+	// findOverlapBlocksInexact(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
+	findOverlapBlocksInexactFMIndexWalk(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
+	if(result.isSubstring) return result;
+	
+	// getchar();
+	// std::cout << complement(seq) << "\n";
+	// findOverlapBlocksInexact(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result);
+	findOverlapBlocksInexactFMIndexWalk(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result);
+	if(result.isSubstring) return result;
+	
+	// Match the prefix of seq to suffixes
+	// getchar();
+	// std::cout << reverseComplement(seq) << "\n";
+	// findOverlapBlocksInexact(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result);
+	findOverlapBlocksInexactFMIndexWalk(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result);
+	if(result.isSubstring) return result;
+	
+	// getchar();
+	// std::cout << reverse(seq) << "\n";
+	// findOverlapBlocksInexact(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result);
+	findOverlapBlocksInexactFMIndexWalk(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result);
+	if(result.isSubstring) return result;
+	
+	// Remove submaximal blocks for each block list including fully contained blocks
+	// Copy the containment blocks into the prefix/suffix lists
+	oblSuffixFwd.insert(oblSuffixFwd.end(), oblFwdContain.begin(), oblFwdContain.end());
+	oblPrefixFwd.insert(oblPrefixFwd.end(), oblFwdContain.begin(), oblFwdContain.end());
+	oblSuffixRev.insert(oblSuffixRev.end(), oblRevContain.begin(), oblRevContain.end());
+	oblPrefixRev.insert(oblPrefixRev.end(), oblRevContain.begin(), oblRevContain.end());
+
+	//Trim the OB list
+	// TrimOBLInterval(&oblSuffixFwd, seq.length());
+	// TrimOBLInterval(&oblSuffixRev, seq.length());
+	// TrimOBLInterval(&oblPrefixFwd, seq.length());
+	// TrimOBLInterval(&oblPrefixRev, seq.length());
+
+	// Perform the submaximal filter, 
+	// bug: Error in resolveOverlap: Overlap blocks with same length do not the have same coordinates
+	// std::cout << oblSuffixFwd.size() << "\n";
+	// removeSubMaximalBlocks(&oblSuffixFwd, m_pBWT, m_pRevBWT);
+	// if(containSubstringBlocks(&oblSuffixFwd, seq.length()))
+		// result.isSubstring=true;
+		
+	// removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
+	// if(containSubstringBlocks(&oblPrefixFwd, seq.length()))
+		// result.isSubstring=true;
+		
+	// removeSubMaximalBlocks(&oblSuffixRev, m_pRevBWT, m_pBWT);
+	// if(containSubstringBlocks(&oblSuffixRev, seq.length()))
+		// result.isSubstring=true;
+		
+	// removeSubMaximalBlocks(&oblPrefixRev, m_pRevBWT, m_pBWT);
+	// if(containSubstringBlocks(&oblPrefixRev, seq.length()))
+		// result.isSubstring=true;
+
+	// if(result.isSubstring) return result;
+	
+
+	// Join the suffix and prefix lists
+	oblSuffixFwd.splice(oblSuffixFwd.end(), oblSuffixRev);
+	oblPrefixFwd.splice(oblPrefixFwd.end(), oblPrefixRev);
+	oblPrefixFwd.splice(oblPrefixFwd.end(), oblSuffixFwd);
+	
+	removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
+	
+	if(containSubstringBlocks(&oblPrefixFwd, seq.length()))
+	{
+		result.isSubstring=true;
+		return result;
+	}
+
+	pOBOut->splice(pOBOut->end(), oblPrefixFwd);
 
 	return result;
 }
@@ -842,6 +967,67 @@ void OverlapAlgorithm::terminateOverlapBlocks(const AlignFlags& af, BWTOverlapIn
 	}
 
 }
+
+
+// Implement inexact overlap using locality-sensitive backward search via FM-index walk
+bool OverlapAlgorithm::findOverlapBlocksInexactFMIndexWalk(const std::string& w, const BWT* pBWT, const BWT* pRevBWT, 
+							const AlignFlags& af, const int minOverlap, 
+							OverlapBlockList* pOverlapList, OverlapBlockList* pContainList, 
+							OverlapResult& result) const
+{
+	// int m_minOverlap = (int)w.length()<minOverlap?w.length()*0.8:minOverlap;
+
+	SAIOverlapTree OverlapTree(w, minOverlap, m_maxIndels, pBWT, pRevBWT, af);
+
+	// SAIOverlapTree has computed seedSize overlap during construction	
+	// Extend base by base for overlaps
+	std::vector<OverlapBlock> OBTmpResults;
+
+	// The number of extensions consider max deletions
+	// for(size_t i = wlength - OverlapTree.getSeedSize() + m_maxIndels; i >= 1; --i)
+	while(OverlapTree.getCurrentLength() < w.length()+m_maxIndels)
+	{
+		if(OverlapTree.isEmpty()) break;
+
+		// Extend one base for all intervals and return intervals terminated with $
+		int flag = OverlapTree.extendOverlapOneBase(OBTmpResults);
+
+		if(flag == -3)
+		{
+			std::cout << "Too many possible overlapping reads: " << "\t" << OverlapTree.size() << "\n"; 
+			// getchar();
+			return false;
+		}
+		// Store intervals with sufficient overlap reach $, if any.
+		for(size_t j=0; j<OBTmpResults.size(); j++)
+			pOverlapList->push_back(OBTmpResults.at(j));
+
+		// Some containment reads may be reached earlier due to indels
+		OBTmpResults.clear();
+		if(OverlapTree.getCurrentLength() >= w.length()-m_maxIndels)
+		{
+			bool isSubstring = OverlapTree.terminateContainedBlocks(OBTmpResults);
+
+			if(isSubstring)
+			{
+				result.isSubstring=true;
+				return false;
+			}
+			else
+			{
+				// push contained blocks into containment list
+				for(size_t j=0; j<OBTmpResults.size(); j++)
+					pContainList->push_back(OBTmpResults.at(j));
+				
+				OBTmpResults.clear();
+			}
+		}
+
+	}// end of BWT update using w[i]
+	
+	return true;	
+}
+
 // Calculate the irreducible blocks from the vector of OverlapBlocks
 void OverlapAlgorithm::computeIrreducibleBlocks(const BWT* pBWT, const BWT* pRevBWT, 
 OverlapBlockList* pOBList, 
