@@ -28,7 +28,7 @@ class SAIOverlapTree
 					   const BWT* pRBWT, 
 					   AlignFlags af,
                        size_t maxLeaves=256,
-					   size_t seedSize=25, size_t seedDist=1);
+					   size_t seedSize=17, size_t seedDist=1);
 		
         ~SAIOverlapTree();
 

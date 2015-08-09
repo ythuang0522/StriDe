@@ -166,26 +166,22 @@ OverlapResult OverlapAlgorithm::overlapReadInexactFMWalk(const SeqRecord& read, 
 
 	// Match the suffix of seq to prefixes
 	// std::cout << read.id << "\n"; 
-	// findOverlapBlocksInexact(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
 	findOverlapBlocksInexactFMIndexWalk(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
 	
 	// getchar();
 	// std::cout << complement(seq) << "\n";
-	// findOverlapBlocksInexact(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result);
 	findOverlapBlocksInexactFMIndexWalk(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result);
 	if(result.isSubstring) return result;
 	
 	// Match the prefix of seq to suffixes
 	// getchar();
 	// std::cout << reverseComplement(seq) << "\n";
-	// findOverlapBlocksInexact(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result);
 	findOverlapBlocksInexactFMIndexWalk(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
 	
 	// getchar();
 	// std::cout << reverse(seq) << "\n";
-	// findOverlapBlocksInexact(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result);
 	findOverlapBlocksInexactFMIndexWalk(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result);
 	if(result.isSubstring) return result;
 	
@@ -203,25 +199,23 @@ OverlapResult OverlapAlgorithm::overlapReadInexactFMWalk(const SeqRecord& read, 
 	// TrimOBLInterval(&oblPrefixRev, seq.length());
 
 	// Perform the submaximal filter, 
-	// bug: Error in resolveOverlap: Overlap blocks with same length do not the have same coordinates
-	// std::cout << oblSuffixFwd.size() << "\n";
-	// removeSubMaximalBlocks(&oblSuffixFwd, m_pBWT, m_pRevBWT);
-	// if(containSubstringBlocks(&oblSuffixFwd, seq.length()))
-		// result.isSubstring=true;
+	removeSubMaximalBlocks(&oblSuffixFwd, m_pBWT, m_pRevBWT);
+	if(containSubstringBlocks(&oblSuffixFwd, seq.length()))
+		result.isSubstring=true;
 		
-	// removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
-	// if(containSubstringBlocks(&oblPrefixFwd, seq.length()))
-		// result.isSubstring=true;
+	removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
+	if(containSubstringBlocks(&oblPrefixFwd, seq.length()))
+		result.isSubstring=true;
 		
-	// removeSubMaximalBlocks(&oblSuffixRev, m_pRevBWT, m_pBWT);
-	// if(containSubstringBlocks(&oblSuffixRev, seq.length()))
-		// result.isSubstring=true;
+	removeSubMaximalBlocks(&oblSuffixRev, m_pRevBWT, m_pBWT);
+	if(containSubstringBlocks(&oblSuffixRev, seq.length()))
+		result.isSubstring=true;
 		
-	// removeSubMaximalBlocks(&oblPrefixRev, m_pRevBWT, m_pBWT);
-	// if(containSubstringBlocks(&oblPrefixRev, seq.length()))
-		// result.isSubstring=true;
+	removeSubMaximalBlocks(&oblPrefixRev, m_pRevBWT, m_pBWT);
+	if(containSubstringBlocks(&oblPrefixRev, seq.length()))
+		result.isSubstring=true;
 
-	// if(result.isSubstring) return result;
+	if(result.isSubstring) return result;
 	
 
 	// Join the suffix and prefix lists
@@ -229,14 +223,6 @@ OverlapResult OverlapAlgorithm::overlapReadInexactFMWalk(const SeqRecord& read, 
 	oblPrefixFwd.splice(oblPrefixFwd.end(), oblPrefixRev);
 	oblPrefixFwd.splice(oblPrefixFwd.end(), oblSuffixFwd);
 	
-	removeSubMaximalBlocks(&oblPrefixFwd, m_pBWT, m_pRevBWT);
-	
-	if(containSubstringBlocks(&oblPrefixFwd, seq.length()))
-	{
-		result.isSubstring=true;
-		return result;
-	}
-
 	pOBOut->splice(pOBOut->end(), oblPrefixFwd);
 
 	return result;

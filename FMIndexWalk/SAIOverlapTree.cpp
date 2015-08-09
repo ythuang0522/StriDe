@@ -62,37 +62,10 @@ SAIOverlapTree::SAIOverlapTree(const std::string& query,
 				std::string seedStr = m_Query.substr(i, m_seedSize);
 				m_TerminatedIntervals.push_back(BWTAlgorithms::findInterval( m_pBWT, seedStr) );		
 			}
-
-			// std::string seedStr = m_Query.substr(m_Query.length()-m_seedSize, m_seedSize);
-			// BWTInterval probe = BWTAlgorithms::findInterval( m_pBWT, seedStr) ;
-			// m_TerminatedIntervals.push_back(probe);	
-			// for(int i = (int)m_Query.length()-m_seedSize-1; i >= 0 ; i -= (int)m_seedDist)
-			// {
-				// BWTAlgorithms::updateInterval( probe, m_Query.at(i), m_pBWT ) ;
-				// m_TerminatedIntervals.push_back(probe);
-			// }
 			
 			break;
 		}
 	}
-
-	// std::cout << initStr << "\n";
-    //initialize the beginning kmer SA intervals with kmer length=m_minOverlap
-    // m_pRootNode->currIntervalPair = BWTAlgorithms::findIntervalPair( m_pBWT, m_pRBWT, initStr);
-
-	// m_pRootNode->lastSeedIdx = 0;
-	// m_pRootNode->lastOverlapLen = m_pRootNode->currOverlapLen = m_pRootNode->queryOverlapLen = m_seedSize;
-	// m_pRootNode->totalSeeds = 1;
-	// m_leaves.push_back(m_pRootNode);
-
-	//initialize the seeding SA intervals with seedSize and seedDist from rightmost to leftmost
-	// for(int i = (int)m_Query.length()-m_seedSize; i >= 0 ; i -= (int)(m_seedDist+m_seedSize))
-	// for(int i = (int)m_Query.length()-m_seedSize; i >= 0 ; i -= (int)m_seedDist)
-	// {
-		// std::string seedStr = m_Query.substr(i, m_seedSize);
-		// m_TerminatedIntervals.push_back(BWTAlgorithms::findInterval( m_pBWT, seedStr) );		
-	// }
-	// std::cout << "Total seeds: " << m_TerminatedIntervals.size()<<"\n";	
 }
 
 //
@@ -113,12 +86,12 @@ int SAIOverlapTree::extendOverlapOneBase(std::vector<OverlapBlock>& results)
     if(!m_leaves.empty() && m_leaves.size() <= m_maxLeaves && 
 		m_currentLength <= m_Query.length()+m_maxIndelSize)
     {
-		// if(m_currentLength>=3071){
+		// if(m_currentLength==3101){
 			// std::cout << m_Query.at(m_Query.length()-m_currentLength) << ":" << m_currentLength << 
 				// ":" << m_leaves.size() << ":" << m_leaves.front()->currIntervalPair.interval[0]<<"\n";	
 
-			// // printAll();
-			// // getchar();
+			// printAll();
+			// getchar();
 		// }
 
 		// ACGT-extend the leaf nodes via updating existing SA interval
@@ -484,7 +457,7 @@ bool SAIOverlapTree::isTerminated(std::vector<OverlapBlock>& results)
 			
 			double errorRate = computeErrorRate(*iter);
 			if(errorRate >= 0.3) continue;
-			
+
 			size_t totalErrors = errorRate * m_Query.length()*2;
 
 			// w: AACCCTTTTGG
