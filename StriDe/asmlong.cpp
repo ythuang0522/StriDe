@@ -238,6 +238,9 @@ int asmlong()
 	// pGraph->visitP(ikeVisit);
 	// pGraph->simplify();
 
+	// outputGraphAndFasta(pGraph, "debug", 0);
+	// pGraph->writeDot("debug.dot",0);
+	// getchar();
 	/*** trim dead end vertices from small to large***/
 	size_t trimLen = asmlongopt::kmerLength+1 , stepsize=asmlongopt::insertSize/5;
     while (trimLen < asmlongopt::insertSize)
