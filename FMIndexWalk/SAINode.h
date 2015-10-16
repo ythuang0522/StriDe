@@ -107,6 +107,7 @@ struct SAIntervalNodeResult
 {
     std::string thread;
 	size_t SAICoverage;
+	int SAIntervalSize;
 };
 typedef std::vector<SAIntervalNodeResult> SAIntervalNodeResultVector;
 
