@@ -27,7 +27,8 @@ enum FMIndexWalkAlgorithm
 	FMW_MERGE,
 	FMW_HYBRID,	//merge and kmerize of paired end reads
 	FMW_VALIDATE,	////merge and kmerize of single end reads
-	FMW_PACBIOSELF	// PacBio self correction
+	FMW_PACBIOSELF,	// PacBio self correction
+	FMW_PACBIOHYB	// PacBio Hybrid Correction
 };
 
 
@@ -60,7 +61,6 @@ struct FMIndexWalkParameters
 	int minKmerLength;
 	int FMWKmerThreshold;
 	int seedKmerThreshold;
-	int maxExtendDistance;
 	int downward;
 	int collectedSeeds;
 	std::vector<int> seedWalkDistance;
@@ -238,6 +238,11 @@ public:
 				return PBSelfCorrection(workItem);
 				break;
 			}
+		case FMW_PACBIOHYB:
+			{
+				return PBHybridCorrection(workItem);
+				break;
+			}
 
 		default:
 			{
@@ -254,11 +259,16 @@ public:
 	FMIndexWalkResult ValidateReads(const SequenceWorkItem& workItem);
 	// PacBio correction by Ya, v20150305.
 	FMIndexWalkResult PBSelfCorrection(const SequenceWorkItem& workItem);
+	FMIndexWalkResult PBHybridCorrection(const SequenceWorkItem& workItem);
 
 private:
+
 	// PacBio correction by Ya, v20150305.
 	std::vector<std::pair<int, std::string> > searchingSeedsUsingSolidKmer(const std::string readSeq);
-	
+	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
+	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
+	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
+		
 	//check necessary conditions for FM-index walk
 	bool isSuitableForFMWalk(std::string& seqFirst, std::string& seqSecond);
 	

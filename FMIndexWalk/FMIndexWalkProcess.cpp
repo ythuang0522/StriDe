@@ -12,7 +12,8 @@
 #include <iomanip>
 #include "SAIntervalTree.h"
 #include "SAIPBSelfCTree.h"
-
+#include "SAIPBHybridCTree.h"
+using namespace std;
 
 //#define KMER_TESTING 1
 
@@ -390,7 +391,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	
 }
 
-// PacBio Correction by Ya, v20151001.
+// PacBio Self Correction by Ya, v20151001.
 FMIndexWalkResult FMIndexWalkProcess::PBSelfCorrection(const SequenceWorkItem& workItem)
 {	
 	FMIndexWalkResult result;
@@ -540,6 +541,247 @@ std::vector<std::pair<int, std::string> > FMIndexWalkProcess::searchingSeedsUsin
 	}
 	
 	return seeds;
+}
+
+// PacBio Hybrid Correction by Ya, v20150617.
+FMIndexWalkResult FMIndexWalkProcess::PBHybridCorrection(const SequenceWorkItem& workItem)
+{
+	FMIndexWalkResult result;
+	
+	// get parameters
+	string readSeq = workItem.read.seq.toString();
+	string corReadSeq = readSeq;
+	vector<string> pacbioCorrectedStrs;	
+	vector<pair<int,string> > seeds;
+	
+	for(int round = 3 ; round > 0 ; round--)
+	{
+		// initialize
+		result.correctedLen = 0;
+		pacbioCorrectedStrs.clear();
+		seeds.clear();
+		
+		// find seeds
+		seeds = findSeedsUsingDynamicKmerLen(corReadSeq);
+		
+		// initialize corrected pacbio reads string
+		if(seeds.size() >= 1)
+		{
+			result.correctedLen += seeds[0].second.length();
+			pacbioCorrectedStrs.push_back(seeds[0].second);
+		}
+		else
+		{
+			result.merge = false;
+			return result;
+		}
+		
+		// FMWalk for each pair of seeds
+		for(size_t i = 1 ; i < seeds.size() ; i++)
+		{			
+			int needWalkLen = (seeds[i].first - seeds[i-1].first - seeds[i-1].second.length());
+			int FMWalkReturnType = -1, minOverlap;
+			string mergedseq;
+			pair<int,string> source = seeds[i-1];
+			pair<int,string> target = seeds[i];
+			
+			if(source.second.length() >= m_params.maxOverlap && target.second.length() >= m_params.maxOverlap)
+				minOverlap = m_params.maxOverlap-2;
+			else
+			{
+				if(source.second.length() <= target.second.length())
+					minOverlap = source.second.length();
+				else
+					minOverlap = target.second.length();
+			}
+			
+			FMWalkReturnType = solveHighError(source, target, minOverlap, needWalkLen, &mergedseq);
+				
+			// record corrected pacbio reads string
+			// FMWalk success
+			if(FMWalkReturnType == 1)
+			{
+				int gainPos = source.second.length();
+				// have gain ground
+				if(mergedseq.length() > gainPos)
+				{
+					string gainStr = mergedseq.substr(gainPos);
+					pacbioCorrectedStrs.back() += gainStr;
+					if(round == 1)
+						result.correctedLen += gainStr.length();
+				}
+			}
+			// FMWalk failure: 
+			// 1. high error 
+			// 2. exceed leaves
+			// 3. exceed depth
+			else
+			{
+				if(round != 1)
+				{
+					// not cut off
+					int startPos = seeds[i-1].first + seeds[i-1].second.length();
+					int distanceBetweenSeeds = seeds[i].first + seeds[i].second.length() - seeds[i-1].first - seeds[i-1].second.length();
+					pacbioCorrectedStrs.back() += corReadSeq.substr(startPos, distanceBetweenSeeds);
+				}
+				else if(round == 1)
+				{
+					// cut off
+					pacbioCorrectedStrs.push_back(seeds[i].second);
+					result.correctedLen += seeds[i].second.length();
+				}
+			}
+			// output information
+			if(round == 3)
+			{
+				result.totalSeedNum = seeds.size();
+				result.totalWalkNum++;				
+				if(FMWalkReturnType == 1)
+					result.correctedNum++;
+				else if(FMWalkReturnType == -1)
+					result.highErrorNum++;
+				else if(FMWalkReturnType == -2)
+					result.exceedDepthNum++;
+				else if(FMWalkReturnType == -3)
+					result.exceedLeaveNum++;
+			}
+		}
+		
+		assert(pacbioCorrectedStrs.size() != 0);
+		corReadSeq = pacbioCorrectedStrs.back();
+	}
+	result.merge = true;
+	result.totalReadsLen = readSeq.length();
+	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
+		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count]);
+	return result;
+}
+
+vector<pair<int,string> > FMIndexWalkProcess::findSeedsUsingDynamicKmerLen(const string readSeq)
+{
+	vector<pair<int,string> > seeds;
+	int kmerLen, iniKmerLen, minKmerLen, kmerThreshold;
+	
+	kmerLen = iniKmerLen = m_params.kmerLength;
+	minKmerLen = m_params.minKmerLength;
+	kmerThreshold = m_params.seedKmerThreshold;
+	
+	int readLen = readSeq.length();
+	if(readLen >= iniKmerLen)
+	{
+		bool start = false;
+		int newStartPos = -1, newStartPos2 = -1, seedStartPos = 0, walkDistance = 0;
+		
+		// starting search seeds
+		for(int i = 0 ; i+kmerLen <= readLen ; i++)
+		{
+			string kmer = readSeq.substr(i, kmerLen);
+			
+			int kmerFreqs = 0;
+			kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
+			kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
+			
+			walkDistance++;
+			if(kmerFreqs >= kmerThreshold)	// find the seed.
+			{
+				// debug
+				//cout << round << "-" << kmerLen << ": " << i << ", " << kmerFreqs << ", ";
+				//cout << endl << kmer << endl;
+				
+				start = true;
+				seedStartPos = i;
+				
+				// Until not contiguous.
+				for(i++ ; i+kmerLen <= readLen ; i++)
+				{
+					kmer = readSeq.substr(i, kmerLen);
+					kmerFreqs = 0;
+					kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
+					kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
+					if(kmerFreqs < kmerThreshold)
+						break;
+				}
+				// debug
+				//cout << i << ", " << kmerFreqs << ".\n";
+				
+				seeds.push_back(make_pair(seedStartPos, readSeq.substr(seedStartPos, kmerLen + i - seedStartPos - 1)));
+				
+				kmerLen = iniKmerLen;
+				i = seeds.back().first + seeds.back().second.length() - 1;
+				newStartPos2 = i;
+				walkDistance = 0;
+			}
+			else if(walkDistance >= m_params.seedWalkDistance[kmerLen])	// It's too long to walk, so using dynamic kmer.
+			{
+				walkDistance = 0;
+				if(kmerLen <= minKmerLen) // It has not searched the seed using dynamic kmer.
+				{
+					newStartPos = i;
+					newStartPos2 = i;
+					kmerLen = iniKmerLen;
+				}
+				else
+				{
+					kmerLen -= 2;
+					if(start == false)	// It's too long to walk from starting point.
+						i = newStartPos;
+					else
+						i = newStartPos2;
+				}
+			}
+		}
+	}
+	
+	return seeds;
+}
+
+int FMIndexWalkProcess::doubleFMWalkForPacbio(pair<int,string> firstSeed, pair<int,string> secondSeed, int minOverlap, int needWalkLen, string* mergedseq)
+{
+	assert(minOverlap <= firstSeed.second.length() && minOverlap <= secondSeed.second.length());
+
+	int FMWalkReturnType;
+	
+	SAIntervalPBHybridCTree SAITree(&firstSeed.second, minOverlap, m_params.maxOverlap, needWalkLen, m_params.maxLeaves,
+							m_params.indices.pBWT, m_params.indices.pRBWT, secondSeed.second, m_params.FMWKmerThreshold);
+	FMWalkReturnType = SAITree.mergeTwoReads(*mergedseq);
+	
+	if(FMWalkReturnType < 0)
+		return FMWalkReturnType;
+
+	assert((*mergedseq).empty() != true);
+	
+	string mergedseq2;
+	string firstSeq = reverseComplement(firstSeed.second);
+	string secondSeq = reverseComplement(secondSeed.second);
+	SAIntervalPBHybridCTree SAITree2(&secondSeq, minOverlap, m_params.maxOverlap, needWalkLen, m_params.maxLeaves,
+							m_params.indices.pBWT, m_params.indices.pRBWT, firstSeq, m_params.FMWKmerThreshold);
+	FMWalkReturnType = SAITree2.mergeTwoReads(mergedseq2);
+
+	if((*mergedseq).length() == mergedseq2.length())
+		return FMWalkReturnType;
+	else if(FMWalkReturnType > 0)
+		return -4;
+	else if(FMWalkReturnType < 0)
+		return FMWalkReturnType;
+	else
+		assert(false);
+}
+
+int FMIndexWalkProcess::solveHighError(pair<int,string> firstSeed, pair<int,string> secondSeed, int minOverlap, int needWalkLen, string* mergedseq)
+{
+	int FMWalkReturnType;
+	int minOverlapTmp = minOverlap;
+	
+	do
+	{
+		FMWalkReturnType = doubleFMWalkForPacbio(firstSeed, secondSeed, minOverlapTmp, needWalkLen, mergedseq);
+		//minOverlapTmp--;
+		//minOverlapTmp-=2;
+		minOverlapTmp=(minOverlapTmp*2)/3;
+		
+	}while(FMWalkReturnType != 1 && minOverlapTmp >= m_params.minKmerLength);
+	
+	return FMWalkReturnType;
 }
 
 //check necessary conditions for FM-index walk
@@ -1074,7 +1316,7 @@ m_seedDis(0)
 //
 FMIndexWalkPostProcess::~FMIndexWalkPostProcess()
 {	
-	if(m_params.algorithm == FMW_PACBIOSELF)
+	if(m_params.algorithm == FMW_PACBIOSELF || m_params.algorithm == FMW_PACBIOHYB)
 	{
 		std::cout << std::endl;
 		std::cout << "totalReadsLen: " << m_totalReadsLen << ", ";
@@ -1100,7 +1342,7 @@ FMIndexWalkPostProcess::~FMIndexWalkPostProcess()
 // Writting results for kmerize and validate
 void FMIndexWalkPostProcess::process(const SequenceWorkItem& item, const FMIndexWalkResult& result)
 {
-	if(m_params.algorithm == FMW_PACBIOSELF)
+	if(m_params.algorithm == FMW_PACBIOSELF || m_params.algorithm == FMW_PACBIOHYB)
 	{
 		m_totalReadsLen += result.totalReadsLen;
 		m_correctedLen += result.correctedLen;

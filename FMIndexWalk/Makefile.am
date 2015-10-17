@@ -16,4 +16,5 @@ libfmindexwalk_a_SOURCES = \
         SAIntervalTree.h SAIntervalTree.cpp \
 	SAINode.h SAINode.cpp \
 	SAIOverlapTree.h SAIOverlapTree.cpp \
-	SAIPBSelfCTree.h SAIPBSelfCTree.cpp 
+	SAIPBSelfCTree.h SAIPBSelfCTree.cpp \
+	SAIPBHybridCTree.h SAIPBHybridCTree.cpp

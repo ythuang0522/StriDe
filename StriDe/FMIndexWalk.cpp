@@ -177,18 +177,44 @@ int FMindexWalkMain(int argc, char** argv)
 		ecParams.downward = 3;
 		ecParams.collectedSeeds = 5;
 		std::cout << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
-							<< "number of threads:\t" << opt::numThreads << std::endl
-							<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
-							<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
-							<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
-							<< "max distance of searching seed:\t2* tendency distance" << std::endl							
-							<< "FMW max overlap:\t" <<  ecParams.maxOverlap << std::endl 
-							<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
-							<< "FMW search depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
-							<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
-							<< "max length of extending head/tail of corrected region:\t" << ecParams.maxExtendDistance << std::endl
-							<< "downward each pair of seeds:\t" << ecParams.downward << std::endl
-							<< "number of target to be collected:\t" << ecParams.collectedSeeds << std::endl << std::endl;
+			   	<< "number of threads:\t" << opt::numThreads << std::endl
+				<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
+				<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
+				<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
+				<< "max distance of searching seed:\t2* tendency distance" << std::endl
+				<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
+				<< "FMW search depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
+				<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
+				<< "downward each pair of seeds:\t" << ecParams.downward << std::endl
+				<< "number of target to be collected:\t" << ecParams.collectedSeeds << std::endl << std::endl;
+	}
+	else if(ecParams.algorithm == FMW_PACBIOHYB)
+	{
+		ecParams.kmerLength = 31;
+		ecParams.minKmerLength = 23;
+		ecParams.seedKmerThreshold = 9;
+		ecParams.maxLeaves = 256;
+		ecParams.FMWKmerThreshold = 3;
+		ecParams.maxOverlap = 91;
+		std::cout << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
+				<< "number of threads:\t" << opt::numThreads << std::endl
+				<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
+				<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
+				<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
+				<< "max distance of searching seed:\t2* tendency distance" << std::endl							
+				<< "FMW max overlap:\t" <<  ecParams.maxOverlap << std::endl 
+				<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
+				<< "FMW search depth:\t1.2~0.8* (length between two seeds +- 10)" << std::endl
+				<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
+		
+		// computing distance of various continuous matches length (dk)
+		for(int i = 0 ; i <= ecParams.kmerLength ; i++)
+		{
+			if(i >= ecParams.minKmerLength && i <= ecParams.kmerLength)
+				ecParams.seedWalkDistance.push_back(2*3.8649*pow(2.7183,0.1239*i));
+			else
+				ecParams.seedWalkDistance.push_back(0);
+		}
 	}
 	else
 	{
@@ -349,6 +375,8 @@ void parseFMWalkOptions(int argc, char** argv)
 		opt::algorithm = FMW_VALIDATE;
 		else if(algo_str == "pacbioS")
 		opt::algorithm = FMW_PACBIOSELF;
+		else if(algo_str == "pacbioH")
+		opt::algorithm = FMW_PACBIOHYB;
 		else
 		{
 			std::cerr << SUBPROGRAM << ": unrecognized -a,--algorithm parameter: " << algo_str << "\n";
@@ -385,6 +413,8 @@ void parseFMWalkOptions(int argc, char** argv)
 		opt::outFile = out_prefix + ".merge.fa";
 		else if (opt::algorithm == FMW_PACBIOSELF)
 			opt::outFile = out_prefix + ".PBSelfCor.fa";
+		else if (opt::algorithm == FMW_PACBIOHYB)
+			opt::outFile = out_prefix + ".PBHybridCor.fa";
 		else
 		opt::outFile = out_prefix + ".origin.fa";
 	}
