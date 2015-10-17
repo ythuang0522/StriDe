@@ -1074,7 +1074,7 @@ m_seedDis(0)
 //
 FMIndexWalkPostProcess::~FMIndexWalkPostProcess()
 {	
-	if(m_params.algorithm == FMW_PACBIO)
+	if(m_params.algorithm == FMW_PACBIOSELF)
 	{
 		std::cout << std::endl;
 		std::cout << "totalReadsLen: " << m_totalReadsLen << ", ";
@@ -1100,7 +1100,7 @@ FMIndexWalkPostProcess::~FMIndexWalkPostProcess()
 // Writting results for kmerize and validate
 void FMIndexWalkPostProcess::process(const SequenceWorkItem& item, const FMIndexWalkResult& result)
 {
-	if(m_params.algorithm == FMW_PACBIO)
+	if(m_params.algorithm == FMW_PACBIOSELF)
 	{
 		m_totalReadsLen += result.totalReadsLen;
 		m_correctedLen += result.correctedLen;

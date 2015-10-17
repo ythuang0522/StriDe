@@ -27,7 +27,7 @@ enum FMIndexWalkAlgorithm
 	FMW_MERGE,
 	FMW_HYBRID,	//merge and kmerize of paired end reads
 	FMW_VALIDATE,	////merge and kmerize of single end reads
-	FMW_PACBIO
+	FMW_PACBIOSELF	// PacBio self correction
 };
 
 
@@ -233,7 +233,7 @@ public:
 				return ValidateReads(workItem);
 				break;
 			}
-		case FMW_PACBIO:
+		case FMW_PACBIOSELF:
 			{
 				return PBSelfCorrection(workItem);
 				break;
