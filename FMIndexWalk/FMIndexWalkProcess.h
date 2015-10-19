@@ -168,16 +168,16 @@ public:
 
 	// PacBio reads correction by Ya, v20151001.
 	std::vector<DNAString> correctedPacbioStrs;
-	long long int totalReadsLen;
-	long long int correctedLen;
-	long long int totalSeedNum;
-	long long int totalWalkNum;
-	long long int correctedNum;
-	long long int highErrorNum;
-	long long int exceedDepthNum;
-	long long int exceedLeaveNum;
-	long long int equalSeedNum;
-	long long int seedDis;
+	int64_t totalReadsLen;
+	int64_t correctedLen;
+	int64_t totalSeedNum;
+	int64_t totalWalkNum;
+	int64_t correctedNum;
+	int64_t highErrorNum;
+	int64_t exceedDepthNum;
+	int64_t exceedLeaveNum;
+	int64_t equalSeedNum;
+	int64_t seedDis;
 };
 
 //
@@ -335,16 +335,16 @@ private:
 	size_t m_mergePassed ;
 	size_t m_qcFail;
 	
-	long long int m_totalReadsLen;
-	long long int m_correctedLen;
-	long long int m_totalSeedNum;
-	long long int m_totalWalkNum;
-	long long int m_correctedNum;
-	long long int m_highErrorNum;
-	long long int m_exceedDepthNum;
-	long long int m_exceedLeaveNum;
-	long long int m_equalSeedNum;
-	long long int m_seedDis;
+	int64_t m_totalReadsLen;
+	int64_t m_correctedLen;
+	int64_t m_totalSeedNum;
+	int64_t m_totalWalkNum;
+	int64_t m_correctedNum;
+	int64_t m_highErrorNum;
+	int64_t m_exceedDepthNum;
+	int64_t m_exceedLeaveNum;
+	int64_t m_equalSeedNum;
+	int64_t m_seedDis;
 
 };
 
