@@ -193,7 +193,6 @@ int FMindexWalkMain(int argc, char** argv)
 		ecParams.kmerLength = 31;
 		ecParams.minKmerLength = 23;
 		ecParams.seedKmerThreshold = 9;
-		ecParams.maxLeaves = 256;
 		ecParams.FMWKmerThreshold = 3;
 		ecParams.maxOverlap = 91;
 		std::cout << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
