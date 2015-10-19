@@ -58,7 +58,7 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -M, --max-overlap=N              the max overlap (default: avg read length*0.9)\n"
 "\nPacBio correction parameters:\n"
 "      -s, --min-kmer-size=N            The minimum length of the kmer to use. (default: 9)\n"
-"      -x, 						        Attempt to correct kmers that are seen less than N times. (default: 3)\n"
+"      -x, --kmer-threshold=N           Attempt to correct kmers that are seen less than N times. (default: 3)\n"
 "      -y, --seed-kmer-threshold=N      Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
 "      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 64)\n"
 "      -d, --downward=N                 for each possible source, we consider N downward seeds as targets. (default: 3)\n"
