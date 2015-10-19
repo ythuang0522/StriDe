@@ -151,7 +151,6 @@ public:
 		highErrorNum(0),
 		exceedDepthNum(0),
 		exceedLeaveNum(0),
-		equalSeedNum(0),
 		seedDis(0) {}
 
 	DNAString correctSequence;
@@ -176,7 +175,6 @@ public:
 	int64_t highErrorNum;
 	int64_t exceedDepthNum;
 	int64_t exceedLeaveNum;
-	int64_t equalSeedNum;
 	int64_t seedDis;
 };
 
@@ -343,7 +341,6 @@ private:
 	int64_t m_highErrorNum;
 	int64_t m_exceedDepthNum;
 	int64_t m_exceedLeaveNum;
-	int64_t m_equalSeedNum;
 	int64_t m_seedDis;
 
 };

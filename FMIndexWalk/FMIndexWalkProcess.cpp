@@ -1306,7 +1306,6 @@ m_correctedNum(0),
 m_highErrorNum(0),
 m_exceedDepthNum(0),
 m_exceedLeaveNum(0),
-m_equalSeedNum(0),
 m_seedDis(0)
 {
 	if(params.algorithm == FMW_VALIDATE)
@@ -1327,7 +1326,6 @@ FMIndexWalkPostProcess::~FMIndexWalkPostProcess()
 		std::cout << "highErrorNum: " << m_highErrorNum << ", ratio: " << (float)(m_highErrorNum*100)/m_totalWalkNum << "%." << std::endl;
 		std::cout << "exceedDepthNum: " << m_exceedDepthNum << ", ratio: " << (float)(m_exceedDepthNum*100)/m_totalWalkNum << "%." << std::endl;
 		std::cout << "exceedLeaveNum: " << m_exceedLeaveNum << ", ratio: " << (float)(m_exceedLeaveNum*100)/m_totalWalkNum << "%." << std::endl;
-		std::cout << "equalSeedNum: " << m_equalSeedNum << ", ratio: " << (float)(m_equalSeedNum*100)/m_totalWalkNum << "%." << std::endl;
 		std::cout << "disBetweenSeeds: " << m_seedDis/m_totalWalkNum << std::endl << std::endl;
 	}
 	else
@@ -1352,7 +1350,6 @@ void FMIndexWalkPostProcess::process(const SequenceWorkItem& item, const FMIndex
 		m_highErrorNum += result.highErrorNum;
 		m_exceedDepthNum += result.exceedDepthNum;
 		m_exceedLeaveNum += result.exceedLeaveNum;
-		m_equalSeedNum += result.equalSeedNum;
 		m_seedDis += result.seedDis;
 		
 		if (result.merge)
