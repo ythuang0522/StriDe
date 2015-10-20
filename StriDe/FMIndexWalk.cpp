@@ -57,12 +57,14 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -m, --min-overlap=N              the min overlap (default: 81)\n"
 "      -M, --max-overlap=N              the max overlap (default: avg read length*0.9)\n"
 "\nPacBio correction parameters:\n"
-"      -s, --min-kmer-size=N            The minimum length of the kmer to use. (default: 9)\n"
+"      -k, --kmer-size=N                The length of the kmer to use. (default: 31, recommend: 31(PacBioH), 17(PacBioS).)\n"
+"      -s, --min-kmer-size=N            The minimum length of the kmer to use. (default: 9, recommend: 21(PacBioH), 9(PacBioS).)\n"
 "      -x, --kmer-threshold=N           Attempt to correct kmers that are seen less than N times. (default: 3)\n"
 "      -y, --seed-kmer-threshold=N      Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
-"      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 64)\n"
+"      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 32)\n"
+"      -M, --max-overlap=N              the max overlap (default: -1, recommend: avg read length*0.9(PacBioH).)\n"
 "      -d, --downward=N                 for each possible source, we consider N downward seeds as targets. (default: 3)\n"
-"      -c, --collect=N                  for each possible source, we consider N downward seeds to collect reads. (default: 3)\n"
+"      -c, --collect=N                  for each possible source, we consider N downward seeds to collect reads. (default: 5)\n"
 
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
@@ -190,12 +192,11 @@ int FMindexWalkMain(int argc, char** argv)
 	ecParams.collectedSeeds = opt::collect;
 	if(ecParams.algorithm == FMW_PACBIOSELF)
 	{
-		std::cout << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
+		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 			   	<< "number of threads:\t" << opt::numThreads << std::endl
 				<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
 				<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
 				<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
-				<< "max distance of searching seed:\t2* tendency distance" << std::endl
 				<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
 				<< "FMW search depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
 				<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
@@ -204,7 +205,7 @@ int FMindexWalkMain(int argc, char** argv)
 	}
 	else if(ecParams.algorithm == FMW_PACBIOHYB)
 	{
-		std::cout << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
+		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 				<< "number of threads:\t" << opt::numThreads << std::endl
 				<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
 				<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
@@ -224,16 +225,18 @@ int FMindexWalkMain(int argc, char** argv)
 				ecParams.seedWalkDistance.push_back(0);
 		}
 	}
+	else
+	{
+		std::cout << "Merge paired end reads into long reads for " << opt::readsFile << " using \n" 
+		<< "min overlap=" <<  ecParams.minOverlap << "\t"
+		<< "max overlap=" <<  ecParams.maxOverlap << "\t"
+		<< "max leaves=" << opt::maxLeaves << "\t"
+		<< "max Insert size=" << opt::maxInsertSize << "\t"
+		<< "kmer size=" << opt::kmerLength << "\n\n";
+	}
 	
 	// Setup post-processor
 	FMIndexWalkPostProcess postProcessor(pWriter, pDiscardWriter, ecParams);
-
-	std::cout << "Merge paired end reads into long reads for " << opt::readsFile << " using \n" 
-	<< "min overlap=" <<  ecParams.minOverlap << "\t"
-	<< "max overlap=" <<  ecParams.maxOverlap << "\t"
-	<< "max leaves=" << opt::maxLeaves << "\t"
-	<< "max Insert size=" << opt::maxInsertSize << "\t"
-	<< "kmer size=" << opt::kmerLength << "\n\n";
 
 	if(opt::numThreads <= 1)
 	{
