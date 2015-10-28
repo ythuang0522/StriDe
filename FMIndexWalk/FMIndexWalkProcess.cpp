@@ -421,21 +421,22 @@ FMIndexWalkResult FMIndexWalkProcess::PBSelfCorrection(const SequenceWorkItem& w
 		std::string mergedseq;
 		std::pair<int,std::string> source = pacbioCorrectedStrs.back();
 		
-		// A lot of goals
+		// Multiple targets will be tested for FM-index walk from source to target, until m_params.downward times.
 		for(int nextTargetSeed = 0 ; nextTargetSeed < m_params.downward && targetSeed + nextTargetSeed < seeds.size() ; nextTargetSeed++)
 		{
-			// <distance between seeds, read(ATCG)>
+			// <distance between targets, read(ATCG)>
 			std::vector<std::pair<int, std::string> > targets;
 			
-			// Goals are collected to find PB reads
+			// Multple targets are collected into targets vector, but for what ???
 			for(int collectedSeed = 0, currentTarget = targetSeed + nextTargetSeed ; collectedSeed < m_params.collectedSeeds && (currentTarget + collectedSeed) < seeds.size() ; collectedSeed++)
 			{
-				int dis_between_seeds = seeds[currentTarget+collectedSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
+				int dis_between_targets = seeds[currentTarget+collectedSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 				std::string target_str = seeds[currentTarget+collectedSeed].second;
-				targets.push_back(make_pair(dis_between_seeds, target_str));
+				targets.push_back(make_pair(dis_between_targets, target_str));
 			}
 			
 			std::cout << result.totalWalkNum << "----\n";
+			
 			SAIntervalTreeForPBGap SAITree(&source.second, m_params.minKmerLength,
 			targets,
 			m_params.maxLeaves, m_params.indices.pBWT, m_params.indices.pRBWT,
@@ -463,10 +464,11 @@ FMIndexWalkResult FMIndexWalkProcess::PBSelfCorrection(const SequenceWorkItem& w
 			}
 		}
 		
-		// FMWalk failure: 
+		// All multiple targets failure: 
 		// 1. high error 
 		// 2. exceed leaves
 		// 3. exceed depth
+		// Then what??
 		if(FMWalkReturnType < 0)
 		{
 			// seed distance
