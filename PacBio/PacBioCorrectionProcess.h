@@ -57,15 +57,15 @@ class PacBioCorrectionResult
 public:
 	PacBioCorrectionResult()
 	: kmerize(false),kmerize2(false),merge(false),merge2(false),
-		totalReadsLen(0),
-		correctedLen(0),
-		totalSeedNum(0),
-		totalWalkNum(0),
-		correctedNum(0),
-		highErrorNum(0),
-		exceedDepthNum(0),
-		exceedLeaveNum(0),
-		seedDis(0) {}
+	totalReadsLen(0),
+	correctedLen(0),
+	totalSeedNum(0),
+	totalWalkNum(0),
+	correctedNum(0),
+	highErrorNum(0),
+	exceedDepthNum(0),
+	exceedLeaveNum(0),
+	seedDis(0) {}
 
 	DNAString correctSequence;
 	DNAString correctSequence2;
@@ -134,7 +134,7 @@ private:
 	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
 	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
 	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
-		
+	
 	PacBioCorrectionParameters m_params;
 
 };
