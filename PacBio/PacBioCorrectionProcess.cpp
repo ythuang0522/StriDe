@@ -58,8 +58,6 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		std::string mergedseq;
 		std::pair<int,std::string> source = pacbioCorrectedStrs.back();
 		
-		SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
-
 		// Multiple targets will be tested for FM-index walk from source to target, until m_params.downward times.
 		for(int nextTargetSeed = 0 ; nextTargetSeed < m_params.downward && targetSeed + nextTargetSeed < seeds.size() ; nextTargetSeed++)
 		{
@@ -104,13 +102,14 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			int dis_between_src_target = seeds[currTargetIndex].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 			
 			// Estimate upper/lower/expected bounds of search depth
-			int maxLength = 1.2*(dis_between_src_target+15) + source.second.length() + smallKmerSize;
-			int minLength = 0.8*(dis_between_src_target-15) + source.second.length() + smallKmerSize;
+			int maxLength = 1.2*(dis_between_src_target+20) + source.second.length() + smallKmerSize;
+			int minLength = 0.8*(dis_between_src_target-20) + source.second.length() + smallKmerSize;
 			if(minLength<0) minLength = 0;
 			
 			size_t expectedLength = dis_between_src_target + source.second.length() + smallKmerSize;
 
 			// std::cout << "before build\t" << expectedLength << "\t" << maxLength << "\t" << minLength << "\n";
+			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
 			
 			// Collect local kmer frequency from source (1st time) and left seeds
 			const int seedMoveStepSize = 2;
@@ -160,7 +159,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			if(FMWalkReturnType==-3)
 			{
 				smallKmerSize++;
-				nextTargetSeed--;
+				// nextTargetSeed--;
 			}
 		}
 		
@@ -186,12 +185,14 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			// cut off
 			// pacbioCorrectedStrs.push_back(seeds[targetSeed]);
 			// }
-			// if(FMWalkReturnType == -1)
-			// result.highErrorNum++;
-			// else if(FMWalkReturnType == -2)
-			// result.exceedDepthNum++;
-			// else if(FMWalkReturnType == -3)
-			// result.exceedLeaveNum++;
+			
+			// statistics of FM extension
+			if(FMWalkReturnType == -1)
+			result.highErrorNum++;
+			else if(FMWalkReturnType == -2)
+			result.exceedDepthNum++;
+			else if(FMWalkReturnType == -3)
+			result.exceedLeaveNum++;
 		}
 		result.totalWalkNum++;
 	}
