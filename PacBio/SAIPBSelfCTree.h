@@ -30,7 +30,8 @@ class SAIPBSelfCorrectTree
         ~SAIPBSelfCorrectTree();
 
 		// Collect kmers from overlapping reads via right extension of single seed
-		void addHashFromSingleSeed(std::string seedStr, size_t hashKmerSize, size_t maxLength);
+		void addHashFromSingleSeedUsingFMExtension(std::string& seedStr, size_t hashKmerSize, size_t maxLength);
+		void addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength);
 
 		// Collect kmers from overlapping reads via FM-index walk between two seeds
 		int addHashFromPairedSeed(std::string seedStr, std::vector<std::pair<int, std::string> >  &targets, size_t hashKmerSize);

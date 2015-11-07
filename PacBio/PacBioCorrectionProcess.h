@@ -144,7 +144,7 @@ class PacBioCorrectionPostProcess
 {
 public:
 	PacBioCorrectionPostProcess(std::ostream* pCorrectedWriter,
-	std::ostream* pDiscardWriter,
+	// std::ostream* pDiscardWriter,
 	const PacBioCorrectionParameters params);
 
 	~PacBioCorrectionPostProcess();

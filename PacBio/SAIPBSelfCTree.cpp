@@ -163,7 +163,7 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 		return -4;
 }
 
-void SAIPBSelfCorrectTree::addHashFromSingleSeed(std::string seedStr, size_t hashKmerSize, size_t maxLength)
+void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingFMExtension(std::string& seedStr, size_t hashKmerSize, size_t maxLength)
 {
 	initializeSearchTree(seedStr, seedStr.length());
 
@@ -198,6 +198,8 @@ void SAIPBSelfCorrectTree::addHashFromSingleSeed(std::string seedStr, size_t has
 				{
 				  kmerHash[kmer].first = 0;
 				}
+				
+				// hashmap[] default value of int is zero
 				kmerHash[kmer].first+=kmerFreq;
 
 			}
@@ -240,6 +242,63 @@ void SAIPBSelfCorrectTree::addHashFromSingleSeed(std::string seedStr, size_t has
 	// printAll();
 	// getchar();
 	
+}
+
+// LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
+void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength)
+{
+	// LF-mapping of each fwd index
+    BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(seedStr));
+	for(int64_t fwdRootIndex = fwdInterval.lower; fwdRootIndex <= fwdInterval.upper && fwdInterval.isValid(); fwdRootIndex++)
+	{
+		// extract hashKmer
+		std::string currentFwdKmer=seedStr.substr(seedStr.length() - hashKmerSize);
+		int64_t fwdIndex = fwdRootIndex;
+		
+		for(size_t currentLength = seedStr.length(); currentLength <= maxLength; currentLength++)
+		{
+			char b = m_pRBWT->getChar(fwdIndex);
+			if(b == '$') break;
+			
+			currentFwdKmer = currentFwdKmer.substr(1) + b;
+			// std::cout << currentFwdKmer << "\n";
+
+			// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator hashiter = kmerHash.find(currentFwdKmer);
+			// if(hashiter == kmerHash.end())
+			  // kmerHash[currentFwdKmer].first = 0;
+
+			kmerHash[currentFwdKmer].first++;
+
+			// LF mapping
+            fwdIndex = m_pRBWT->getPC(b) + m_pRBWT->getOcc(b, fwdIndex - 1);			
+		}
+	}
+
+	// LF-mapping of each rvc index	
+	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(seedStr));
+	for(int64_t rvcRootIndex=rvcInterval.lower; rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid(); rvcRootIndex++)
+	{
+		std::string currentRvcKmer=reverseComplement(seedStr.substr(seedStr.length() - hashKmerSize));
+		int64_t rvcIndex = rvcRootIndex;
+		
+		for(size_t currentLength = seedStr.length(); currentLength <= maxLength; currentLength++)
+		{
+			char b = m_pBWT->getChar(rvcIndex);
+			if(b == '$') break;
+			
+			currentRvcKmer = b + currentRvcKmer.substr(0, hashKmerSize-1);
+			// std::cout << hashKmerSize << ":" << currentRvcKmer << "\n";
+
+			// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator hashiter = kmerHash.find(currentRvcKmer);
+			// if(hashiter == kmerHash.end())
+			  // kmerHash[currentRvcKmer].first = 0;
+
+			kmerHash[currentRvcKmer].first++;
+			
+			// LF mapping
+            rvcIndex = m_pBWT->getPC(b) + m_pBWT->getOcc(b, rvcIndex - 1);
+		}
+	}
 }
 
 int SAIPBSelfCorrectTree::addHashFromPairedSeed(std::string seedStr, std::vector<std::pair<int, std::string> >  &targets, size_t hashKmerSize)
@@ -337,7 +396,6 @@ void SAIPBSelfCorrectTree::printAll()
 // Extend each leaf node
 void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, size_t hashKmerSize)
 {
-	//int diff = 25;
     for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
     {
 		std::vector< std::pair<std::string, BWTIntervalPair> > extensions;
@@ -352,13 +410,17 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
             (*iter)->extend(extensions.front().first);
             (*iter)->fwdInterval=extensions.front().second.interval[0];
             (*iter)->rvcInterval=extensions.front().second.interval[1];
-			std::string kmer = (*iter)->getSuffix(hashKmerSize);
 			
-			SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator kmeriter = kmerHash.find(kmer);
-			if(kmeriter == kmerHash.end())
-			  continue;
+			std::string fwdkmer = (*iter)->getSuffix(hashKmerSize);
+			std::string rvckmer = reverseComplement(fwdkmer);
+			
+			// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator kmeriter = kmerHash.find(kmer);
+			// if(kmeriter == kmerHash.end())
+			  // continue;
 
-			size_t kmerfreqs = kmerHash[kmer].first;
+			size_t kmerfreqs = kmerHash[fwdkmer].first + kmerHash[rvckmer].first;
+			std::cout << kmerHash[fwdkmer].first << "\t" << kmerHash[rvckmer].first << "\n";
+			getchar();
 			if(kmerfreqs >= m_min_SA_threshold)
 			{
 				(*iter)->addKmerCount(kmerfreqs);
@@ -373,13 +435,19 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
                 SAIntervalNode* pChildNode = (*iter)->createChild(extensions[i].first);
                 pChildNode->fwdInterval=extensions[i].second.interval[0];
                 pChildNode->rvcInterval=extensions[i].second.interval[1];
-				std::string kmer = pChildNode->getSuffix(hashKmerSize);
-
-				SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator kmeriter = kmerHash.find(kmer);
-				if(kmeriter == kmerHash.end())
-				  continue;
+			
+				std::string fwdkmer = (*iter)->getSuffix(hashKmerSize);
+				std::string rvckmer = reverseComplement(fwdkmer);
 				
-				size_t kmerfreqs = kmerHash[kmer].first;
+				// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator kmeriter = kmerHash.find(kmer);
+				// if(kmeriter == kmerHash.end())
+				  // continue;
+
+				size_t kmerfreqs = kmerHash[fwdkmer].first + kmerHash[rvckmer].first;
+
+				// std::cout << m_min_SA_threshold << ": " << kmerHash[fwdkmer].first << "\t" << kmerHash[rvckmer].first << "\n";
+				// getchar();
+				
 				if(kmerfreqs >= m_min_SA_threshold)
 				{
 					pChildNode->addKmerCount((*iter)->getKmerCount());
@@ -390,6 +458,7 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
         }
     }
 }
+
 
 // Refine SA intervals of each leave with a new kmer
 void SAIPBSelfCorrectTree::refineSAInterval(size_t newKmer)

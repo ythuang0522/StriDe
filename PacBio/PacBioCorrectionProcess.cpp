@@ -12,6 +12,7 @@
 #include <iomanip>
 #include "SAIPBSelfCTree.h"
 #include "SAIPBHybridCTree.h"
+#include "Timer.h"
 using namespace std;
 
 
@@ -53,7 +54,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 	{
 		size_t largeKmerSize = m_params.kmerLength;
 		size_t smallKmerSize = m_params.minKmerLength;
-
+		
 		int FMWalkReturnType = -1;
 		std::string mergedseq;
 		std::pair<int,std::string> source = pacbioCorrectedStrs.back();
@@ -61,7 +62,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		// Multiple targets will be tested for FM-index walk from source to target, until m_params.downward times.
 		for(int nextTargetSeed = 0 ; nextTargetSeed < m_params.downward && targetSeed + nextTargetSeed < seeds.size() ; nextTargetSeed++)
 		{
-			std::cout << "======= " << result.totalWalkNum << " =======\n";
+			// std::cout << "======= " << result.totalWalkNum << " =======\n";
 
 			/********* PingYe's implementation  ***********/
 			// // <distance between targets, read(ATCG)>
@@ -108,37 +109,41 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			
 			size_t expectedLength = dis_between_src_target + source.second.length() + smallKmerSize;
 
-			// std::cout << "before build\t" << expectedLength << "\t" << maxLength << "\t" << minLength << "\n";
 			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
 			
 			// Collect local kmer frequency from source (1st time) and left seeds
-			const int seedMoveStepSize = 2;
-			const size_t maxkmerCount = 2;
-			int seedIdx=source.second.length()-largeKmerSize - (nextTargetSeed*seedMoveStepSize*maxkmerCount);
-			size_t kmerCount = 0;
-			for(; seedIdx >= 0 && kmerCount < maxkmerCount; seedIdx-=seedMoveStepSize, kmerCount++)
-			{
+			// const int seedMoveStepSize = 2;
+			// const size_t maxkmerCount = 1;
+			// int seedIdx=source.second.length()-largeKmerSize - (nextTargetSeed*seedMoveStepSize*maxkmerCount);
+			// size_t kmerCount = 0;
+			
+			int seedIdx=source.second.length()-largeKmerSize;			
+			// for(; seedIdx >= 0 && kmerCount < maxkmerCount; seedIdx-=seedMoveStepSize, kmerCount++)
+			// {
 				std::string srcStr = source.second.substr(seedIdx, largeKmerSize);
-				SAITree.addHashFromSingleSeed(srcStr, smallKmerSize, maxLength);
-			}
+				SAITree.addHashFromSingleSeedUsingLFMapping(srcStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
+				// SAITree.addHashFromSingleSeedUsingFMExtension(srcStr, smallKmerSize, maxLength);
+			// }
 
 			// Collect local kmer frequency from right targets
-			kmerCount = 0;			
-			for(int seedIdx=targetStr.length()-largeKmerSize; seedIdx >= 0 && kmerCount < 2; seedIdx-=2, kmerCount++)				
-			{
-				std::string destStr = targetStr.substr(seedIdx, largeKmerSize);			
-				SAITree.addHashFromSingleSeed(reverseComplement(destStr), smallKmerSize, maxLength);
-			}
+			// kmerCount = 0;			
+			// for(seedIdx=0; seedIdx <= (int)targetStr.length()-(int)largeKmerSize && kmerCount < maxkmerCount; seedIdx+=seedMoveStepSize, kmerCount++)				
+			// {
+				std::string destStr = targetStr.substr(0, largeKmerSize);	
+				destStr	= reverseComplement(destStr);
+				SAITree.addHashFromSingleSeedUsingLFMapping(destStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
+				// SAITree.addHashFromSingleSeedUsingFMExtension(destStr, smallKmerSize, maxLength);
+			// }
 			
 			// Extension using local kmer hash with smaller kmer size = m_params.minKmerLength
 			FMWalkReturnType = SAITree.mergeTwoSeedsUsingHash(source.second, targetStr, mergedseq, smallKmerSize, m_params.maxLeaves,
 			minLength, maxLength, expectedLength);
 			
-			std::cout << pacbioCorrectedStrs.size()-1 << ": " //<< reverseComplement((source.second).substr(source.second.length()-minOverlap)) << " " << reverseComplement((target.second).substr(0, minOverlap)) << " "
-			//<< (source.second).substr(source.second.length()-minOverlap) << " " << (target.second).substr(0, minOverlap) << " "
-			<< source.first << "-" << source.first+source.second.length()-1 <<  ":" << source.second.length() << ", " 
-			<<	seeds[targetSeed+nextTargetSeed].first << "-" << seeds[targetSeed+nextTargetSeed].first+seeds[targetSeed+nextTargetSeed].second.length()-1 <<  ":" << seeds[targetSeed+nextTargetSeed].second.length() << ", dis: "
-			<< dis_between_src_target << ". " << FMWalkReturnType << ".\n";
+			// std::cout << pacbioCorrectedStrs.size()-1 << ": " //<< reverseComplement((source.second).substr(source.second.length()-minOverlap)) << " " << reverseComplement((target.second).substr(0, minOverlap)) << " "
+			// //<< (source.second).substr(source.second.length()-minOverlap) << " " << (target.second).substr(0, minOverlap) << " "
+			// << source.first << "-" << source.first+source.second.length()-1 <<  ":" << source.second.length() << ", " 
+			// <<	seeds[targetSeed+nextTargetSeed].first << "-" << seeds[targetSeed+nextTargetSeed].first+seeds[targetSeed+nextTargetSeed].second.length()-1 <<  ":" << seeds[targetSeed+nextTargetSeed].second.length() << ", dis: "
+			// << dis_between_src_target << ". " << FMWalkReturnType << ".\n";
 			
 
 			// FMWalk success
@@ -159,7 +164,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			if(FMWalkReturnType==-3)
 			{
 				smallKmerSize++;
-				// nextTargetSeed--;
+				nextTargetSeed--;
 			}
 		}
 		
@@ -500,7 +505,7 @@ int PacBioCorrectionProcess::solveHighError(pair<int,string> firstSeed, pair<int
 //
 //
 PacBioCorrectionPostProcess::PacBioCorrectionPostProcess(std::ostream* pCorrectedWriter,
-std::ostream* pDiscardWriter,
+// std::ostream* pDiscardWriter,
 const PacBioCorrectionParameters params) :
 m_pCorrectedWriter(pCorrectedWriter),
 m_params(params),
