@@ -110,6 +110,7 @@ AC_CONFIG_FILES([Makefile
 		Concurrency/Makefile
 		SuffixTools/Makefile
 		FMIndexWalk/Makefile
+		PacBio/Makefile
 		StriDe/Makefile])
 
 AC_OUTPUT

@@ -9,7 +9,8 @@ stride_CPPFLAGS = \
 	-I$(top_srcdir)/Algorithm \
 	-I$(top_srcdir)/SQG \
 	-I$(top_srcdir)/Thirdparty \
-	-I$(top_srcdir)/FMIndexWalk
+	-I$(top_srcdir)/FMIndexWalk \
+	-I$(top_srcdir)/PacBio
 
 stride_LDADD = \
 	$(top_builddir)/StringGraph/libstringgraph.a \
@@ -20,7 +21,8 @@ stride_LDADD = \
 	$(top_builddir)/Util/libutil.a \
 	$(top_builddir)/SQG/libsqg.a \
 	$(top_builddir)/Thirdparty/libthirdparty.a \
-	$(top_builddir)/FMIndexWalk/libfmindexwalk.a
+	$(top_builddir)/FMIndexWalk/libfmindexwalk.a \
+	$(top_builddir)/PacBio/libpacbio.a
 
 stride_LDFLAGS = -pthread
 
@@ -39,5 +41,6 @@ stride_SOURCES = StriDe.cpp \
 		kmerfreq.h kmerfreq.cpp \
 		grep.h grep.cpp \
 		FMIndexWalk.h FMIndexWalk.cpp \
+		PacBioCorrection.h PacBioCorrection.cpp \
 		asmlong.h asmlong.cpp \
               SGACommon.h 

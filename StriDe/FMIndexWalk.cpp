@@ -47,24 +47,13 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -o, --outfile=FILE               write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
 "      -t, --threads=NUM                use NUM threads for the computation (default: 1)\n"
 "      -a, --algorithm=STR              specify the walking algorithm (hybrid (default), merge, kmerize, or validate)\n"
-"                                       pacbioH: pacbio hybrid correction (using NGS reads to correct PB reads)\n"
-"                                       pacbioS: pacbio self correction (using PB reads to correct PB reads)\n"
 "\nAlgorithm parameters:\n"
 "      -k, --kmer-size=N                The length of the kmer to use. (default: 31)\n"
 "      -x, --kmer-threshold=N           Attempt to correct kmers that are seen less than N times. (default: 3)\n"
 "      -L, --max-leaves=N               Number of maximum leaves in the search tree (default: 32)\n"
 "      -I, --max-insertsize=N           the maximum insert size (i.e. search depth) (deault: 400)\n"
-"      -m, --min-overlap=N              the min overlap (default: 81)\n"
-"      -M, --max-overlap=N              the max overlap (default: avg read length*0.9)\n"
-"\nPacBio correction parameters:\n"
-"      -k, --kmer-size=N                The length of the kmer to use. (default: 31, recommend: 31 (PacBioH), 17 (PacBioS).)\n"
-"      -s, --min-kmer-size=N            The minimum length of the kmer to use. (default: 9, recommend: 21 (PacBioH), 9 (PacBioS).)\n"
-"      -x, --kmer-threshold=N           Attempt to correct kmers that are seen less than N times. (default: 3)\n"
-"      -y, --seed-kmer-threshold=N      Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
-"      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 32)\n"
-"      -M, --max-overlap=N              the max overlap (default: -1, recommend: avg read length*0.9 (PacBioH).)\n"
-"      -d, --downward=N                 for each possible source, we consider N downward seeds as targets. (default: 3)\n"
-"      -c, --collect=N                  for each possible source, we consider N downward seeds to collect reads. (default: 5)\n"
+"      -m, --min-overlap=N           the min overlap (default: 81)\n"
+"      -M, --max-overlap=N           the max overlap (default: avg read length*0.9)\n"
 
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
@@ -90,16 +79,11 @@ namespace opt
 	static int maxInsertSize=400;
 	static int minOverlap=81;
 	static int maxOverlap=-1;
-	
-	static int minKmerLength = 9;
-	static int seedKmerThreshold = 10;
-	static int downward = 3;
-	static int collect = 5;
 
 	static FMIndexWalkAlgorithm algorithm = FMW_HYBRID;
 }
 
-static const char* shortopts = "p:t:o:a:k:x:L:I:m:M:s:y:d:c:v";
+static const char* shortopts = "p:t:o:a:k:x:L:I:m:M:v";
 
 enum { OPT_HELP = 1, OPT_VERSION, OPT_METRICS, OPT_DISCARD, OPT_LEARN };
 
@@ -110,14 +94,10 @@ static const struct option longopts[] = {
 	{ "prefix",        required_argument, NULL, 'p' },
 	{ "algorithm",     required_argument, NULL, 'a' },
 	{ "kmer-size",     required_argument, NULL, 'k' },
-	{ "kmer-threshold" ,required_argument, NULL, 'x' },
+	{ "kmer-threshold",required_argument, NULL, 'x' },
 	{ "max-leaves",    required_argument, NULL, 'L' },
-	{ "max-insertsize" ,required_argument, NULL, 'I' },
-	{ "min-overlap"    ,required_argument, NULL, 'm' },
-	{ "min-kmer-size"  ,required_argument, NULL, 's' },
-	{ "seed-kmer-threshold"   ,required_argument, NULL, 'y' },
-	{ "downward"       ,required_argument, NULL, 'd' },
-	{ "collect"        ,required_argument, NULL, 'c' },
+	{ "max-insertsize",required_argument, NULL, 'I' },
+	{ "min-overlap"   ,required_argument, NULL, 'm' },
 	{ "learn",         no_argument,       NULL, OPT_LEARN },
 	{ "discard",       no_argument,       NULL, OPT_DISCARD },
 	{ "help",          no_argument,       NULL, OPT_HELP },
@@ -185,58 +165,16 @@ int FMindexWalkMain(int argc, char** argv)
 	ecParams.maxInsertSize = opt::maxInsertSize;
 	ecParams.minOverlap = opt::minOverlap;
 	ecParams.maxOverlap = opt::maxOverlap;
-	ecParams.minKmerLength = opt::minKmerLength;
-	ecParams.seedKmerThreshold = opt::seedKmerThreshold;
-	ecParams.FMWKmerThreshold = opt::kmerThreshold;
-	ecParams.downward = opt::downward;
-	ecParams.collectedSeeds = opt::collect;
-	if(ecParams.algorithm == FMW_PACBIOSELF)
-	{
-		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
-			   	<< "number of threads:\t" << opt::numThreads << std::endl
-				<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
-				<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
-				<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
-				<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
-				<< "FMW search depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
-				<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
-				<< "downward each pair of seeds:\t" << ecParams.downward << std::endl
-				<< "number of target to be collected:\t" << ecParams.collectedSeeds << std::endl << std::endl;
-	}
-	else if(ecParams.algorithm == FMW_PACBIOHYB)
-	{
-		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
-				<< "number of threads:\t" << opt::numThreads << std::endl
-				<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
-				<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
-				<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
-				<< "max distance of searching seed:\t2* tendency distance" << std::endl							
-				<< "FMW max overlap:\t" <<  ecParams.maxOverlap << std::endl 
-				<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
-				<< "FMW search depth:\t1.2~0.8* (length between two seeds +- 10)" << std::endl
-				<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
-		
-		// computing distance of various continuous matches length (dk)
-		for(int i = 0 ; i <= ecParams.kmerLength ; i++)
-		{
-			if(i >= ecParams.minKmerLength && i <= ecParams.kmerLength)
-				ecParams.seedWalkDistance.push_back(2*3.8649*pow(2.7183,0.1239*i));
-			else
-				ecParams.seedWalkDistance.push_back(0);
-		}
-	}
-	else
-	{
-		std::cout << "Merge paired end reads into long reads for " << opt::readsFile << " using \n" 
-		<< "min overlap=" <<  ecParams.minOverlap << "\t"
-		<< "max overlap=" <<  ecParams.maxOverlap << "\t"
-		<< "max leaves=" << opt::maxLeaves << "\t"
-		<< "max Insert size=" << opt::maxInsertSize << "\t"
-		<< "kmer size=" << opt::kmerLength << "\n\n";
-	}
 	
 	// Setup post-processor
 	FMIndexWalkPostProcess postProcessor(pWriter, pDiscardWriter, ecParams);
+
+	std::cout << "Merge paired end reads into long reads for " << opt::readsFile << " using \n" 
+	<< "min overlap=" <<  ecParams.minOverlap << "\t"
+	<< "max overlap=" <<  ecParams.maxOverlap << "\t"
+	<< "max leaves=" << opt::maxLeaves << "\t"
+	<< "max Insert size=" << opt::maxInsertSize << "\t"
+	<< "kmer size=" << opt::kmerLength << "\n\n";
 
 	if(opt::numThreads <= 1)
 	{
@@ -325,10 +263,6 @@ void parseFMWalkOptions(int argc, char** argv)
 		case 'I': arg >> opt::maxInsertSize; break;
 		case 'm': arg >> opt::minOverlap; break;
 		case 'M': arg >> opt::maxOverlap; break;
-		case 's': arg >> opt::minKmerLength; break;
-		case 'y': arg >> opt::seedKmerThreshold; break;
-		case 'd': arg >> opt::downward; break;
-		case 'c': arg >> opt::collect; break;
 		case OPT_LEARN: opt::bLearnKmerParams = true; break;
 		case OPT_HELP:
 			std::cout << CORRECT_USAGE_MESSAGE;
@@ -380,10 +314,6 @@ void parseFMWalkOptions(int argc, char** argv)
 		opt::algorithm = FMW_KMERIZE;
 		else if(algo_str == "validate")
 		opt::algorithm = FMW_VALIDATE;
-		else if(algo_str == "pacbioS")
-		opt::algorithm = FMW_PACBIOSELF;
-		else if(algo_str == "pacbioH")
-		opt::algorithm = FMW_PACBIOHYB;
 		else
 		{
 			std::cerr << SUBPROGRAM << ": unrecognized -a,--algorithm parameter: " << algo_str << "\n";
@@ -418,10 +348,6 @@ void parseFMWalkOptions(int argc, char** argv)
 	{
 		if (opt::algorithm == FMW_HYBRID || opt::algorithm ==  FMW_MERGE )
 		opt::outFile = out_prefix + ".merge.fa";
-		else if (opt::algorithm == FMW_PACBIOSELF)
-			opt::outFile = out_prefix + ".PBSelfCor.fa";
-		else if (opt::algorithm == FMW_PACBIOHYB)
-			opt::outFile = out_prefix + ".PBHybridCor.fa";
 		else
 		opt::outFile = out_prefix + ".origin.fa";
 	}

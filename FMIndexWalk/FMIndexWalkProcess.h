@@ -26,9 +26,7 @@ enum FMIndexWalkAlgorithm
 	FMW_KMERIZE,
 	FMW_MERGE,
 	FMW_HYBRID,	//merge and kmerize of paired end reads
-	FMW_VALIDATE,	////merge and kmerize of single end reads
-	FMW_PACBIOSELF,	// PacBio self correction
-	FMW_PACBIOHYB	// PacBio Hybrid Correction
+	FMW_VALIDATE	////merge and kmerize of single end reads
 };
 
 
@@ -57,13 +55,6 @@ struct FMIndexWalkParameters
 	
 	KmerDistribution kd;
 
-	// FMW_PACBIO
-	int minKmerLength;
-	int FMWKmerThreshold;
-	int seedKmerThreshold;
-	int downward;
-	int collectedSeeds;
-	std::vector<int> seedWalkDistance;
 };
 
 
@@ -142,16 +133,7 @@ class FMIndexWalkResult
 {
 public:
 	FMIndexWalkResult()
-	: kmerize(false),kmerize2(false),merge(false),merge2(false),
-		totalReadsLen(0),
-		correctedLen(0),
-		totalSeedNum(0),
-		totalWalkNum(0),
-		correctedNum(0),
-		highErrorNum(0),
-		exceedDepthNum(0),
-		exceedLeaveNum(0),
-		seedDis(0) {}
+	: kmerize(false),kmerize2(false),merge(false),merge2(false) {}
 
 	DNAString correctSequence;
 	DNAString correctSequence2;
@@ -165,17 +147,6 @@ public:
 	std::vector<DNAString> kmerizedReads ;
 	std::vector<DNAString> kmerizedReads2 ;
 
-	// PacBio reads correction by Ya, v20151001.
-	std::vector<DNAString> correctedPacbioStrs;
-	int64_t totalReadsLen;
-	int64_t correctedLen;
-	int64_t totalSeedNum;
-	int64_t totalWalkNum;
-	int64_t correctedNum;
-	int64_t highErrorNum;
-	int64_t exceedDepthNum;
-	int64_t exceedLeaveNum;
-	int64_t seedDis;
 };
 
 //
@@ -231,16 +202,6 @@ public:
 				return ValidateReads(workItem);
 				break;
 			}
-		case FMW_PACBIOSELF:
-			{
-				return PBSelfCorrection(workItem);
-				break;
-			}
-		case FMW_PACBIOHYB:
-			{
-				return PBHybridCorrection(workItem);
-				break;
-			}
 
 		default:
 			{
@@ -255,18 +216,8 @@ public:
 	FMIndexWalkResult MergePairedReads(const SequenceWorkItemPair& workItemPair);
 	FMIndexWalkResult KmerizeReads(const SequenceWorkItem& workItem);
 	FMIndexWalkResult ValidateReads(const SequenceWorkItem& workItem);
-	// PacBio correction by Ya, v20150305.
-	FMIndexWalkResult PBSelfCorrection(const SequenceWorkItem& workItem);
-	FMIndexWalkResult PBHybridCorrection(const SequenceWorkItem& workItem);
 
-private:
-
-	// PacBio correction by Ya, v20150305.
-	std::vector<std::pair<int, std::string> > searchingSeedsUsingSolidKmer(const std::string readSeq);
-	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
-	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
-	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
-		
+private:		
 	//check necessary conditions for FM-index walk
 	bool isSuitableForFMWalk(std::string& seqFirst, std::string& seqSecond);
 	
@@ -332,16 +283,6 @@ private:
 	size_t m_kmerizePassed ;
 	size_t m_mergePassed ;
 	size_t m_qcFail;
-	
-	int64_t m_totalReadsLen;
-	int64_t m_correctedLen;
-	int64_t m_totalSeedNum;
-	int64_t m_totalWalkNum;
-	int64_t m_correctedNum;
-	int64_t m_highErrorNum;
-	int64_t m_exceedDepthNum;
-	int64_t m_exceedLeaveNum;
-	int64_t m_seedDis;
 
 };
 

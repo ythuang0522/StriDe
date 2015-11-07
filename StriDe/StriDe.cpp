@@ -20,6 +20,7 @@
 #include "kmerfreq.h"
 #include "grep.h"
 #include "FMIndexWalk.h"
+#include "PacBioCorrection.h"
 #include "strideall.h"
 #include "asmlong.h"
 
@@ -30,7 +31,7 @@ static const char *STRIDE_VERSION_MESSAGE =
 "Stride Assembler  " PACKAGE_VERSION "\n"
 "Written by Yao-Ting Huang.\n"
 "\n"
-"Copyright 2014 National Chung Cheng University\n";
+"Copyright 2015 National Chung Cheng University\n";
 
 static const char *STRIDE_USAGE_MESSAGE =
 "Program: " PACKAGE_NAME "\n"
@@ -43,6 +44,7 @@ static const char *STRIDE_USAGE_MESSAGE =
 "      preprocess  filter and quality-trim reads\n"
 "      index       build FM-index for a set of reads\n"
 "      correct     correct sequencing errors in reads \n"
+"      pbcorrect   correct sequencing errors in PacBio reads \n"
 "      fmwalk      merge paired reads into long reads via FM-index walk\n"
 "      filter      remove redundant reads from a data set\n"
 "      overlap     compute overlaps between reads\n"
@@ -87,7 +89,9 @@ int main(int argc, char** argv)
             overlapMain(argc - 1, argv + 1);
         else if(command == "correct")
             correctMain(argc - 1, argv + 1);
-        else if(command == "assemble")
+        else if(command == "pbcorrect")
+            PacBioCorrectionMain(argc - 1, argv + 1);
+		else if(command == "assemble")
             assembleMain(argc - 1, argv + 1);
         else if(command == "subgraph")
             subgraphMain(argc - 1, argv + 1);
