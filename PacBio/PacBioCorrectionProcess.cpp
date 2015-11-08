@@ -38,7 +38,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 	seeds = searchingSeedsUsingSolidKmer(readSeq);	
 	result.totalSeedNum = seeds.size();
 	
-	std::cout << workItem.read.id << ":" << readSeq.length() << "\n";
+	std::cout << workItem.read.id << "\n";
 
 	// initialize corrected pacbio reads string
 	if(seeds.size() > 1)
@@ -146,13 +146,13 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			// FMWalk success
 			if(FMWalkReturnType > 0)
 			{				
-				size_t gainPos = source.second.length();
-				assert(mergedseq.length() > gainPos);
-				std::string gainStr = mergedseq.substr(gainPos);
+				size_t startPos = source.second.length();
+				// assert(mergedseq.length() > startPos);
+				std::string gainStr = mergedseq.substr(startPos);
 				pacbioCorrectedStrs.back().second += gainStr;
 				result.correctedLen += gainStr.length();
 				result.correctedNum++;
-				result.seedDis += seeds[targetSeed+nextTargetSeed].first - source.first - source.second.length();
+				result.seedDis += seeds[targetSeed+nextTargetSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 				targetSeed = targetSeed + nextTargetSeed;
 				break;
 			}
@@ -173,20 +173,17 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		if(FMWalkReturnType < 0)
 		{
 			// seed distance
-			result.seedDis += seeds[targetSeed].first - source.first - source.second.length();
+			result.seedDis += seeds[targetSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 			result.correctedLen += seeds[targetSeed].second.length();
-			// if(round != 1)
-			// {
+
 			// not cut off
-			pacbioCorrectedStrs.back().second += readSeq.substr(source.first + source.second.length(), 
-			seeds[targetSeed].first + seeds[targetSeed].second.length() - source.first - source.second.length());
-			// }
-			
-			// else if(round == 1)
-			// {
+			// size_t startPos = seeds[targetSeed-1].first + seeds[targetSeed-1].second.length();
+			// size_t extendedLen = seeds[targetSeed].first + seeds[targetSeed].second.length() - startPos;
+			// std::cout << readSeq.length() << "\t" << startPos << "\t" << extendedLen << "\n";
+			// pacbioCorrectedStrs.back().second += readSeq.substr(startPos,extendedLen);
+
 			// cut off
-			// pacbioCorrectedStrs.push_back(seeds[targetSeed]);
-			// }
+			pacbioCorrectedStrs.push_back(seeds[targetSeed]);
 			
 			// statistics of FM extension
 			if(FMWalkReturnType == -1)
