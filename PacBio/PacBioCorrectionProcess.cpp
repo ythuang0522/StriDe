@@ -26,20 +26,22 @@ PacBioCorrectionProcess::~PacBioCorrectionProcess()
 }
 
 
-// PacBio Self Correction by Ya, v20151001.
+// PacBio Self Correction by Ya and YTH, v20151107.
 PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceWorkItem& workItem)
 {	
 	PacBioCorrectionResult result;
 	
 	std::vector<std::pair<int, std::string> > seeds, pacbioCorrectedStrs;
 	std::string readSeq = workItem.read.seq.toString();
-	
+		
 	// find seeds
 	seeds = searchingSeedsUsingSolidKmer(readSeq);	
 	result.totalSeedNum = seeds.size();
 	
+	std::cout << workItem.read.id << ":" << readSeq.length() << "\n";
+
 	// initialize corrected pacbio reads string
-	if(seeds.size() >= 1)
+	if(seeds.size() > 1)
 	{
 		result.correctedLen += seeds[0].second.length();
 		pacbioCorrectedStrs.push_back(seeds[0]);
@@ -49,6 +51,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		result.merge = false;
 		return result;
 	}
+	
 	
 	for(size_t targetSeed = 1 ; targetSeed < seeds.size() ; targetSeed++)
 	{
@@ -111,36 +114,30 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 
 			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
 			
-			// Collect local kmer frequency from source (1st time) and left seeds
-			// const int seedMoveStepSize = 2;
-			// const size_t maxkmerCount = 1;
-			// int seedIdx=source.second.length()-largeKmerSize - (nextTargetSeed*seedMoveStepSize*maxkmerCount);
-			// size_t kmerCount = 0;
-			
+			// Timer *phase1 = new Timer("phase1");
+
+			// Collect local kmer frequency from source
 			int seedIdx=source.second.length()-largeKmerSize;			
-			// for(; seedIdx >= 0 && kmerCount < maxkmerCount; seedIdx-=seedMoveStepSize, kmerCount++)
-			// {
-				std::string srcStr = source.second.substr(seedIdx, largeKmerSize);
-				SAITree.addHashFromSingleSeedUsingLFMapping(srcStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
-				// SAITree.addHashFromSingleSeedUsingFMExtension(srcStr, smallKmerSize, maxLength);
-			// }
+			std::string srcStr = source.second.substr(seedIdx, largeKmerSize);
+			bool leftSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(srcStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
 
 			// Collect local kmer frequency from right targets
-			// kmerCount = 0;			
-			// for(seedIdx=0; seedIdx <= (int)targetStr.length()-(int)largeKmerSize && kmerCount < maxkmerCount; seedIdx+=seedMoveStepSize, kmerCount++)				
-			// {
-				std::string destStr = targetStr.substr(0, largeKmerSize);	
-				destStr	= reverseComplement(destStr);
-				SAITree.addHashFromSingleSeedUsingLFMapping(destStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
-				// SAITree.addHashFromSingleSeedUsingFMExtension(destStr, smallKmerSize, maxLength);
-			// }
-			
+			std::string destStr = targetStr.substr(0, largeKmerSize);	
+			destStr	= reverseComplement(destStr);
+			bool rightSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(destStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
+
+			if(!leftSeedSafe || !rightSeedSafe)
+				return result;
+
+			// delete phase1;
+			// Timer *phase2 = new Timer("phase2");
+
 			// Extension using local kmer hash with smaller kmer size = m_params.minKmerLength
 			FMWalkReturnType = SAITree.mergeTwoSeedsUsingHash(source.second, targetStr, mergedseq, smallKmerSize, m_params.maxLeaves,
 			minLength, maxLength, expectedLength);
 			
+			// delete phase2;
 			// std::cout << pacbioCorrectedStrs.size()-1 << ": " //<< reverseComplement((source.second).substr(source.second.length()-minOverlap)) << " " << reverseComplement((target.second).substr(0, minOverlap)) << " "
-			// //<< (source.second).substr(source.second.length()-minOverlap) << " " << (target.second).substr(0, minOverlap) << " "
 			// << source.first << "-" << source.first+source.second.length()-1 <<  ":" << source.second.length() << ", " 
 			// <<	seeds[targetSeed+nextTargetSeed].first << "-" << seeds[targetSeed+nextTargetSeed].first+seeds[targetSeed+nextTargetSeed].second.length()-1 <<  ":" << seeds[targetSeed+nextTargetSeed].second.length() << ", dis: "
 			// << dis_between_src_target << ". " << FMWalkReturnType << ".\n";
@@ -160,8 +157,8 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 				break;
 			}
 			
-			
-			if(FMWalkReturnType==-3)
+			// increase smallKmerSize for reducing repeats
+			if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
 			{
 				smallKmerSize++;
 				nextTargetSeed--;
@@ -205,7 +202,20 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 	result.merge = true;
 	result.totalReadsLen = readSeq.length();
 	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
-	result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].second);
+		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].second);
+	
+
+	std::cout << std::endl;
+	std::cout << "totalReadLen: " << readSeq.length() << ", ";
+	std::cout << "correctedLen: " << result.correctedLen << ", ratio: " << (float)(result.correctedLen)/readSeq.length() << "." << std::endl;
+	std::cout << "totalSeedNum: " << result.totalSeedNum << "." << std::endl;
+	std::cout << "totalWalkNum: " << result.totalWalkNum << ", ";
+	std::cout << "correctedNum: " << result.correctedNum << ", ratio: " << (float)(result.correctedNum*100)/result.totalWalkNum << "%." << std::endl;
+	std::cout << "highErrorNum: " << result.highErrorNum << ", ratio: " << (float)(result.highErrorNum*100)/result.totalWalkNum << "%." << std::endl;
+	std::cout << "exceedDepthNum: " << result.exceedDepthNum << ", ratio: " << (float)(result.exceedDepthNum*100)/result.totalWalkNum << "%." << std::endl;
+	std::cout << "exceedLeaveNum: " << result.exceedLeaveNum << ", ratio: " << (float)(result.exceedLeaveNum*100)/result.totalWalkNum << "%." << std::endl;
+
+
 	return result;
 }
 
@@ -505,9 +515,10 @@ int PacBioCorrectionProcess::solveHighError(pair<int,string> firstSeed, pair<int
 //
 //
 PacBioCorrectionPostProcess::PacBioCorrectionPostProcess(std::ostream* pCorrectedWriter,
-// std::ostream* pDiscardWriter,
+std::ostream* pDiscardWriter,
 const PacBioCorrectionParameters params) :
 m_pCorrectedWriter(pCorrectedWriter),
+m_pDiscardWriter(pDiscardWriter),
 m_params(params),
 m_totalReadsLen(0),
 m_correctedLen(0),
@@ -526,18 +537,21 @@ PacBioCorrectionPostProcess::~PacBioCorrectionPostProcess()
 {	
 	if(m_params.algorithm == PBC_SELF || m_params.algorithm == PBC_HYBRID)
 	{
-		std::cout << std::endl;
-		std::cout << "totalReadsLen: " << m_totalReadsLen << ", ";
-		std::cout << "correctedLen: " << m_correctedLen << ", ratio: " << (float)(m_correctedLen)/m_totalReadsLen << "." << std::endl;
-		std::cout << "totalSeedNum: " << m_totalSeedNum << "." << std::endl;
-		std::cout << "totalWalkNum: " << m_totalWalkNum << ", ";
-		std::cout << "correctedNum: " << m_correctedNum << ", ratio: " << (float)(m_correctedNum*100)/m_totalWalkNum << "%." << std::endl;
-		std::cout << "highErrorNum: " << m_highErrorNum << ", ratio: " << (float)(m_highErrorNum*100)/m_totalWalkNum << "%." << std::endl;
-		std::cout << "exceedDepthNum: " << m_exceedDepthNum << ", ratio: " << (float)(m_exceedDepthNum*100)/m_totalWalkNum << "%." << std::endl;
-		std::cout << "exceedLeaveNum: " << m_exceedLeaveNum << ", ratio: " << (float)(m_exceedLeaveNum*100)/m_totalWalkNum << "%." << std::endl;
-		
-		if(m_params.algorithm == PBC_SELF)
-		std::cout << "disBetweenSeeds: " << m_seedDis/m_totalWalkNum << std::endl << std::endl;
+		if(m_totalWalkNum>0 && m_totalReadsLen>0)
+		{
+			std::cout << std::endl;
+			std::cout << "totalReadsLen: " << m_totalReadsLen << ", ";
+			std::cout << "correctedLen: " << m_correctedLen << ", ratio: " << (float)(m_correctedLen)/m_totalReadsLen << "." << std::endl;
+			std::cout << "totalSeedNum: " << m_totalSeedNum << "." << std::endl;
+			std::cout << "totalWalkNum: " << m_totalWalkNum << ", ";
+			std::cout << "correctedNum: " << m_correctedNum << ", ratio: " << (float)(m_correctedNum*100)/m_totalWalkNum << "%." << std::endl;
+			std::cout << "highErrorNum: " << m_highErrorNum << ", ratio: " << (float)(m_highErrorNum*100)/m_totalWalkNum << "%." << std::endl;
+			std::cout << "exceedDepthNum: " << m_exceedDepthNum << ", ratio: " << (float)(m_exceedDepthNum*100)/m_totalWalkNum << "%." << std::endl;
+			std::cout << "exceedLeaveNum: " << m_exceedLeaveNum << ", ratio: " << (float)(m_exceedLeaveNum*100)/m_totalWalkNum << "%." << std::endl;
+			
+			if(m_params.algorithm == PBC_SELF)
+				std::cout << "disBetweenSeeds: " << m_seedDis/m_totalWalkNum << std::endl << std::endl;
+		}
 	}
 }
 
@@ -546,19 +560,19 @@ PacBioCorrectionPostProcess::~PacBioCorrectionPostProcess()
 void PacBioCorrectionPostProcess::process(const SequenceWorkItem& item, const PacBioCorrectionResult& result)
 {
 	if(m_params.algorithm == PBC_SELF || m_params.algorithm == PBC_HYBRID)
-	{
-		m_totalReadsLen += result.totalReadsLen;
-		m_correctedLen += result.correctedLen;
-		m_totalSeedNum += result.totalSeedNum;
-		m_totalWalkNum += result.totalWalkNum;
-		m_correctedNum += result.correctedNum;
-		m_highErrorNum += result.highErrorNum;
-		m_exceedDepthNum += result.exceedDepthNum;
-		m_exceedLeaveNum += result.exceedLeaveNum;
-		m_seedDis += result.seedDis;
-		
+	{		
 		if (result.merge)
 		{
+			m_totalReadsLen += result.totalReadsLen;
+			m_correctedLen += result.correctedLen;
+			m_totalSeedNum += result.totalSeedNum;
+			m_totalWalkNum += result.totalWalkNum;
+			m_correctedNum += result.correctedNum;
+			m_highErrorNum += result.highErrorNum;
+			m_exceedDepthNum += result.exceedDepthNum;
+			m_exceedLeaveNum += result.exceedLeaveNum;
+			m_seedDis += result.seedDis;
+
 			//cout << result.correctSequence.toString();
 			/*SeqItem mergeRecord;
 			stringstream ss;
@@ -576,6 +590,14 @@ void PacBioCorrectionPostProcess::process(const SequenceWorkItem& item, const Pa
 				mergeRecord2.seq = result.correctedPacbioStrs[i];
 				mergeRecord2.write(*m_pCorrectedWriter);
 			}
+		}
+		else
+		{
+			// write into discard.fa
+			SeqItem mergeRecord2;
+			mergeRecord2.id = item.read.id;
+			mergeRecord2.seq = item.read.seq;
+			mergeRecord2.write(*m_pDiscardWriter);
 		}
 	}
 }

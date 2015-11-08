@@ -15,7 +15,7 @@ SAIPBSelfCorrectTree::SAIPBSelfCorrectTree(
                     const BWT* pRBWT,
 					size_t min_SA_threshold) :
                     m_pBWT(pBWT), m_pRBWT(pRBWT), m_min_SA_threshold(min_SA_threshold),
-					m_PBLen(0), debug(false)
+					m_PBLen(0), m_pRootNode(NULL), debug(false)
 {
 
 	//if(targets[0].first == 169) debug = true;
@@ -25,7 +25,8 @@ SAIPBSelfCorrectTree::SAIPBSelfCorrectTree(
 SAIPBSelfCorrectTree::~SAIPBSelfCorrectTree()
 {
     // Recursively destroy the tree
-    delete m_pRootNode;
+	if(m_pRootNode!=NULL)
+		delete m_pRootNode;
 }
 
 // create root node using src
@@ -245,10 +246,19 @@ void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingFMExtension(std::string& se
 }
 
 // LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
-void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength)
+// Contaminated reads often are simple repeats C* or T* with large freq
+// Give up this read if the freq is way too large
+bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength, int64_t contaminatedCutoff)
 {
 	// LF-mapping of each fwd index
     BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(seedStr));
+	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(seedStr));
+
+	// std::cout << fwdInterval.isValid() << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
+
+	// Contamination leads to large freq
+	if(fwdInterval.size() >= contaminatedCutoff || rvcInterval.size() >= contaminatedCutoff) return false;
+
 	for(int64_t fwdRootIndex = fwdInterval.lower; fwdRootIndex <= fwdInterval.upper && fwdInterval.isValid(); fwdRootIndex++)
 	{
 		// extract hashKmer
@@ -275,7 +285,6 @@ void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 	}
 
 	// LF-mapping of each rvc index	
-	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(seedStr));
 	for(int64_t rvcRootIndex=rvcInterval.lower; rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid(); rvcRootIndex++)
 	{
 		std::string currentRvcKmer=reverseComplement(seedStr.substr(seedStr.length() - hashKmerSize));
@@ -299,6 +308,8 @@ void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
             rvcIndex = m_pBWT->getPC(b) + m_pBWT->getOcc(b, rvcIndex - 1);
 		}
 	}
+	
+	return true;
 }
 
 int SAIPBSelfCorrectTree::addHashFromPairedSeed(std::string seedStr, std::vector<std::pair<int, std::string> >  &targets, size_t hashKmerSize)
@@ -419,8 +430,8 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
 			  // continue;
 
 			size_t kmerfreqs = kmerHash[fwdkmer].first + kmerHash[rvckmer].first;
-			std::cout << kmerHash[fwdkmer].first << "\t" << kmerHash[rvckmer].first << "\n";
-			getchar();
+			// std::cout << kmerHash[fwdkmer].first << "\t" << kmerHash[rvckmer].first << "\n";
+			// getchar();
 			if(kmerfreqs >= m_min_SA_threshold)
 			{
 				(*iter)->addKmerCount(kmerfreqs);

@@ -174,14 +174,14 @@ int PacBioCorrectionMain(int argc, char** argv)
 	{
 		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 		<< "number of threads:\t" << opt::numThreads << std::endl
-		<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
-		<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
-		<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
-		<< "FMW max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "FMW search depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
-		<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
+		<< "large kmer size:\t" << ecParams.kmerLength << std::endl 
+		<< "large kmer freq. cutoff:\t" << ecParams.seedKmerThreshold << std::endl
+		<< "small kmer size:\t" << ecParams.minKmerLength << std::endl
+		<< "small kmer freq. cutoff:\t" << ecParams.FMWKmerThreshold << std::endl
+		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
+		<< "max depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
 		<< "downward each pair of seeds:\t" << ecParams.downward << std::endl
-		<< "number of target to be collected:\t" << ecParams.collectedSeeds << std::endl << std::endl;
+		<< "number of targets to be collected:\t" << ecParams.collectedSeeds << std::endl << std::endl;
 	}
 	else if(ecParams.algorithm == PBC_HYBRID)
 	{
@@ -207,7 +207,7 @@ int PacBioCorrectionMain(int argc, char** argv)
 	}
 	
 	// Setup post-processor
-	PacBioCorrectionPostProcess postProcessor(pWriter, ecParams);
+	PacBioCorrectionPostProcess postProcessor(pWriter, pDiscardWriter, ecParams);
 
 	if(opt::numThreads <= 1)
 	{
@@ -371,5 +371,5 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 		else
 		assert(false);
 	}
-
+	opt::discardFile = out_prefix + ".discard.fa";
 }

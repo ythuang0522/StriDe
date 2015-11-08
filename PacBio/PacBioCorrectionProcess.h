@@ -56,7 +56,7 @@ class PacBioCorrectionResult
 {
 public:
 	PacBioCorrectionResult()
-	: kmerize(false),kmerize2(false),merge(false),merge2(false),
+	: merge(false),
 	totalReadsLen(0),
 	correctedLen(0),
 	totalSeedNum(0),
@@ -68,16 +68,10 @@ public:
 	seedDis(0) {}
 
 	DNAString correctSequence;
-	DNAString correctSequence2;
-
-	bool kmerize;
-	bool kmerize2;
+	
 	bool merge;
-	bool merge2;
-
+	
 	size_t kmerLength;
-	std::vector<DNAString> kmerizedReads ;
-	std::vector<DNAString> kmerizedReads2 ;
 
 	// PacBio reads correction by Ya, v20151001.
 	std::vector<DNAString> correctedPacbioStrs;
@@ -98,7 +92,11 @@ class PacBioCorrectionProcess
 public:
 	PacBioCorrectionProcess(const PacBioCorrectionParameters params);
 	~PacBioCorrectionProcess();
-	
+
+	// PacBio correction by Ya, v20150305.
+	PacBioCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
+	PacBioCorrectionResult PBHybridCorrection(const SequenceWorkItem& workItem);
+
 	PacBioCorrectionResult process(const SequenceWorkItem& workItem)
 	{
 		switch(m_params.algorithm)
@@ -123,9 +121,6 @@ public:
 		PacBioCorrectionResult result;
 		return result;
 	}		
-	// PacBio correction by Ya, v20150305.
-	PacBioCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
-	PacBioCorrectionResult PBHybridCorrection(const SequenceWorkItem& workItem);
 
 private:
 
@@ -144,13 +139,13 @@ class PacBioCorrectionPostProcess
 {
 public:
 	PacBioCorrectionPostProcess(std::ostream* pCorrectedWriter,
-	// std::ostream* pDiscardWriter,
+	std::ostream* pDiscardWriter,
 	const PacBioCorrectionParameters params);
 
 	~PacBioCorrectionPostProcess();
 
 	void process(const SequenceWorkItem& item, const PacBioCorrectionResult& result);
-	void process(const SequenceWorkItemPair& itemPair, const PacBioCorrectionResult& result);
+	// void process(const SequenceWorkItemPair& itemPair, const PacBioCorrectionResult& result);
 
 private:
 

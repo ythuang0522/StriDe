@@ -31,7 +31,11 @@ class SAIPBSelfCorrectTree
 
 		// Collect kmers from overlapping reads via right extension of single seed
 		void addHashFromSingleSeedUsingFMExtension(std::string& seedStr, size_t hashKmerSize, size_t maxLength);
-		void addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength);
+		
+		// LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
+		// Contaminated reads often are simple repeats C* or T* with large freq
+		// Return false if the freq is way too large
+		bool addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength, int64_t contaminatedCutoff=256);
 
 		// Collect kmers from overlapping reads via FM-index walk between two seeds
 		int addHashFromPairedSeed(std::string seedStr, std::vector<std::pair<int, std::string> >  &targets, size_t hashKmerSize);
