@@ -216,7 +216,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 	return result;
 }
 
-std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeedsUsingSolidKmer(const std::string readSeq)
+std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeedsUsingSolidKmer(const std::string readSeq, size_t contaminatedCutoff)
 {
 	std::vector<std::pair<int, std::string> > seeds;
 	int kmerLen = m_params.kmerLength, 
@@ -228,37 +228,37 @@ std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeed
 		for(int i = 0 ; i+kmerLen <= readLen ; i++)
 		{
 			std::string kmer = readSeq.substr(i, kmerLen);
-			// int kmerFreqs = 0;
-			// kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
-			// kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
-			int kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);
+			size_t kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);
 			
 			// std::cout << i << ": " << kmerFreqs << "\n";
 			
-			if(kmerFreqs >= kmerThreshold)
+			if(kmerFreqs >= (size_t) kmerThreshold)
 			{
 				int seedStartPos = i, 
 				seedLen = 0;
 				
 				// Group consecutive solid kmers into one seed if possible
-				for(i++ ; i+kmerLen <= readLen ; i++)
+				size_t maxKmerFreq = kmerFreqs;
+				for(i++ ; i+kmerLen <= readLen; i++)
 				{
-					// std::cout << i << ": " << kmerFreqs << "\n";
 					kmer = readSeq.substr(i, kmerLen);
-					// kmerFreqs = 0;
-					// kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
-					// kmerFreqs += BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
 					kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);;
-					// std::cout << kmer << ": " << kmerFreqs << "\n";
+					// std::cout << i << ": " << kmerFreqs << "\n";
 					
-					if(kmerFreqs >= kmerThreshold)
-					seedLen++;
+					// contaminated seeds lead to large kmer freq					
+					maxKmerFreq = std::max(maxKmerFreq,kmerFreqs);
+					if(kmerFreqs >= (size_t) kmerThreshold)
+						seedLen++;
 					else
-					break;
+						break;
 				}
-				
-				seeds.push_back(make_pair(seedStartPos, readSeq.substr(seedStartPos, seedLen+kmerLen)));
-				i = i - 2 + kmerLen;
+
+				// skip contaminated seeds
+				if(maxKmerFreq < contaminatedCutoff)
+				{
+					seeds.push_back(make_pair(seedStartPos, readSeq.substr(seedStartPos, seedLen+kmerLen)));
+					i = i - 2 + kmerLen;
+				}
 			}
 		}
 	}

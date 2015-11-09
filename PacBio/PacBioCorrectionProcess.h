@@ -125,7 +125,7 @@ public:
 private:
 
 	// PacBio correction by Ya, v20150305.
-	std::vector<std::pair<int, std::string> > searchingSeedsUsingSolidKmer(const std::string readSeq);
+	std::vector<std::pair<int, std::string> > searchingSeedsUsingSolidKmer(const std::string readSeq, size_t contaminatedCutoff=256);
 	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
 	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
 	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);

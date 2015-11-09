@@ -78,7 +78,7 @@ namespace opt
 	static int kmerThreshold = 3;
 	static bool bLearnKmerParams = false;
 
-	static int maxLeaves=32;
+	static int maxLeaves=256;
 	static int minOverlap=81;
 	static int maxOverlap=-1;
 	

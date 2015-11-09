@@ -254,7 +254,7 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
     BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(seedStr));
 	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(seedStr));
 
-	// std::cout << fwdInterval.isValid() << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
+	// std::cout << hashKmerSize << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
 
 	// Contamination leads to large freq
 	if(fwdInterval.size() >= contaminatedCutoff || rvcInterval.size() >= contaminatedCutoff) return false;
