@@ -34,13 +34,13 @@ class KmerFeatures{
 		bool m_isVisited;
 
     public: 
-		KmerFeatures(size_t expectedLength, size_t intervalSize=32):
+		KmerFeatures(long long int pos, size_t expectedLength, size_t intervalSize=32):
 			m_intervalSize(intervalSize), 
 			m_totalFreq(0),m_totalSum(0), m_maxAvgFreq(0), m_isVisited(false)
 			{
 				m_sumOfFreq.resize(expectedLength/32 + 1);
 				m_sumOfPos.resize(expectedLength/32 + 1);
-
+				add(pos);
 			}
 			
 		~KmerFeatures(){
@@ -126,7 +126,7 @@ class KmerFeatures{
 class SAIPBSelfCorrectTree
 {
     public: 
-		SAIPBSelfCorrectTree(const BWT* pBWT, const BWT* pRBWT, size_t min_SA_threshold=3, int m_maxLeavesAllowed=256);
+		SAIPBSelfCorrectTree(const BWT* pBWT, const BWT* pRBWT, size_t min_SA_threshold=3, int m_maxLeavesAllowed=128);
 		
         ~SAIPBSelfCorrectTree();
 
@@ -194,8 +194,8 @@ class SAIPBSelfCorrectTree
 		// SparseHashMap<std::string, std::pair<long long int, long long int> > kmerHash;
 		
 		// multiple means for repeats leading to multinomial occurrences
-		SparseHashMap<std::string, KmerFeatures*, StringHasher> kmerHash;
-		typedef SparseHashMap<std::string, KmerFeatures*> :: iterator kmerHashiter;
+		DenseHashMap<std::string, KmerFeatures*, StringHasher> kmerHash;
+		typedef DenseHashMap<std::string, KmerFeatures*> :: iterator kmerHashiter;
 		
 		bool debug;
 };

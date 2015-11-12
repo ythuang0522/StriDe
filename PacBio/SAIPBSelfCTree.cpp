@@ -18,8 +18,9 @@ SAIPBSelfCorrectTree::SAIPBSelfCorrectTree(
                     m_pBWT(pBWT), m_pRBWT(pRBWT), m_min_SA_threshold(min_SA_threshold), m_maxLeavesAllowed(maxLeavesAllowed),
 					m_expectedLength(0), m_currentLength(0), m_pRootNode(NULL), debug(false)
 {
-
-	//if(targets[0].first == 169) debug = true;
+	// initialize google dense hashmap
+	kmerHash.set_empty_key("");
+	kmerHash.resize(6000);
 }
 
 //
@@ -28,8 +29,8 @@ SAIPBSelfCorrectTree::~SAIPBSelfCorrectTree()
     // Recursively destroy the tree
 	if(m_pRootNode!=NULL)
 		delete m_pRootNode;
-		
-	SparseHashMap<std::string, KmerFeatures*> :: iterator hashiter = kmerHash.begin();
+	
+	kmerHashiter hashiter = kmerHash.begin();
 	for(; hashiter != kmerHash.end(); ++hashiter)
 	{
 		delete hashiter->second;
@@ -196,23 +197,21 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 			kmerHashiter hashiter = kmerHash.find(currentFwdKmer);
 			if(hashiter == kmerHash.end())
 			{
-				KmerFeatures *newEntry = new KmerFeatures(maxLength);
+				KmerFeatures *newEntry;
+				if(expectedLength<0)
+					newEntry = new KmerFeatures(currentLength-seedStr.length(), maxLength);
+				else
+					newEntry = new KmerFeatures(expectedLength - currentLength + smallKmerSize, maxLength);
+					
 				kmerHash.insert(std::make_pair<std::string, KmerFeatures*>(currentFwdKmer, newEntry));
 			}
-			
-
-			// if(kmerHash[currentFwdKmer].second>0 && 
-				// (currentLength-kmerHash[currentFwdKmer].second/kmerHash[currentFwdKmer].first)>64)
-				// std::cout << currentLength-kmerHash[currentFwdKmer].second/kmerHash[currentFwdKmer].first << " haha\n";
-			
-			// std::cout << currentLength+1 - seedStr.length() << "\n";
-
-			hashiter = kmerHash.find(currentFwdKmer);
-			if(expectedLength<0)
-				hashiter->second->add(currentLength-seedStr.length());
 			else
-				hashiter->second->add(expectedLength - currentLength + smallKmerSize);
-
+			{
+				if(expectedLength<0)
+					hashiter->second->add(currentLength-seedStr.length());
+				else
+					hashiter->second->add(expectedLength - currentLength + smallKmerSize);
+			}
 			// LF mapping
             fwdIndex = m_pRBWT->getPC(b) + m_pRBWT->getOcc(b, fwdIndex - 1);			
 		}
@@ -234,24 +233,22 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 
 			kmerHashiter hashiter = kmerHash.find(currentRvcKmer);
 			if(hashiter == kmerHash.end())
-			{
-				KmerFeatures *newEntry = new KmerFeatures(maxLength);
+			{				
+				KmerFeatures *newEntry;
+				if(expectedLength<0)
+					newEntry = new KmerFeatures(currentLength-seedStr.length(), maxLength);
+				else
+					newEntry = new KmerFeatures(expectedLength - currentLength + smallKmerSize, maxLength);
+					
 				kmerHash.insert(std::make_pair<std::string, KmerFeatures*>(currentRvcKmer, newEntry));
 			}
-			 
-			// kmerHash[currentRvcKmer].first++;
-			
-			// if(expectedLength < 0)
-				// kmerHash[currentRvcKmer].second += currentLength;
-			// else
-				// kmerHash[currentRvcKmer].second += expectedLength-currentLength+smallKmerSize;
-
-			hashiter = kmerHash.find(currentRvcKmer);
-			if(expectedLength<0)
-				hashiter->second->add(currentLength-seedStr.length());
 			else
-				hashiter->second->add(expectedLength - currentLength + smallKmerSize);
-
+			{
+				if(expectedLength<0)
+					hashiter->second->add(currentLength-seedStr.length());
+				else
+					hashiter->second->add(expectedLength - currentLength + smallKmerSize);
+			}
 			// LF mapping
             rvcIndex = m_pBWT->getPC(b) + m_pBWT->getOcc(b, rvcIndex - 1);
 		}

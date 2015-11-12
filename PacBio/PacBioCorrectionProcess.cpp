@@ -119,7 +119,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			
 			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
 			
-			// Timer *phase1 = new Timer("phase1");
+			// Timer *phase1 = new Timer("addHashFromSingleSeedUsingLFMapping");
 			int maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
 			bool leftSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(sourceStr, largeKmerSize, smallKmerSize, maxLength);
 
@@ -134,7 +134,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 				return result;
 
 			// delete phase1;
-			// Timer *phase2 = new Timer("phase2");
+			// Timer *phase2 = new Timer("mergeTwoSeedsUsingHash");
 
 			// Estimate upper/lower/expected bounds of search depth
 			maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
