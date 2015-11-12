@@ -13,9 +13,10 @@ using namespace std;
 SAIPBSelfCorrectTree::SAIPBSelfCorrectTree(
 					const BWT* pBWT,
                     const BWT* pRBWT,
-					size_t min_SA_threshold) :
-                    m_pBWT(pBWT), m_pRBWT(pRBWT), m_min_SA_threshold(min_SA_threshold),
-					m_PBLen(0), m_pRootNode(NULL), debug(false)
+					size_t min_SA_threshold,
+					int maxLeavesAllowed) :
+                    m_pBWT(pBWT), m_pRBWT(pRBWT), m_min_SA_threshold(min_SA_threshold), m_maxLeavesAllowed(maxLeavesAllowed),
+					m_expectedLength(0), m_currentLength(0), m_pRootNode(NULL), debug(false)
 {
 
 	//if(targets[0].first == 169) debug = true;
@@ -27,6 +28,14 @@ SAIPBSelfCorrectTree::~SAIPBSelfCorrectTree()
     // Recursively destroy the tree
 	if(m_pRootNode!=NULL)
 		delete m_pRootNode;
+		
+	SparseHashMap<std::string, KmerFeatures*> :: iterator hashiter = kmerHash.begin();
+	for(; hashiter != kmerHash.end(); ++hashiter)
+	{
+		delete hashiter->second;
+		hashiter->second = NULL;
+	}
+
 }
 
 // create root node using src
@@ -49,8 +58,10 @@ void SAIPBSelfCorrectTree::initializeSearchTree(std::string src, size_t hashKmer
 	m_leaves.push_back(pRootNode);
 	
 	// for cleaning memory
-	m_pRootNode = pRootNode;
-
+	m_pRootNode = pRootNode;	
+	m_seedLength = src.length();
+	m_currentLength = src.length();
+	
 	// debug
 	// std::cout << beginningkmer << "\t" << pRootNode->fwdInterval.size() << "\t" << pRootNode->rvcInterval.size() << "\n";
 	
@@ -71,11 +82,10 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 {	
 	initializeSearchTree(src, hashKmerSize);
 	initializeTerminalIntervals(dest, hashKmerSize);
-	m_PBLen = expectedLength;
-	size_t currentLength = src.length();
+	m_expectedLength = expectedLength;
 	
 	SAIntervalNodeResultVector results;
-	while(!m_leaves.empty() && m_leaves.size() <= maxLeaves && currentLength <= maxLength)
+	while(!m_leaves.empty() && m_leaves.size() <= maxLeaves &&  (size_t)m_currentLength <= maxLength)
 	{
 		// std::cout << m_leaves.size() << "\t" << currentLength << "\t" << expectedLength << "\t" << maxLength << "\n";
 		refineSAInterval(hashKmerSize-1);
@@ -88,32 +98,19 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 
 		// extension succeed
 		if(!newLeaves.empty())
-			currentLength++;
+			m_currentLength++;
 
 		m_leaves.clear();
 		m_leaves = newLeaves;
 		
 		// see if terminating string is reached
-		if(currentLength >= minLength)
-		{
+		if( (size_t) m_currentLength >= minLength)
 			isTerminated(results);
-		}
 
-		/*if(debug == true)*/
-		// {
-			// cout << "CGCCAGCTGAGCTGGCGGTGTGAAATCAGGCAGTCAGGCGGCTCGCGTCTTGCGCGATAACCAGTTCTTCGTTGGTTGGGATAACCACCGCAGGACGGGTACCTTCTTTGTTGATGAAACCAGATTTGCCGAAACGTGCAGCCAGGTTGCGTTCATGATCAACTTCAAAGCCCAGCACGCCCAGTTTGCCCAGAGACAGTTCACGA\n";
-			// for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
-			// {
-				// std::string STNodeStr = (*iter)->getFullString();
-				// // char DNA[4] = {'A','T','C','G'};
-				// // for(int i = 0; i < 4 ; i++)
-				// // {
-					// // std::string fwdrepeatunit = (*iter)->getSuffix(hashKmerSize).substr(0,8) + DNA[i];
-					// std::string fwdrepeatunit = (*iter)->getSuffix(hashKmerSize);
-					// if(m_leaves.size() <= 50)
-						// cout << STNodeStr << " " << fwdrepeatunit << ":" << kmerHash[fwdrepeatunit].first << endl;
-				// // }
-			// }
+		// if(src.length() == 2216 || src.length() == 2190 || src.length() == 1112){
+			// std::cout << src << "\n";
+			// getchar();
+			// printLeaves(hashKmerSize);
 		// }
 	}
 	
@@ -136,7 +133,7 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 			//if(debug == true) cout << ">" << i << endl << tmpseq << endl;
 			
 			size_t cov = results[i].SAICoverage;
-			int ansDiff = tmpseq.length() - m_PBLen;
+			int ansDiff = tmpseq.length() - m_expectedLength;
 			
 			if(abs(ansDiff) <= lengthDiff && cov > maxKmerCoverage)
 			{
@@ -154,130 +151,67 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
     }
 	
     // Did not reach the terminal kmer
-    if(m_leaves.empty())
+    if(m_leaves.empty() && m_currentLength >= (int)(expectedLength-m_seedLength)/2+m_seedLength)
         return -1;	// high error
-    else if(currentLength > maxLength)
+    else if( (size_t) m_currentLength > maxLength)
         return -2;	// exceed search depth
     else if(m_leaves.size() > maxLeaves)
         return -3;	// too much repeats
-	else
+	else if(m_leaves.empty() && m_currentLength < (int)(expectedLength-m_seedLength)/2+m_seedLength)
 		return -4;
+	else
+		return -5;
 }
 
-void SAIPBSelfCorrectTree::addHashFromSingleSeedUsingFMExtension(std::string& seedStr, size_t hashKmerSize, size_t maxLength)
-{
-	initializeSearchTree(seedStr, seedStr.length());
-
-	size_t currentLength = seedStr.length();	
-	while(!m_leaves.empty() && currentLength <= maxLength)
-    {
-		// std::cout << m_leaves.size() << "\t" << ENDs[ENDs.size()-1].maxLength << "\n";
-		STNodePtrList newLeaves;
-		for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
-		{
-			std::vector< std::pair<std::string, BWTIntervalPair> > extensions;
-			
-			// Simulate LF-mapping of each SA index by setting min frequency of 1
-			extensions = getFMIndexRightExtensions(*iter, 1);
-
-			if(extensions.size() == 1)
-			{
-				(*iter)->extend(extensions.front().first);
-				(*iter)->fwdInterval=extensions.front().second.interval[0];
-				(*iter)->rvcInterval=extensions.front().second.interval[1];
-				newLeaves.push_back(*iter);
-
-				// insert into kmer hash
-				size_t kmerFreq = (*iter)->fwdInterval.isValid()?(*iter)->fwdInterval.size():0;
-				kmerFreq = (*iter)->rvcInterval.isValid()?kmerFreq+(*iter)->rvcInterval.size():kmerFreq;
-				assert(kmerFreq>0);
-				std::string kmer = (*iter)->getSuffix(hashKmerSize);
-				
-				// std::cout << kmer << "\t" << kmerHash[kmer].first << "\n";
-				SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator hashiter = kmerHash.find(kmer);
-				if(hashiter == kmerHash.end())
-				{
-				  kmerHash[kmer].first = 0;
-				}
-				
-				// hashmap[] default value of int is zero
-				kmerHash[kmer].first+=kmerFreq;
-
-			}
-			else if(extensions.size() > 1)
-			{
-				for(size_t i = 0; i < extensions.size(); ++i)
-				{
-					SAIntervalNode* pChildNode = (*iter)->createChild(extensions[i].first);
-					pChildNode->fwdInterval=extensions[i].second.interval[0];
-					pChildNode->rvcInterval=extensions[i].second.interval[1];
-					newLeaves.push_back(pChildNode);
-
-					// insert into kmer hash
-					size_t kmerFreq = (*iter)->fwdInterval.isValid()?(*iter)->fwdInterval.size():0;
-					kmerFreq = (*iter)->rvcInterval.isValid()?kmerFreq+(*iter)->rvcInterval.size():kmerFreq;
-					assert(kmerFreq>0);
-					std::string kmer = pChildNode->getSuffix(hashKmerSize);
-
-					// std::cout << kmer << "\t" << kmerHash[kmer].first << "\n";
-					SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator hashiter = kmerHash.find(kmer);
-					if(hashiter == kmerHash.end())
-					{
-					  kmerHash[kmer].first = 0;
-					}
-					kmerHash[kmer].first+=kmerFreq;
-				}
-			}
-		}
-	
-		if(!newLeaves.empty())
-			currentLength++;
-			
-		m_leaves.clear();
-		m_leaves = newLeaves;
-	}
-	
-	// m_pRootNode was pointed to root of the tree
-	delete m_pRootNode;
-	// cout << "CGCCAGCTGAGCTGGCGGTGTGAAATCAGGCAGTCAGGCGGCTCGCGTCTTGCGCGATAACCAGTTCTTCGTTGGTTGGGATAACCACCGCAGGACGGGTACCTTCTTTGTTGATGAAACCAGATTTGCCGAAACGTGCAGCCAGGTTGCGTTCATGATCAACTTCAAAGCCCAGCACGCCCAGTTTGCCCAGAGACAGTTCACGA\n";
-	// printAll();
-	// getchar();
-	
-}
 
 // LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
 // Contaminated reads often are simple repeats C* or T* with large freq
 // Give up this read if the freq is way too large
-bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t hashKmerSize, size_t maxLength, int64_t contaminatedCutoff)
+bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, int expectedLength)
 {
 	// LF-mapping of each fwd index
-    BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(seedStr));
-	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(seedStr));
+	std::string initKmer = seedStr.substr(seedStr.length() - largeKmerSize);
+    BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(initKmer));
+	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(initKmer));
 
-	// std::cout << hashKmerSize << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
-
+	// std::cout << largeKmerSize << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
+	
 	// Contamination leads to large freq
-	if(fwdInterval.size() >= contaminatedCutoff || rvcInterval.size() >= contaminatedCutoff) return false;
+	if( (fwdInterval.isValid() && fwdInterval.size() >= (int)m_maxLeavesAllowed) || 
+		(rvcInterval.isValid() && rvcInterval.size() >= (int)m_maxLeavesAllowed) ) return false;
 
 	for(int64_t fwdRootIndex = fwdInterval.lower; fwdRootIndex <= fwdInterval.upper && fwdInterval.isValid(); fwdRootIndex++)
 	{
-		// extract hashKmer
-		std::string currentFwdKmer=seedStr.substr(seedStr.length() - hashKmerSize);
+		// extract small hash Kmer
+		std::string currentFwdKmer = seedStr.substr(seedStr.length() - smallKmerSize);
 		int64_t fwdIndex = fwdRootIndex;
 		
-		for(size_t currentLength = seedStr.length(); currentLength <= maxLength; currentLength++)
+		for(int64_t currentLength = (int64_t)seedStr.length(); currentLength <= (int64_t)maxLength; currentLength++)
 		{
 			char b = m_pRBWT->getChar(fwdIndex);
 			if(b == '$') break;
 			
 			currentFwdKmer = currentFwdKmer.substr(1) + b;
-			// std::cout << currentFwdKmer << "\n";
 
-			// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator hashiter = kmerHash.find(currentFwdKmer);
-			// if(hashiter == kmerHash.end())
-			  // kmerHash[currentFwdKmer].first = 0;
+			kmerHashiter hashiter = kmerHash.find(currentFwdKmer);
+			if(hashiter == kmerHash.end())
+			{
+				KmerFeatures *newEntry = new KmerFeatures(maxLength);
+				kmerHash.insert(std::make_pair<std::string, KmerFeatures*>(currentFwdKmer, newEntry));
+			}
+			
 
-			kmerHash[currentFwdKmer].first++;
+			// if(kmerHash[currentFwdKmer].second>0 && 
+				// (currentLength-kmerHash[currentFwdKmer].second/kmerHash[currentFwdKmer].first)>64)
+				// std::cout << currentLength-kmerHash[currentFwdKmer].second/kmerHash[currentFwdKmer].first << " haha\n";
+			
+			// std::cout << currentLength+1 - seedStr.length() << "\n";
+
+			hashiter = kmerHash.find(currentFwdKmer);
+			if(expectedLength<0)
+				hashiter->second->add(currentLength-seedStr.length());
+			else
+				hashiter->second->add(expectedLength - currentLength + smallKmerSize);
 
 			// LF mapping
             fwdIndex = m_pRBWT->getPC(b) + m_pRBWT->getOcc(b, fwdIndex - 1);			
@@ -287,114 +221,99 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 	// LF-mapping of each rvc index	
 	for(int64_t rvcRootIndex=rvcInterval.lower; rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid(); rvcRootIndex++)
 	{
-		std::string currentRvcKmer=reverseComplement(seedStr.substr(seedStr.length() - hashKmerSize));
+		std::string currentRvcKmer = reverseComplement( seedStr.substr(seedStr.length() - smallKmerSize) );
 		int64_t rvcIndex = rvcRootIndex;
 		
-		for(size_t currentLength = seedStr.length(); currentLength <= maxLength; currentLength++)
+		for(int64_t currentLength = (int64_t)seedStr.length(); currentLength <= (int64_t)maxLength; currentLength++)
 		{
 			char b = m_pBWT->getChar(rvcIndex);
 			if(b == '$') break;
 			
-			currentRvcKmer = b + currentRvcKmer.substr(0, hashKmerSize-1);
-			// std::cout << hashKmerSize << ":" << currentRvcKmer << "\n";
+			currentRvcKmer = b + currentRvcKmer.substr(0, smallKmerSize-1);
+			// std::cout << smallKmerSize << ":" << currentRvcKmer << "\n";
 
-			// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator hashiter = kmerHash.find(currentRvcKmer);
-			// if(hashiter == kmerHash.end())
-			  // kmerHash[currentRvcKmer].first = 0;
-
-			kmerHash[currentRvcKmer].first++;
+			kmerHashiter hashiter = kmerHash.find(currentRvcKmer);
+			if(hashiter == kmerHash.end())
+			{
+				KmerFeatures *newEntry = new KmerFeatures(maxLength);
+				kmerHash.insert(std::make_pair<std::string, KmerFeatures*>(currentRvcKmer, newEntry));
+			}
+			 
+			// kmerHash[currentRvcKmer].first++;
 			
+			// if(expectedLength < 0)
+				// kmerHash[currentRvcKmer].second += currentLength;
+			// else
+				// kmerHash[currentRvcKmer].second += expectedLength-currentLength+smallKmerSize;
+
+			hashiter = kmerHash.find(currentRvcKmer);
+			if(expectedLength<0)
+				hashiter->second->add(currentLength-seedStr.length());
+			else
+				hashiter->second->add(expectedLength - currentLength + smallKmerSize);
+
 			// LF mapping
             rvcIndex = m_pBWT->getPC(b) + m_pBWT->getOcc(b, rvcIndex - 1);
 		}
 	}
 	
+	// std::cout << kmerHash.size() << "\n";
 	return true;
 }
 
-int SAIPBSelfCorrectTree::addHashFromPairedSeed(std::string seedStr, std::vector<std::pair<int, std::string> >  &targets, size_t hashKmerSize)
+
+void SAIPBSelfCorrectTree::printLeaves(size_t hashKmerSize)
 {
-	// cut target str into shorter End str
-	std::vector<END> ENDs;
-	for(size_t i = 0 ; i < targets.size() ; i++)
+	std::cout << m_leaves.size() << ":" << m_currentLength << "\n";
+	//Bamboo.PB.45195.gap.fa
+	//cout << "CGCCAGCTGAGCTGGCGGTGTGAAATCAGGCAGTCAGGCGGCTCGCGTCTTGCGCGATAACCAGTTCTTCGTTGGTTGGGATAACCACCGCAGGACGGGTACCTTCTTTGTTGATGAAACCAGATTTGCCGAAACGTGCAGCCAGGTTGCGTTCATGATCAACTTCAAAGCCCAGCACGCCCAGTTTGCCCAGAGACAGTTCACGA\n";
+
+	//PB248_9895	
+	// cout << "GCGAGACGGTATTACCCGGCCCCTGGTCGCGCGGCAGGTTATGAATATTCTGTTCATGCAGGGAAAAACTCCCCGCCAGTGTAGCGATTTCACGCTCAGCAACATGGCGCGGCACACCAGCTAATAGAACTTCTCCACGCATCTGCACAATGTTCCCGCGCTCGCCAAGTTGCAAGGTGTTAAACGATGCCACGGGCGAGACTTCCGTTGCCAC\n";
+	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 	{
-		END tmpEND;
-		int dist_between_targets = targets[i].first;
-		tmpEND.endingKmer = targets[i].second.substr(0, hashKmerSize);
-		tmpEND.maxLength = (1.4*(dist_between_targets+40)) + tmpEND.endingKmer.length()+seedStr.length();
-		tmpEND.minLength = (0.6*(dist_between_targets-40)) + tmpEND.endingKmer.length()+seedStr.length();
-		tmpEND.fwdTerminatedInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(tmpEND.endingKmer));
-		tmpEND.rvcTerminatedInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(tmpEND.endingKmer));
-		ENDs.push_back(tmpEND);
-	}
-
-	initializeSearchTree(seedStr, hashKmerSize);
-	m_fwdTerminatedInterval=ENDs[0].fwdTerminatedInterval;
-    m_rvcTerminatedInterval=ENDs[0].rvcTerminatedInterval;
-	
-	int currentLength = seedStr.length();
-	
-	SAIntervalNodeResultVector results;
-	while(!m_leaves.empty() && currentLength <= ENDs[ENDs.size()-1].maxLength)
-    {
-		// std::cout << m_leaves.size() << "\t" << ENDs[ENDs.size()-1].maxLength << "\n";
-		STNodePtrList newLeaves;
-		for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
-		{
-			std::vector< std::pair<std::string, BWTIntervalPair> > extensions;
-			extensions = getFMIndexRightExtensions(*iter, 1);
-
-			if(extensions.size() == 1)
-			{
-				(*iter)->extend(extensions.front().first);
-				(*iter)->fwdInterval=extensions.front().second.interval[0];
-				(*iter)->rvcInterval=extensions.front().second.interval[1];
-				newLeaves.push_back(*iter);
-			}
-			else if(extensions.size() > 1)
-			{
-				for(size_t i = 0; i < extensions.size(); ++i)
-				{
-					SAIntervalNode* pChildNode = (*iter)->createChild(extensions[i].first);
-					pChildNode->fwdInterval=extensions[i].second.interval[0];
-					pChildNode->rvcInterval=extensions[i].second.interval[1];
-					newLeaves.push_back(pChildNode);
-				}
-			}
-		}
-	
-		if(!newLeaves.empty())
-			currentLength++;
-		m_leaves.clear();
-		m_leaves = newLeaves;
+		std::string STNodeStr = (*iter)->getFullString();
+		std::string fwdrepeatunit = (*iter)->getSuffix(hashKmerSize);
+		kmerHashiter hashiter = kmerHash.find(fwdrepeatunit);
 		
-		for(size_t i = 0 ; i < ENDs.size() ; i++)
-			if(currentLength >= ENDs[i].minLength && currentLength <= ENDs[i].maxLength)
-				isTerminated(results, ENDs[i]);
-	}
-	
-	delete m_pRootNode;
-	
-	int PBReads = 0;
-	if(results.size() > 0)
-	{
-		for(size_t i = 0 ; i < results.size() ; i++)
+		if(hashiter!=kmerHash.end() 
+			// && kmerHash[fwdrepeatunit]->getTotalFreq() > 0 
+			// && kmerHash[fwdrepeatunit]->getSumOfFreq(m_currentLength-m_seedLength)>0 
+		  )
 		{
-			std::string tmpseq;
-			tmpseq = results[i].thread;
-			PBReads += results[i].SAIntervalSize;
-			//if(debug == true) std::cout << ">" << i << "_" << tmpseq.substr(seedStr.length()-hashKmerSize).length() << "\n" << tmpseq.substr(seedStr.length()-hashKmerSize) << std::endl;
-			for(size_t j = seedStr.length()-hashKmerSize+1 ; j <= tmpseq.length() - hashKmerSize && j <= ENDs[0].maxLength - hashKmerSize; j++)
-			{
-				string kmer = tmpseq.substr(j, hashKmerSize);
-				kmerHash[kmer].first+=results[i].SAIntervalSize;
-			}
+			std::cout << STNodeStr.substr(m_seedLength-hashKmerSize) << " " << fwdrepeatunit 
+			<< ":" << kmerHash[fwdrepeatunit]->getTotalFreq() 
+			<< ":" << kmerHash[fwdrepeatunit]->getSumOfFreq(m_currentLength-m_seedLength) 
+			// << ":" << kmerHash[fwdrepeatunit]->getTotalSum()/kmerHash[fwdrepeatunit]->getTotalFreq() + src.length()
+			// << ":" << kmerHash[fwdrepeatunit]->getSumOfPos(m_currentLength-m_seedLength)/ kmerHash[fwdrepeatunit]->getSumOfFreq(m_currentLength-m_seedLength)+m_seedLength
+			;
 		}
-		cout << "PBReads: " << PBReads << "." << endl;
-		return 1;
+		
+		std::string rvcrepeatunit = reverseComplement(fwdrepeatunit);
+		kmerHashiter hashiter2 = kmerHash.find(rvcrepeatunit);
+		
+		
+		if(hashiter2!=kmerHash.end() 
+			// && kmerHash[rvcrepeatunit]->getTotalFreq() > 0 
+			// && kmerHash[rvcrepeatunit]->getSumOfFreq(m_currentLength-m_seedLength)>0 
+			)
+		{
+			std::cout << "-"  << " " << rvcrepeatunit
+			<< ":" << kmerHash[rvcrepeatunit]->getTotalFreq() 
+			<< ":" << kmerHash[rvcrepeatunit]->getSumOfFreq(m_currentLength-m_seedLength) 
+			// << ":" << kmerHash[rvcrepeatunit]->getTotalSum()/kmerHash[rvcrepeatunit]->getTotalFreq() + m_seedLength
+			// << ":" << kmerHash[rvcrepeatunit]->getSumOfPos(m_currentLength-m_seedLength)/ kmerHash[rvcrepeatunit]->getSumOfFreq(m_currentLength-m_seedLength)+m_seedLength
+			;
+		}
+		
+		if(hashiter!=kmerHash.end() || hashiter2!=kmerHash.end())
+		{
+			std::cout << "--" << (double)(*iter)->getKmerCount()/m_currentLength;
+			std::cout << "\n"; 
+		}
+		
+		// assert(hashiter!=kmerHash.end() || hashiter2!=kmerHash.end());
 	}
-	assert(false);
-	return -1;
 }
 
 // Print the string represented by every node
@@ -423,16 +342,10 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
             (*iter)->rvcInterval=extensions.front().second.interval[1];
 			
 			std::string fwdkmer = (*iter)->getSuffix(hashKmerSize);
-			std::string rvckmer = reverseComplement(fwdkmer);
+			double currAvgFreq = (double)(*iter)->getKmerCount()/m_currentLength;
 			
-			// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator kmeriter = kmerHash.find(kmer);
-			// if(kmeriter == kmerHash.end())
-			  // continue;
-
-			size_t kmerfreqs = kmerHash[fwdkmer].first + kmerHash[rvckmer].first;
-			// std::cout << kmerHash[fwdkmer].first << "\t" << kmerHash[rvckmer].first << "\n";
-			// getchar();
-			if(kmerfreqs >= m_min_SA_threshold)
+			size_t kmerfreqs = 0;
+			if( isExtensionValid(fwdkmer, currAvgFreq, kmerfreqs) )
 			{
 				(*iter)->addKmerCount(kmerfreqs);
 				newLeaves.push_back(*iter);
@@ -440,27 +353,20 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
         }
         else if(extensions.size() > 1)
         {
-            // Branch
+            // Create extensions for each new base
             for(size_t i = 0; i < extensions.size(); ++i)
             {
                 SAIntervalNode* pChildNode = (*iter)->createChild(extensions[i].first);
                 pChildNode->fwdInterval=extensions[i].second.interval[0];
                 pChildNode->rvcInterval=extensions[i].second.interval[1];
 			
-				std::string fwdkmer = (*iter)->getSuffix(hashKmerSize);
-				std::string rvckmer = reverseComplement(fwdkmer);
+				std::string fwdkmer = pChildNode->getSuffix(hashKmerSize);
+				double currAvgFreq = (double)(*iter)->getKmerCount()/m_currentLength;
 				
-				// SparseHashMap<std::string, std::pair<long long int, long long int> > :: iterator kmeriter = kmerHash.find(kmer);
-				// if(kmeriter == kmerHash.end())
-				  // continue;
-
-				size_t kmerfreqs = kmerHash[fwdkmer].first + kmerHash[rvckmer].first;
-
-				// std::cout << m_min_SA_threshold << ": " << kmerHash[fwdkmer].first << "\t" << kmerHash[rvckmer].first << "\n";
-				// getchar();
-				
-				if(kmerfreqs >= m_min_SA_threshold)
+				size_t kmerfreqs=0;
+				if( isExtensionValid(fwdkmer, currAvgFreq, kmerfreqs) )
 				{
+					// inherit kmer freq from parents
 					pChildNode->addKmerCount((*iter)->getKmerCount());
 					pChildNode->addKmerCount(kmerfreqs);
 					newLeaves.push_back(pChildNode);
@@ -470,6 +376,44 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
     }
 }
 
+// check if new extension satisfies frequency, position, ...
+bool SAIPBSelfCorrectTree::isExtensionValid(std::string fwdkmer, double& currAvgFreq, size_t& kmerFreq)
+{
+		kmerHashiter iter1 = kmerHash.find(fwdkmer);			
+		
+		// bubble removal by removing kmer path with avg kmer freq less than previous one
+		if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
+			return false;
+		
+		if( iter1!=kmerHash.end() && currAvgFreq > iter1->second->getMaxAvgFreq() )
+			iter1->second->setMaxAvgFreq( currAvgFreq );
+
+		// do it again for reverse complement kmer
+		std::string rvckmer = reverseComplement(fwdkmer);
+		kmerHashiter iter2 = kmerHash.find(rvckmer);
+		
+		// bubble removal for rvc may not be consistent		
+		// if( iter2!=kmerHash.end() && currAvgFreq > iter2->second->getMaxAvgFreq() )
+			// iter2->second->setMaxAvgFreq( currAvgFreq );
+			
+		// if( iter2!=kmerHash.end() && currAvgFreq < iter2->second->getMaxAvgFreq() &&
+			// iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq()) 
+			// return false;
+
+
+		// Restricted to local kmer frequency
+		kmerFreq = iter1==kmerHash.end()? 0 : iter1->second->getSumOfFreq(m_currentLength - m_seedLength);						
+		kmerFreq += iter2==kmerHash.end()? 0 : iter2->second->getSumOfFreq(m_currentLength - m_seedLength);
+					
+		// return sum of frequency
+		// kmerFreq = iter1==kmerHash.end()? 0 : iter1->second->getTotalFreq();						
+		// kmerFreq += iter2==kmerHash.end()? 0 : iter2->second->getTotalFreq();
+		
+		if(kmerFreq >= m_min_SA_threshold)
+			return true;
+		else
+			return false;
+}
 
 // Refine SA intervals of each leave with a new kmer
 void SAIPBSelfCorrectTree::refineSAInterval(size_t newKmer)
@@ -604,3 +548,88 @@ bool SAIPBSelfCorrectTree::isTerminated(SAIntervalNodeResultVector& results)
 
     return found;
 }
+
+// int SAIPBSelfCorrectTree::addHashFromPairedSeed(std::string seedStr, std::vector<std::pair<int, std::string> >  &targets, size_t hashKmerSize)
+// {
+	// // cut target str into shorter End str
+	// std::vector<END> ENDs;
+	// for(size_t i = 0 ; i < targets.size() ; i++)
+	// {
+		// END tmpEND;
+		// int dist_between_targets = targets[i].first;
+		// tmpEND.endingKmer = targets[i].second.substr(0, hashKmerSize);
+		// tmpEND.maxLength = (1.4*(dist_between_targets+40)) + tmpEND.endingKmer.length()+seedStr.length();
+		// tmpEND.minLength = (0.6*(dist_between_targets-40)) + tmpEND.endingKmer.length()+seedStr.length();
+		// tmpEND.fwdTerminatedInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(tmpEND.endingKmer));
+		// tmpEND.rvcTerminatedInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(tmpEND.endingKmer));
+		// ENDs.push_back(tmpEND);
+	// }
+
+	// initializeSearchTree(seedStr, hashKmerSize);
+	// m_fwdTerminatedInterval=ENDs[0].fwdTerminatedInterval;
+    // m_rvcTerminatedInterval=ENDs[0].rvcTerminatedInterval;
+	
+	// int currentLength = seedStr.length();
+	
+	// SAIntervalNodeResultVector results;
+	// while(!m_leaves.empty() && currentLength <= ENDs[ENDs.size()-1].maxLength)
+    // {
+		// // std::cout << m_leaves.size() << "\t" << ENDs[ENDs.size()-1].maxLength << "\n";
+		// STNodePtrList newLeaves;
+		// for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
+		// {
+			// std::vector< std::pair<std::string, BWTIntervalPair> > extensions;
+			// extensions = getFMIndexRightExtensions(*iter, 1);
+
+			// if(extensions.size() == 1)
+			// {
+				// (*iter)->extend(extensions.front().first);
+				// (*iter)->fwdInterval=extensions.front().second.interval[0];
+				// (*iter)->rvcInterval=extensions.front().second.interval[1];
+				// newLeaves.push_back(*iter);
+			// }
+			// else if(extensions.size() > 1)
+			// {
+				// for(size_t i = 0; i < extensions.size(); ++i)
+				// {
+					// SAIntervalNode* pChildNode = (*iter)->createChild(extensions[i].first);
+					// pChildNode->fwdInterval=extensions[i].second.interval[0];
+					// pChildNode->rvcInterval=extensions[i].second.interval[1];
+					// newLeaves.push_back(pChildNode);
+				// }
+			// }
+		// }
+	
+		// if(!newLeaves.empty())
+			// currentLength++;
+		// m_leaves.clear();
+		// m_leaves = newLeaves;
+		
+		// for(size_t i = 0 ; i < ENDs.size() ; i++)
+			// if(currentLength >= ENDs[i].minLength && currentLength <= ENDs[i].maxLength)
+				// isTerminated(results, ENDs[i]);
+	// }
+	
+	// delete m_pRootNode;
+	
+	// int PBReads = 0;
+	// if(results.size() > 0)
+	// {
+		// for(size_t i = 0 ; i < results.size() ; i++)
+		// {
+			// std::string tmpseq;
+			// tmpseq = results[i].thread;
+			// PBReads += results[i].SAIntervalSize;
+			// //if(debug == true) std::cout << ">" << i << "_" << tmpseq.substr(seedStr.length()-hashKmerSize).length() << "\n" << tmpseq.substr(seedStr.length()-hashKmerSize) << std::endl;
+			// for(size_t j = seedStr.length()-hashKmerSize+1 ; j <= tmpseq.length() - hashKmerSize && j <= ENDs[0].maxLength - hashKmerSize; j++)
+			// {
+				// string kmer = tmpseq.substr(j, hashKmerSize);
+				// kmerHash[kmer].first+=results[i].SAIntervalSize;
+			// }
+		// }
+		// cout << "PBReads: " << PBReads << "." << endl;
+		// return 1;
+	// }
+	// assert(false);
+	// return -1;
+// }

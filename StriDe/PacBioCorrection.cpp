@@ -57,6 +57,7 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -M, --max-overlap=N              the max overlap (default: -1, recommend: avg read length*0.9 (PacBioH).)\n"
 "      -d, --downward=N                 for each possible source, we consider N downward seeds as targets. (default: 3)\n"
 "      -c, --collect=N                  for each possible source, we consider N downward seeds to collect reads. (default: 5)\n"
+"      --split                  		split the uncorrected reads (default: false)\n"
 
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
@@ -86,13 +87,14 @@ namespace opt
 	static int seedKmerThreshold = 10;
 	static int downward = 3;
 	static int collect = 5;
+	static bool split = false;
 
 	static PacBioCorrectionAlgorithm algorithm = PBC_SELF;
 }
 
 static const char* shortopts = "p:t:o:a:k:x:L:m:M:s:y:d:c:v";
 
-enum { OPT_HELP = 1, OPT_VERSION, OPT_METRICS, OPT_DISCARD, OPT_LEARN };
+enum { OPT_HELP = 1, OPT_VERSION, OPT_DISCARD, OPT_SPLIT };
 
 static const struct option longopts[] = {
 	{ "verbose",       no_argument,       NULL, 'v' },
@@ -108,11 +110,10 @@ static const struct option longopts[] = {
 	{ "seed-kmer-threshold"   ,required_argument, NULL, 'y' },
 	{ "downward"       ,required_argument, NULL, 'd' },
 	{ "collect"        ,required_argument, NULL, 'c' },
-	{ "learn",         no_argument,       NULL, OPT_LEARN },
+	{ "split",       	no_argument,       NULL, OPT_SPLIT },
 	{ "discard",       no_argument,       NULL, OPT_DISCARD },
 	{ "help",          no_argument,       NULL, OPT_HELP },
 	{ "version",       no_argument,       NULL, OPT_VERSION },
-	{ "metrics",       required_argument, NULL, OPT_METRICS },
 	{ NULL, 0, NULL, 0 }
 };
 
@@ -170,6 +171,8 @@ int PacBioCorrectionMain(int argc, char** argv)
 	ecParams.FMWKmerThreshold = opt::kmerThreshold;
 	ecParams.downward = opt::downward;
 	ecParams.collectedSeeds = opt::collect;
+	ecParams.isSplit = opt::split;
+	
 	if(ecParams.algorithm == PBC_SELF)
 	{
 		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
@@ -229,11 +232,16 @@ int PacBioCorrectionMain(int argc, char** argv)
 			processorVector.push_back(pProcessor);
 		}
 
-		SequenceProcessFramework::processSequencesParallel<SequenceWorkItem,
+		// SequenceProcessFramework::processSequencesParallel<SequenceWorkItem,
+		// PacBioCorrectionResult,
+		// PacBioCorrectionProcess,
+		// PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
+
+		SequenceProcessFramework::processSequencesParallelOpenMP<SequenceWorkItem,
 		PacBioCorrectionResult,
 		PacBioCorrectionProcess,
 		PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
-
+		
 		for(int i = 0; i < opt::numThreads; ++i)
 		{
 			delete processorVector[i];
@@ -285,7 +293,7 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 		case 'y': arg >> opt::seedKmerThreshold; break;
 		case 'd': arg >> opt::downward; break;
 		case 'c': arg >> opt::collect; break;
-		case OPT_LEARN: opt::bLearnKmerParams = true; break;
+		case OPT_SPLIT: opt::split = true; break;
 		case OPT_HELP:
 			std::cout << CORRECT_USAGE_MESSAGE;
 			exit(EXIT_SUCCESS);

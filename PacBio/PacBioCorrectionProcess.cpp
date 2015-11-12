@@ -58,7 +58,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		size_t largeKmerSize = m_params.kmerLength;
 		size_t smallKmerSize = m_params.minKmerLength;
 		
-		int FMWalkReturnType = -1;
+		int FMWalkReturnType = 0;
 		std::string mergedseq;
 		std::pair<int,std::string> source = pacbioCorrectedStrs.back();
 		
@@ -67,7 +67,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		{
 			// std::cout << "======= " << result.totalWalkNum << " =======\n";
 
-			/********* PingYe's implementation  ***********/
+			/********* PingYe's implementation  ***********
 			// // <distance between targets, read(ATCG)>
 			// std::vector<std::pair<int, std::string> > targets;
 			
@@ -98,67 +98,87 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			// << source.first << "-" << source.first+source.second.length()-1 <<  ":" << source.second.length() << ", " 
 			// <<	seeds[targetSeed+nextTargetSeed].first << "-" << seeds[targetSeed+nextTargetSeed].first+seeds[targetSeed+nextTargetSeed].second.length()-1 <<  ":" << seeds[targetSeed+nextTargetSeed].second.length() << ", dis: "
 			// << targets[0].first << ". " << FMWalkReturnType << ".\n";
-			
+			*/
 			
 			/********* YT's implementation  ***********/					
 			size_t currTargetIndex = targetSeed+nextTargetSeed;
-			std::string targetStr = seeds[currTargetIndex].second;
+			std::string sourceStr = source.second;
+			// Collect local kmer frequency from source
 			int dis_between_src_target = seeds[currTargetIndex].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 			
-			// Estimate upper/lower/expected bounds of search depth
-			int maxLength = 1.2*(dis_between_src_target+20) + source.second.length() + smallKmerSize;
-			int minLength = 0.8*(dis_between_src_target-20) + source.second.length() + smallKmerSize;
-			if(minLength<0) minLength = 0;
+			if(dis_between_src_target>1000) break;
 			
-			size_t expectedLength = dis_between_src_target + source.second.length() + smallKmerSize;
-
+			// if(FMWalkReturnType==-4 && (int)sourceStr.length()-(int)largeKmerSize*(nextTargetSeed*2+1)>=0)
+			// {
+				// sourceStr=sourceStr.substr(0, sourceStr.length()-largeKmerSize*nextTargetSeed*2);
+				// pacbioCorrectedStrs.back().second=sourceStr;
+				// dis_between_src_target+=largeKmerSize*nextTargetSeed*2;
+			// }
+			
+			std::string targetStr = seeds[currTargetIndex].second;
+			
 			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
 			
 			// Timer *phase1 = new Timer("phase1");
-
-			// Collect local kmer frequency from source
-			int seedIdx=source.second.length()-largeKmerSize;			
-			std::string srcStr = source.second.substr(seedIdx, largeKmerSize);
-			bool leftSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(srcStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
+			int maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
+			bool leftSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(sourceStr, largeKmerSize, smallKmerSize, maxLength);
 
 			// Collect local kmer frequency from right targets
-			std::string destStr = targetStr.substr(0, largeKmerSize);	
-			destStr	= reverseComplement(destStr);
-			bool rightSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(destStr, smallKmerSize, maxLength-source.second.length()+largeKmerSize);
+			std::string rvcTargetStr = reverseComplement(targetStr);
+			maxLength = 1.2*(dis_between_src_target+20) + rvcTargetStr.length() + smallKmerSize;
+			size_t expectedLength = dis_between_src_target + rvcTargetStr.length();
+			bool rightSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(rvcTargetStr, largeKmerSize, smallKmerSize, maxLength, expectedLength);
 
+			// return if any seed is contaminated
 			if(!leftSeedSafe || !rightSeedSafe)
 				return result;
 
 			// delete phase1;
 			// Timer *phase2 = new Timer("phase2");
 
-			// Extension using local kmer hash with smaller kmer size = m_params.minKmerLength
-			FMWalkReturnType = SAITree.mergeTwoSeedsUsingHash(source.second, targetStr, mergedseq, smallKmerSize, m_params.maxLeaves,
+			// Estimate upper/lower/expected bounds of search depth
+			maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
+			int minLength = 0.8*(dis_between_src_target-20) + sourceStr.length() + smallKmerSize;
+			if(minLength<0) minLength = 0;
+			expectedLength = dis_between_src_target + sourceStr.length() + smallKmerSize;
+			
+			FMWalkReturnType = SAITree.mergeTwoSeedsUsingHash(sourceStr, targetStr, mergedseq, smallKmerSize, m_params.maxLeaves,
 			minLength, maxLength, expectedLength);
 			
 			// delete phase2;
 			// std::cout << pacbioCorrectedStrs.size()-1 << ": " //<< reverseComplement((source.second).substr(source.second.length()-minOverlap)) << " " << reverseComplement((target.second).substr(0, minOverlap)) << " "
-			// << source.first << "-" << source.first+source.second.length()-1 <<  ":" << source.second.length() << ", " 
-			// <<	seeds[targetSeed+nextTargetSeed].first << "-" << seeds[targetSeed+nextTargetSeed].first+seeds[targetSeed+nextTargetSeed].second.length()-1 <<  ":" << seeds[targetSeed+nextTargetSeed].second.length() << ", dis: "
-			// << dis_between_src_target << ". " << FMWalkReturnType << ".\n";
+			// << source.first << "-" << source.first+sourceStr.length()-1 <<  ":" << sourceStr.length() << ", " 
+			// <<	seeds[currTargetIndex].first << "-" << seeds[currTargetIndex].first+seeds[currTargetIndex].second.length()-1 <<  ":" << seeds[currTargetIndex].second.length() 
+			// << ", dis: " << dis_between_src_target << ". " << FMWalkReturnType << ".\n";
 			
 
 			// FMWalk success
 			if(FMWalkReturnType > 0)
 			{				
-				size_t startPos = source.second.length();
+				size_t startPos = sourceStr.length();
 				// assert(mergedseq.length() > startPos);
-				std::string gainStr = mergedseq.substr(startPos);
-				pacbioCorrectedStrs.back().second += gainStr;
-				result.correctedLen += gainStr.length();
+				std::string extendedStr = mergedseq.substr(startPos);
+				pacbioCorrectedStrs.back().second += extendedStr;
+				result.correctedLen += extendedStr.length();
 				result.correctedNum++;
-				result.seedDis += seeds[targetSeed+nextTargetSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
+				result.seedDis += dis_between_src_target;
+				
+				// jump to nextTargetSeed+1 if more than one target was tried and succeeded
 				targetSeed = targetSeed + nextTargetSeed;
 				break;
 			}
 			
 			// increase smallKmerSize for reducing repeats
-			if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
+			if(FMWalkReturnType==-1 || FMWalkReturnType==-2 || FMWalkReturnType==-4)
+			{
+				// extension failed due to no kmer extension
+				// mostly due to error seeds in source or targets
+				// seed freq can't distinguish due to sequencing/error bias
+				// have to change to other seeds
+				smallKmerSize = m_params.minKmerLength;
+				
+			}
+			else if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
 			{
 				smallKmerSize++;
 				nextTargetSeed--;
@@ -170,20 +190,25 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		// 2. exceed leaves
 		// 3. exceed depth
 		// Then what??
-		if(FMWalkReturnType < 0)
+		if(FMWalkReturnType <= 0)
 		{
 			// seed distance
 			result.seedDis += seeds[targetSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 			result.correctedLen += seeds[targetSeed].second.length();
 
 			// not cut off
-			// size_t startPos = seeds[targetSeed-1].first + seeds[targetSeed-1].second.length();
-			// size_t extendedLen = seeds[targetSeed].first + seeds[targetSeed].second.length() - startPos;
-			// std::cout << readSeq.length() << "\t" << startPos << "\t" << extendedLen << "\n";
-			// pacbioCorrectedStrs.back().second += readSeq.substr(startPos,extendedLen);
-
-			// cut off
-			pacbioCorrectedStrs.push_back(seeds[targetSeed]);
+			if(!m_params.isSplit)
+			{
+				size_t startPos = seeds[targetSeed-1].first + seeds[targetSeed-1].second.length();
+				size_t extendedLen = seeds[targetSeed].first + seeds[targetSeed].second.length() - startPos;
+				// std::cout << readSeq.length() << "\t" << startPos << "\t" << extendedLen << "\n";
+				pacbioCorrectedStrs.back().second += readSeq.substr(startPos,extendedLen);
+			}
+			else
+			{
+				// cut off
+				pacbioCorrectedStrs.push_back(seeds[targetSeed]);
+			}
 			
 			// statistics of FM extension
 			if(FMWalkReturnType == -1)
@@ -202,15 +227,15 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].second);
 	
 
-	std::cout << std::endl;
-	std::cout << "totalReadLen: " << readSeq.length() << ", ";
-	std::cout << "correctedLen: " << result.correctedLen << ", ratio: " << (float)(result.correctedLen)/readSeq.length() << "." << std::endl;
-	std::cout << "totalSeedNum: " << result.totalSeedNum << "." << std::endl;
-	std::cout << "totalWalkNum: " << result.totalWalkNum << ", ";
-	std::cout << "correctedNum: " << result.correctedNum << ", ratio: " << (float)(result.correctedNum*100)/result.totalWalkNum << "%." << std::endl;
-	std::cout << "highErrorNum: " << result.highErrorNum << ", ratio: " << (float)(result.highErrorNum*100)/result.totalWalkNum << "%." << std::endl;
-	std::cout << "exceedDepthNum: " << result.exceedDepthNum << ", ratio: " << (float)(result.exceedDepthNum*100)/result.totalWalkNum << "%." << std::endl;
-	std::cout << "exceedLeaveNum: " << result.exceedLeaveNum << ", ratio: " << (float)(result.exceedLeaveNum*100)/result.totalWalkNum << "%." << std::endl;
+	// std::cout << std::endl;
+	// std::cout << "totalReadLen: " << readSeq.length() << ", ";
+	// std::cout << "correctedLen: " << result.correctedLen << ", ratio: " << (float)(result.correctedLen)/readSeq.length() << "." << std::endl;
+	// std::cout << "totalSeedNum: " << result.totalSeedNum << "." << std::endl;
+	// std::cout << "totalWalkNum: " << result.totalWalkNum << ", ";
+	// std::cout << "correctedNum: " << result.correctedNum << ", ratio: " << (float)(result.correctedNum*100)/result.totalWalkNum << "%." << std::endl;
+	// std::cout << "highErrorNum: " << result.highErrorNum << ", ratio: " << (float)(result.highErrorNum*100)/result.totalWalkNum << "%." << std::endl;
+	// std::cout << "exceedDepthNum: " << result.exceedDepthNum << ", ratio: " << (float)(result.exceedDepthNum*100)/result.totalWalkNum << "%." << std::endl;
+	// std::cout << "exceedLeaveNum: " << result.exceedLeaveNum << ", ratio: " << (float)(result.exceedLeaveNum*100)/result.totalWalkNum << "%." << std::endl;
 
 
 	return result;
@@ -228,11 +253,15 @@ std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeed
 		for(int i = 0 ; i+kmerLen <= readLen ; i++)
 		{
 			std::string kmer = readSeq.substr(i, kmerLen);
-			size_t kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);
+
+			size_t fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
+			size_t rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
+			size_t kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
+			// size_t kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);
 			
-			// std::cout << i << ": " << kmerFreqs << "\n";
+			// std::cout << i << ": " << kmerFreqs <<":" << fwdKmerFreqs << ":" << rvcKmerFreqs << "\n";
 			
-			if(kmerFreqs >= (size_t) kmerThreshold)
+			if(kmerFreqs >= (size_t) kmerThreshold && fwdKmerFreqs>=3 && rvcKmerFreqs>=3)
 			{
 				int seedStartPos = i, 
 				seedLen = 0;
@@ -242,12 +271,16 @@ std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeed
 				for(i++ ; i+kmerLen <= readLen; i++)
 				{
 					kmer = readSeq.substr(i, kmerLen);
-					kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);;
-					// std::cout << i << ": " << kmerFreqs << "\n";
-					
+					// kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);;
+					fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
+					rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
+					kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
+			
+					// std::cout << i << ": " << kmerFreqs <<":" << fwdKmerFreqs << ":" << rvcKmerFreqs << "\n";
+
 					// contaminated seeds lead to large kmer freq					
 					maxKmerFreq = std::max(maxKmerFreq,kmerFreqs);
-					if(kmerFreqs >= (size_t) kmerThreshold)
+					if(kmerFreqs >= (size_t) kmerThreshold && fwdKmerFreqs>=3 && rvcKmerFreqs>=3)
 						seedLen++;
 					else
 						break;

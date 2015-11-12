@@ -49,6 +49,7 @@ struct PacBioCorrectionParameters
 	int downward;
 	int collectedSeeds;
 	std::vector<int> seedWalkDistance;
+	bool isSplit;
 };
 
 
