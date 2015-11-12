@@ -39,7 +39,8 @@ size_t processWorkSerial(Generator& generator, Processor* pProcessor, PostProces
     // are still sequences to consume from the reader
     while(generator.getNumConsumed() < n && generator.generate(workItem))
     {
-        Output output = pProcessor->process(workItem);
+
+		Output output = pProcessor->process(workItem);
 
         pPostProcessor->process(workItem, output);
         if(generator.getNumConsumed() % 50000 == 0)
@@ -293,12 +294,12 @@ size_t processWorkParallelOpenMP(Generator& generator,
         done = !valid || generator.getNumConsumed() == n;
 
         // Once all buffers are full or the input is finished, dispatch the work to the threads
-        if(inputBuffer.size() == (10 * numThreads * BUFFER_SIZE) || done)
+        if(inputBuffer.size() == (numThreads * 64) || done)
         {
             outputBuffer.resize(inputBuffer.size());
 
             //
-            #pragma omp parallel for schedule(dynamic, 256)
+            #pragma omp parallel for schedule(dynamic, 8)
             for(int i = 0; i < (int)inputBuffer.size(); ++i)
             {
                 // Dispatch the work to a processor and write the output to the output buffer
@@ -316,7 +317,7 @@ size_t processWorkParallelOpenMP(Generator& generator,
             outputBuffer.clear();
 
             double proc_time_secs = timer.getElapsedWallTime();
-            if(generator.getNumConsumed() % (numThreads * BUFFER_SIZE) == 0)
+            if(generator.getNumConsumed() % (numThreads * 64) == 0)
                 printf("Processed %zu sequences in %lfs (%lf sequences/s)\n", generator.getNumConsumed(), proc_time_secs, (double)generator.getNumConsumed() / proc_time_secs);
         }
     }
