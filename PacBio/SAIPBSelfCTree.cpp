@@ -168,8 +168,12 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 // LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
 // Contaminated reads often are simple repeats C* or T* with large freq
 // Give up this read if the freq is way too large
-bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, int expectedLength)
+bool SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, int expectedLength)
 {
+	// PacBio errors create repeat-like seeds with large interval
+	// limit the upper bound of interval for speedup
+	const int64_t maxIntervalSize = 25;
+	
 	// LF-mapping of each fwd index
 	std::string initKmer = seedStr.substr(seedStr.length() - largeKmerSize);
     BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(initKmer));
@@ -181,7 +185,9 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 	if( (fwdInterval.isValid() && fwdInterval.size() >= (int)m_maxLeavesAllowed) || 
 		(rvcInterval.isValid() && rvcInterval.size() >= (int)m_maxLeavesAllowed) ) return false;
 
-	for(int64_t fwdRootIndex = fwdInterval.lower; fwdRootIndex <= fwdInterval.upper && fwdInterval.isValid(); fwdRootIndex++)
+	for(int64_t fwdRootIndex = fwdInterval.lower; 
+		fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper &&  fwdRootIndex - fwdInterval.lower < maxIntervalSize; 
+		fwdRootIndex++)
 	{
 		// extract small hash Kmer
 		std::string currentFwdKmer = seedStr.substr(seedStr.length() - smallKmerSize);
@@ -218,7 +224,9 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 	}
 
 	// LF-mapping of each rvc index	
-	for(int64_t rvcRootIndex=rvcInterval.lower; rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid(); rvcRootIndex++)
+	for(int64_t rvcRootIndex=rvcInterval.lower; 
+		rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid() && rvcRootIndex - rvcInterval.lower < maxIntervalSize; 
+		rvcRootIndex++)
 	{
 		std::string currentRvcKmer = reverseComplement( seedStr.substr(seedStr.length() - smallKmerSize) );
 		int64_t rvcIndex = rvcRootIndex;
@@ -236,7 +244,7 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 			{				
 				KmerFeatures *newEntry;
 				if(expectedLength<0)
-					newEntry = new KmerFeatures(currentLength-seedStr.length(), maxLength);
+					newEntry = new KmerFeatures(currentLength - seedStr.length(), maxLength);
 				else
 					newEntry = new KmerFeatures(expectedLength - currentLength + smallKmerSize, maxLength);
 					
@@ -257,7 +265,6 @@ bool SAIPBSelfCorrectTree::addHashFromSingleSeedUsingLFMapping(std::string& seed
 	// std::cout << kmerHash.size() << "\n";
 	return true;
 }
-
 
 void SAIPBSelfCorrectTree::printLeaves(size_t hashKmerSize)
 {
@@ -379,11 +386,11 @@ bool SAIPBSelfCorrectTree::isExtensionValid(std::string fwdkmer, double& currAvg
 		kmerHashiter iter1 = kmerHash.find(fwdkmer);			
 		
 		// bubble removal by removing kmer path with avg kmer freq less than previous one
-		if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
-			return false;
+		// if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
+			// return false;
 		
-		if( iter1!=kmerHash.end() && currAvgFreq > iter1->second->getMaxAvgFreq() )
-			iter1->second->setMaxAvgFreq( currAvgFreq );
+		// if( iter1!=kmerHash.end() && currAvgFreq > iter1->second->getMaxAvgFreq() )
+			// iter1->second->setMaxAvgFreq( currAvgFreq );
 
 		// do it again for reverse complement kmer
 		std::string rvckmer = reverseComplement(fwdkmer);

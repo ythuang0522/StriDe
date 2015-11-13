@@ -83,7 +83,7 @@ namespace opt
 	static int minOverlap=81;
 	static int maxOverlap=-1;
 	
-	static int minKmerLength = 9;
+	static int minKmerLength = 10;
 	static int seedKmerThreshold = 10;
 	static int downward = 3;
 	static int collect = 5;

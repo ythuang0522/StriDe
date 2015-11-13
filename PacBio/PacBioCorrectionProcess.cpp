@@ -58,14 +58,14 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		size_t largeKmerSize = m_params.kmerLength;
 		size_t smallKmerSize = m_params.minKmerLength;
 		
-		int FMWalkReturnType = 0;
+		int FMWalkReturnType = 0, prevFMWalkReturnType = 0;
 		std::string mergedseq;
 		std::pair<int,std::string> source = pacbioCorrectedStrs.back();
 		
 		// Multiple targets will be tested for FM-index walk from source to target, until m_params.downward times.
 		for(int nextTargetSeed = 0 ; nextTargetSeed < m_params.downward && targetSeed + nextTargetSeed < seeds.size() ; nextTargetSeed++)
 		{
-			// std::cout << "======= " << result.totalWalkNum << " =======\n";
+			std::cout << "======= " << result.totalWalkNum << " =======\n";
 
 			/********* PingYe's implementation  ***********
 			// // <distance between targets, read(ATCG)>
@@ -103,31 +103,25 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			/********* YT's implementation  ***********/					
 			size_t currTargetIndex = targetSeed+nextTargetSeed;
 			std::string sourceStr = source.second;
-			// Collect local kmer frequency from source
+			std::string targetStr = seeds[currTargetIndex].second;
+
+			// Estimate distance between source and target, but this may over-estimate due to more insertion errors
 			int dis_between_src_target = seeds[currTargetIndex].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 			
-			if(dis_between_src_target>1000) break;
-			
-			// if(FMWalkReturnType==-4 && (int)sourceStr.length()-(int)largeKmerSize*(nextTargetSeed*2+1)>=0)
-			// {
-				// sourceStr=sourceStr.substr(0, sourceStr.length()-largeKmerSize*nextTargetSeed*2);
-				// pacbioCorrectedStrs.back().second=sourceStr;
-				// dis_between_src_target+=largeKmerSize*nextTargetSeed*2;
-			// }
-			
-			std::string targetStr = seeds[currTargetIndex].second;
-			
+			// skip seeds with large distance in between for speedup
+			if(dis_between_src_target>=500) break;
+						
 			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
 			
-			// Timer *phase1 = new Timer("addHashFromSingleSeedUsingLFMapping");
+			// Timer *phase1 = new Timer("addHashBySingleSeed");
 			int maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
-			bool leftSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(sourceStr, largeKmerSize, smallKmerSize, maxLength);
+			bool leftSeedSafe = SAITree.addHashBySingleSeed(sourceStr, largeKmerSize, smallKmerSize, maxLength);
 
 			// Collect local kmer frequency from right targets
 			std::string rvcTargetStr = reverseComplement(targetStr);
 			maxLength = 1.2*(dis_between_src_target+20) + rvcTargetStr.length() + smallKmerSize;
 			size_t expectedLength = dis_between_src_target + rvcTargetStr.length();
-			bool rightSeedSafe = SAITree.addHashFromSingleSeedUsingLFMapping(rvcTargetStr, largeKmerSize, smallKmerSize, maxLength, expectedLength);
+			bool rightSeedSafe = SAITree.addHashBySingleSeed(rvcTargetStr, largeKmerSize, smallKmerSize, maxLength, expectedLength);
 
 			// return if any seed is contaminated
 			if(!leftSeedSafe || !rightSeedSafe)
@@ -164,7 +158,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 				result.seedDis += dis_between_src_target;
 				
 				// jump to nextTargetSeed+1 if more than one target was tried and succeeded
-				targetSeed = targetSeed + nextTargetSeed;
+				targetSeed = targetSeed + nextTargetSeed;				
 				break;
 			}
 			
@@ -177,12 +171,17 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 				// have to change to other seeds
 				smallKmerSize = m_params.minKmerLength;
 				
+				// if src seed is error, every run leads to the same -4
+				if(prevFMWalkReturnType==-4 && FMWalkReturnType==-4)
+					break;
 			}
-			else if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
-			{
-				smallKmerSize++;
-				nextTargetSeed--;
-			}
+			// else if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
+			// {
+				// smallKmerSize++;
+				// nextTargetSeed--;
+			// }
+			
+			prevFMWalkReturnType = FMWalkReturnType;
 		}
 		
 		// All multiple targets failure: 
@@ -191,7 +190,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		// 3. exceed depth
 		// Then what??
 		if(FMWalkReturnType <= 0)
-		{
+		{		
 			// seed distance
 			result.seedDis += seeds[targetSeed].first - seeds[targetSeed-1].first - seeds[targetSeed-1].second.length();
 			result.correctedLen += seeds[targetSeed].second.length();
@@ -211,12 +210,13 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			}
 			
 			// statistics of FM extension
-			if(FMWalkReturnType == -1)
+			if(FMWalkReturnType == -1 || FMWalkReturnType == -4)
 			result.highErrorNum++;
 			else if(FMWalkReturnType == -2)
 			result.exceedDepthNum++;
 			else if(FMWalkReturnType == -3)
 			result.exceedLeaveNum++;
+			
 		}
 		result.totalWalkNum++;
 	}
@@ -257,7 +257,6 @@ std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeed
 			size_t fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
 			size_t rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
 			size_t kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
-			// size_t kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);
 			
 			// std::cout << i << ": " << kmerFreqs <<":" << fwdKmerFreqs << ":" << rvcKmerFreqs << "\n";
 			
@@ -271,7 +270,6 @@ std::vector<std::pair<int, std::string> > PacBioCorrectionProcess::searchingSeed
 				for(i++ ; i+kmerLen <= readLen; i++)
 				{
 					kmer = readSeq.substr(i, kmerLen);
-					// kmerFreqs = BWTAlgorithms::countSequenceOccurrences(kmer, m_params.indices);;
 					fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
 					rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
 					kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
