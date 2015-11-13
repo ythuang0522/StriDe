@@ -65,7 +65,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		// Multiple targets will be tested for FM-index walk from source to target, until m_params.downward times.
 		for(int nextTargetSeed = 0 ; nextTargetSeed < m_params.downward && targetSeed + nextTargetSeed < seeds.size() ; nextTargetSeed++)
 		{
-			std::cout << "======= " << result.totalWalkNum << " =======\n";
+			// std::cout << "======= " << result.totalWalkNum << " =======\n";
 
 			/********* PingYe's implementation  ***********
 			// // <distance between targets, read(ATCG)>
