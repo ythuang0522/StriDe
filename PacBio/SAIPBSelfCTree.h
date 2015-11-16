@@ -38,8 +38,8 @@ class KmerFeatures{
 			m_intervalSize(intervalSize), 
 			m_totalFreq(0),m_totalSum(0), m_maxAvgFreq(0), m_isVisited(false)
 			{
-				m_sumOfFreq.resize(expectedLength/32 + 1);
-				m_sumOfPos.resize(expectedLength/32 + 1);
+				m_sumOfFreq.resize(expectedLength/intervalSize + 1);
+				m_sumOfPos.resize(expectedLength/intervalSize + 1);
 				add(pos);
 			}
 			

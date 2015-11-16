@@ -12,6 +12,8 @@
 #include <iomanip>
 #include "SAIPBSelfCTree.h"
 #include "SAIPBHybridCTree.h"
+#include "RollingPBSelfCTree.h"
+
 #include "Timer.h"
 using namespace std;
 
@@ -112,20 +114,21 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			if(dis_between_src_target>=500) break;
 						
 			SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
-			
+			// RollingPBSelfCTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, smallKmerSize, m_params.FMWKmerThreshold);
+					
 			// Timer *phase1 = new Timer("addHashBySingleSeed");
 			int maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
-			bool leftSeedSafe = SAITree.addHashBySingleSeed(sourceStr, largeKmerSize, smallKmerSize, maxLength);
+			SAITree.addHashBySingleSeed(sourceStr, largeKmerSize, smallKmerSize, maxLength);
 
 			// Collect local kmer frequency from right targets
 			std::string rvcTargetStr = reverseComplement(targetStr);
 			maxLength = 1.2*(dis_between_src_target+20) + rvcTargetStr.length() + smallKmerSize;
 			size_t expectedLength = dis_between_src_target + rvcTargetStr.length();
-			bool rightSeedSafe = SAITree.addHashBySingleSeed(rvcTargetStr, largeKmerSize, smallKmerSize, maxLength, expectedLength);
+			SAITree.addHashBySingleSeed(rvcTargetStr, largeKmerSize, smallKmerSize, maxLength, expectedLength);
 
 			// return if any seed is contaminated
-			if(!leftSeedSafe || !rightSeedSafe)
-				return result;
+			// if(!leftSeedSafe || !rightSeedSafe)
+				// return result;
 
 			// delete phase1;
 			// Timer *phase2 = new Timer("mergeTwoSeedsUsingHash");

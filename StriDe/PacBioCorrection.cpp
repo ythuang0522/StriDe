@@ -232,15 +232,15 @@ int PacBioCorrectionMain(int argc, char** argv)
 			processorVector.push_back(pProcessor);
 		}
 
-		// SequenceProcessFramework::processSequencesParallel<SequenceWorkItem,
-		// PacBioCorrectionResult,
-		// PacBioCorrectionProcess,
-		// PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
-
-		SequenceProcessFramework::processSequencesParallelOpenMP<SequenceWorkItem,
+		SequenceProcessFramework::processSequencesParallel<SequenceWorkItem,
 		PacBioCorrectionResult,
 		PacBioCorrectionProcess,
 		PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
+
+		// SequenceProcessFramework::processSequencesParallelOpenMP<SequenceWorkItem,
+		// PacBioCorrectionResult,
+		// PacBioCorrectionProcess,
+		// PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
 		
 		for(int i = 0; i < opt::numThreads; ++i)
 		{

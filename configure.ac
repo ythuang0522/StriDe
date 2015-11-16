@@ -101,7 +101,6 @@ AC_CHECK_HEADERS([ \
 ])
 
 AC_CONFIG_FILES([Makefile
-		Thirdparty/Makefile
 		Util/Makefile
 		SQG/Makefile
 		Bigraph/Makefile
@@ -111,6 +110,7 @@ AC_CONFIG_FILES([Makefile
 		SuffixTools/Makefile
 		FMIndexWalk/Makefile
 		PacBio/Makefile
+		Thirdparty/Makefile
 		StriDe/Makefile])
 
 AC_OUTPUT

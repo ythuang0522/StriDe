@@ -182,8 +182,8 @@ bool SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t larg
 	// std::cout << largeKmerSize << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
 	
 	// Contamination leads to large freq
-	if( (fwdInterval.isValid() && fwdInterval.size() >= (int)m_maxLeavesAllowed) || 
-		(rvcInterval.isValid() && rvcInterval.size() >= (int)m_maxLeavesAllowed) ) return false;
+	// if( (fwdInterval.isValid() && fwdInterval.size() >= (int)m_maxLeavesAllowed) || 
+		// (rvcInterval.isValid() && rvcInterval.size() >= (int)m_maxLeavesAllowed) ) return false;
 
 	for(int64_t fwdRootIndex = fwdInterval.lower; 
 		fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper &&  fwdRootIndex - fwdInterval.lower < maxIntervalSize; 
@@ -386,11 +386,11 @@ bool SAIPBSelfCorrectTree::isExtensionValid(std::string fwdkmer, double& currAvg
 		kmerHashiter iter1 = kmerHash.find(fwdkmer);			
 		
 		// bubble removal by removing kmer path with avg kmer freq less than previous one
-		// if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
-			// return false;
+		if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
+			return false;
 		
-		// if( iter1!=kmerHash.end() && currAvgFreq > iter1->second->getMaxAvgFreq() )
-			// iter1->second->setMaxAvgFreq( currAvgFreq );
+		if( iter1!=kmerHash.end() && currAvgFreq > iter1->second->getMaxAvgFreq() )
+			iter1->second->setMaxAvgFreq( currAvgFreq );
 
 		// do it again for reverse complement kmer
 		std::string rvckmer = reverseComplement(fwdkmer);
