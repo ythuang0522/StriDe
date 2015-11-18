@@ -162,6 +162,8 @@ class SAIPBSelfCorrectTree
 		void attempToExtendUsingHash(STNodePtrList &newLeaves, size_t hashKmerSize);
         void refineSAInterval(size_t newKmer);
 		std::vector<std::pair<std::string, BWTIntervalPair> > getFMIndexRightExtensions(SAIntervalNode* pNode, const size_t IntervalSizeCutoff);
+		
+		void insertKmerToHash(std::string& insertedKmer, size_t seedStrLen, size_t currentLength, size_t smallKmerSize, size_t maxLength, int expectedLength);
 
 		bool isExtensionValid(std::string fwdkmer, double& currAvgFreq, size_t& kmerFreq);
 		
@@ -190,8 +192,6 @@ class SAIPBSelfCorrectTree
 
         BWTInterval m_fwdTerminatedInterval;   //in rBWT
         BWTInterval m_rvcTerminatedInterval;   //in BWT
-
-		// SparseHashMap<std::string, std::pair<long long int, long long int> > kmerHash;
 		
 		// multiple means for repeats leading to multinomial occurrences
 		DenseHashMap<std::string, KmerFeatures*, StringHasher> kmerHash;

@@ -33,10 +33,12 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 {	
 	PacBioCorrectionResult result;
 	
+	// int: seed pos, string: seed string
 	std::vector<std::pair<int, std::string> > seeds, pacbioCorrectedStrs;
 	std::string readSeq = workItem.read.seq.toString();
 		
 	// find seeds
+	// int: seed pos, string: seed string
 	seeds = searchingSeedsUsingSolidKmer(readSeq);	
 	result.totalSeedNum = seeds.size();
 	
@@ -54,7 +56,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		return result;
 	}
 	
-	
+	// for each pair of seeds, perform extension using local kmer frequency
 	for(size_t targetSeed = 1 ; targetSeed < seeds.size() ; targetSeed++)
 	{
 		size_t largeKmerSize = m_params.kmerLength;
@@ -117,25 +119,24 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			// RollingPBSelfCTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, smallKmerSize, m_params.FMWKmerThreshold);
 					
 			// Timer *phase1 = new Timer("addHashBySingleSeed");
-			int maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
+			
+			int maxLength = 1.2*(dis_between_src_target+30) + sourceStr.length() + smallKmerSize;
+			
+			// Collect local kmer frequency from source upto maxLength
 			SAITree.addHashBySingleSeed(sourceStr, largeKmerSize, smallKmerSize, maxLength);
 
-			// Collect local kmer frequency from right targets
+			// Collect local kmer frequency from target upto maxLength
 			std::string rvcTargetStr = reverseComplement(targetStr);
-			maxLength = 1.2*(dis_between_src_target+20) + rvcTargetStr.length() + smallKmerSize;
+			maxLength = 1.2*(dis_between_src_target+30) + rvcTargetStr.length() + smallKmerSize;
 			size_t expectedLength = dis_between_src_target + rvcTargetStr.length();
 			SAITree.addHashBySingleSeed(rvcTargetStr, largeKmerSize, smallKmerSize, maxLength, expectedLength);
-
-			// return if any seed is contaminated
-			// if(!leftSeedSafe || !rightSeedSafe)
-				// return result;
 
 			// delete phase1;
 			// Timer *phase2 = new Timer("mergeTwoSeedsUsingHash");
 
 			// Estimate upper/lower/expected bounds of search depth
-			maxLength = 1.2*(dis_between_src_target+20) + sourceStr.length() + smallKmerSize;
-			int minLength = 0.8*(dis_between_src_target-20) + sourceStr.length() + smallKmerSize;
+			maxLength = 1.2*(dis_between_src_target+30) + sourceStr.length() + smallKmerSize;
+			int minLength = 0.8*(dis_between_src_target-30) + sourceStr.length() + smallKmerSize;
 			if(minLength<0) minLength = 0;
 			expectedLength = dis_between_src_target + sourceStr.length() + smallKmerSize;
 			
@@ -146,7 +147,8 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 			// std::cout << pacbioCorrectedStrs.size()-1 << ": " //<< reverseComplement((source.second).substr(source.second.length()-minOverlap)) << " " << reverseComplement((target.second).substr(0, minOverlap)) << " "
 			// << source.first << "-" << source.first+sourceStr.length()-1 <<  ":" << sourceStr.length() << ", " 
 			// <<	seeds[currTargetIndex].first << "-" << seeds[currTargetIndex].first+seeds[currTargetIndex].second.length()-1 <<  ":" << seeds[currTargetIndex].second.length() 
-			// << ", dis: " << dis_between_src_target << ". " << FMWalkReturnType << ".\n";
+			// << ", dis: " << dis_between_src_target << ", " << expectedLength << ", " << maxLength << ", "
+			// << FMWalkReturnType << ".\n";
 			
 
 			// FMWalk success
@@ -165,7 +167,7 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 				break;
 			}
 			
-			// increase smallKmerSize for reducing repeats
+			
 			if(FMWalkReturnType==-1 || FMWalkReturnType==-2 || FMWalkReturnType==-4)
 			{
 				// extension failed due to no kmer extension
@@ -178,11 +180,12 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 				if(prevFMWalkReturnType==-4 && FMWalkReturnType==-4)
 					break;
 			}
-			// else if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
-			// {
+			// increase smallKmerSize for reducing repeats
+			else if(FMWalkReturnType==-3 && smallKmerSize < largeKmerSize - 3)
+			{
 				// smallKmerSize++;
 				// nextTargetSeed--;
-			// }
+			}
 			
 			prevFMWalkReturnType = FMWalkReturnType;
 		}
