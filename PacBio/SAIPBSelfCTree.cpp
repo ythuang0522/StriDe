@@ -108,9 +108,8 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 		if( (size_t) m_currentLength >= minLength)
 			isTerminated(results);
 
-		// if(src.length() == 2216 || src.length() == 2190 || src.length() == 1112){
+		// if(src.length() == 710 ){
 			// printLeaves(hashKmerSize);
-			// getchar();
 		// }
 	}
 	
@@ -158,19 +157,26 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 // LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
 // Contaminated reads often are simple repeats C* or T* with large freq
 // Give up this read if the freq is way too large
-bool SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, int expectedLength)
+size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, bool b_skippedRepeat, int expectedLength)
 {
 	// PacBio errors create repeat-like seeds with large interval
 	// limit the upper bound of interval for speedup
-	const int64_t maxIntervalSize = 25;
+	const int64_t maxIntervalSize = 40;
 	
+	size_t kmerFreq = 0;
 	// LF-mapping of each fwd index using largeKmerSize
+	// assert(seedStr.length() >= largeKmerSize);
 	std::string initKmer = seedStr.substr(seedStr.length() - largeKmerSize);
     BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(initKmer));
 	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(initKmer));
 
-	// std::cout << largeKmerSize << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() <<"\n";
+	kmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
+	kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
 
+	// std::cout << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
+	
+	if(b_skippedRepeat && kmerFreq > maxIntervalSize) return kmerFreq;
+	
 	// extend each SA index and collect kmers of smallKmerSize along the extension
 	for(int64_t fwdRootIndex = fwdInterval.lower; 
 		fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper &&  fwdRootIndex - fwdInterval.lower < maxIntervalSize; 
@@ -224,7 +230,7 @@ bool SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t larg
 	}
 	
 	// std::cout << kmerHash.size() << "\n";
-	return true;
+	return kmerFreq;
 }
 
 void SAIPBSelfCorrectTree::insertKmerToHash(std::string& insertedKmer, size_t seedStrLen, size_t currentLength, size_t smallKmerSize, size_t maxLength, int expectedLength)
@@ -255,13 +261,8 @@ void SAIPBSelfCorrectTree::insertKmerToHash(std::string& insertedKmer, size_t se
 void SAIPBSelfCorrectTree::printLeaves(size_t hashKmerSize)
 {
 	std::cout << m_leaves.size() << ":" << m_currentLength << "\n";
-	//Bamboo.PB.45195.gap.fa
-	//cout << "CGCCAGCTGAGCTGGCGGTGTGAAATCAGGCAGTCAGGCGGCTCGCGTCTTGCGCGATAACCAGTTCTTCGTTGGTTGGGATAACCACCGCAGGACGGGTACCTTCTTTGTTGATGAAACCAGATTTGCCGAAACGTGCAGCCAGGTTGCGTTCATGATCAACTTCAAAGCCCAGCACGCCCAGTTTGCCCAGAGACAGTTCACGA\n";
-
-	//PB248_9895	
-	// cout << "GCGAGACGGTATTACCCGGCCCCTGGTCGCGCGGCAGGTTATGAATATTCTGTTCATGCAGGGAAAAACTCCCCGCCAGTGTAGCGATTTCACGCTCAGCAACATGGCGCGGCACACCAGCTAATAGAACTTCTCCACGCATCTGCACAATGTTCCCGCGCTCGCCAAGTTGCAAGGTGTTAAACGATGCCACGGGCGAGACTTCCGTTGCCAC\n";
-	
-	cout << "GCGCGTCGCGAAGCGGAAGAAGAGTTGGGCATTGCCGGTGTCCCCCTTTGCCGAGCACGGGCAGTTCTATTTCGAAGATAAAAATTGCCGTGTCTGGGCGCATTGTTCAGCTGCGTCTCTCACGGTCCCTTCGCACTACAGGAAGATGAAGTCAGTGAAGTTTGCTGGCTGACGCCGGAAGAAATCACCGCACGCTGC\n";
+	// cout << "GCGCGTCGCGAAGCGGAAGAAGAGTTGGGCATTGCCGGTGTCCCCCTTTGCCGAGCACGGGCAGTTCTATTTCGAAGATAAAAATTGCCGTGTCTGGGCGCATTGTTCAGCTGCGTCTCTCACGGTCCCTTCGCACTACAGGAAGATGAAGTCAGTGAAGTTTGCTGGCTGACGCCGGAAGAAATCACCGCACGCTGC\n";
+	cout << "TTGATCGCACAGTCACCGTAAACGTAAACCTGTTCCG-CAGCAGCATGAAGAACACGGAA\n";
 	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 	{
 		std::string STNodeStr = (*iter)->getFullString();

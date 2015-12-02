@@ -55,7 +55,7 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -y, --seed-kmer-threshold=N      Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
 "      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 32)\n"
 "      -M, --max-overlap=N              the max overlap (default: -1, recommend: avg read length*0.9 (PacBioH).)\n"
-"      -d, --downward=N                 for each possible source, we consider N downward seeds as targets. (default: 3)\n"
+"      -d, --downward=N                 for each possible source, we consider N downward seeds as targets. (default: 1)\n"
 "      -c, --collect=N                  for each possible source, we consider N downward seeds to collect reads. (default: 5)\n"
 "      --split                  		split the uncorrected reads (default: false)\n"
 
@@ -75,26 +75,29 @@ namespace opt
 	static int sampleRate = BWT::DEFAULT_SAMPLE_RATE_SMALL;
 
 
-	static int kmerLength = 31;
+	static int kmerLength = 17;
 	static int kmerThreshold = 3;
 	static bool bLearnKmerParams = false;
 
-	static int maxLeaves=256;
+	static int maxLeaves=32;
 	static int minOverlap=81;
 	static int maxOverlap=-1;
 	
-	static int minKmerLength = 10;
+	static int minKmerLength = 15;
 	static int seedKmerThreshold = 10;
-	static int downward = 3;
+	static int numOfNextTarget = 1;
 	static int collect = 5;
+	
 	static bool split = false;
+	static bool isFirst = false;
+	size_t maxSeedInterval = 500;
 
 	static PacBioCorrectionAlgorithm algorithm = PBC_SELF;
 }
 
 static const char* shortopts = "p:t:o:a:k:x:L:m:M:s:y:d:c:v";
 
-enum { OPT_HELP = 1, OPT_VERSION, OPT_DISCARD, OPT_SPLIT };
+enum { OPT_HELP = 1, OPT_VERSION, OPT_DISCARD, OPT_SPLIT, OPT_FIRST };
 
 static const struct option longopts[] = {
 	{ "verbose",       no_argument,       NULL, 'v' },
@@ -111,6 +114,7 @@ static const struct option longopts[] = {
 	{ "downward"       ,required_argument, NULL, 'd' },
 	{ "collect"        ,required_argument, NULL, 'c' },
 	{ "split",       	no_argument,       NULL, OPT_SPLIT },
+	{ "first",       	no_argument,       NULL, OPT_FIRST },
 	{ "discard",       no_argument,       NULL, OPT_DISCARD },
 	{ "help",          no_argument,       NULL, OPT_HELP },
 	{ "version",       no_argument,       NULL, OPT_VERSION },
@@ -149,6 +153,16 @@ int PacBioCorrectionMain(int argc, char** argv)
 		}
 	}
 
+	// Sample 100000 kmer counts into KmerDistribution from reverse BWT 
+	// Don't sample from forward BWT as Illumina reads are bad at the 3' end
+	ecParams.kd = BWTAlgorithms::sampleKmerCounts(opt::kmerLength, 100000, pBWT);
+	ecParams.kd.computeKDAttributes();
+	// ecParams.kd.print(100);
+	// const size_t RepeatKmerFreq = ecParams.kd.getCutoffForProportion(0.95); 
+	// std::cout << "Median kmer frequency: " <<ecParams.kd.getMedian() << "\t Std: " <<  ecParams.kd.getSdv() 
+				// <<"\t 95% kmer frequency: " << ecParams.kd.getCutoffForProportion(0.95)
+				// << "\t Repeat frequency cutoff: " << ecParams.kd.getRepeatKmerCutoff() << "\n";
+	
 	BWTIndexSet indexSet;
 	indexSet.pBWT = pBWT;
 	indexSet.pRBWT = pRBWT;
@@ -169,9 +183,11 @@ int PacBioCorrectionMain(int argc, char** argv)
 	ecParams.minKmerLength = opt::minKmerLength;
 	ecParams.seedKmerThreshold = opt::seedKmerThreshold;
 	ecParams.FMWKmerThreshold = opt::kmerThreshold;
-	ecParams.downward = opt::downward;
+	ecParams.numOfNextTarget = opt::numOfNextTarget;
 	ecParams.collectedSeeds = opt::collect;
 	ecParams.isSplit = opt::split;
+	ecParams.isFirst = opt::isFirst;
+	ecParams.maxSeedInterval = opt::maxSeedInterval;
 	
 	if(ecParams.algorithm == PBC_SELF)
 	{
@@ -182,9 +198,8 @@ int PacBioCorrectionMain(int argc, char** argv)
 		<< "small kmer size:\t" << ecParams.minKmerLength << std::endl
 		<< "small kmer freq. cutoff:\t" << ecParams.FMWKmerThreshold << std::endl
 		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "max depth:\t1.4~0.6* (length between two seeds +- 40)" << std::endl
-		<< "downward each pair of seeds:\t" << ecParams.downward << std::endl
-		<< "number of targets to be collected:\t" << ecParams.collectedSeeds << std::endl << std::endl;
+		<< "max depth:\t1.2~0.8* (length between two seeds +- 20)" << std::endl
+		<< "num of next Targets:\t" << ecParams.numOfNextTarget << std::endl;
 	}
 	else if(ecParams.algorithm == PBC_HYBRID)
 	{
@@ -291,9 +306,10 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 		case 'M': arg >> opt::maxOverlap; break;
 		case 's': arg >> opt::minKmerLength; break;
 		case 'y': arg >> opt::seedKmerThreshold; break;
-		case 'd': arg >> opt::downward; break;
+		case 'd': arg >> opt::numOfNextTarget; break;
 		case 'c': arg >> opt::collect; break;
 		case OPT_SPLIT: opt::split = true; break;
+		case OPT_FIRST: opt::isFirst = true; break;
 		case OPT_HELP:
 			std::cout << CORRECT_USAGE_MESSAGE;
 			exit(EXIT_SUCCESS);
