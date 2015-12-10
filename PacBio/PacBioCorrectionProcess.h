@@ -24,27 +24,37 @@
 struct SeedFeature
 {
 	public:
-		SeedFeature(size_t startPos, std::string str, bool repeat=false):seedStartPos(startPos), seedStr(str), isRepeat(repeat)
-		{
-			seedEndPos = seedStartPos + seedStr.length() -1;
-			seedLength = seedStr.length();
-		}
+		SeedFeature(size_t startPos, std::string str, bool repeat=false, size_t kmerSize=17);
 		
 		// append current seed string with extendedStr
-		void append(std::string extendedStr)
-		{
-			seedStr += extendedStr;
-			seedLength += extendedStr.length();
-			seedEndPos += extendedStr.length();
-		}
+		void append(std::string extendedStr);
+		void setBestKmerSize(size_t kmerSize);		
+		void estimateBestKmerSize(const BWT* pBWT);
 		
 		size_t seedStartPos;
 		size_t seedEndPos;
 		size_t seedLength;
 		std::string seedStr;
+		bool isRepeat;
+		
+		// estimated by calling estimateBestKmerSize
+		size_t startBestKmerSize;
+		size_t endBestKmerSize;
 		size_t startKmerFreq;
 		size_t endKmerFreq;
-		bool isRepeat;
+		
+	private:
+		size_t freqUpperBound;
+		size_t freqLowerBound;
+		size_t minKmerSize;
+		
+		//estimate kmer size
+		void increaseStartKmerSize(const BWT* pBWT);
+		void decreaseStartKmerSize(const BWT* pBWT);
+
+		//estimate kmer size
+		void increaseEndKmerSize(const BWT* pBWT);
+		void decreaseEndKmerSize(const BWT* pBWT);
 };
 
 enum PacBioCorrectionAlgorithm
@@ -157,11 +167,14 @@ public:
 
 private:
 
-	// PacBio correction by Ya, v20150305.
-	// std::vector<std::pair<int, std::string> > searchingSeedsUsingSolidKmer(const std::string readSeq, size_t contaminatedCutoff=128);
-	std::vector<SeedFeature> searchingSeedsUsingSolidKmer(const std::string readSeq, size_t contaminatedCutoff=128);
+	// PacBio correction by Yao-Ting Huang, v20151208
+	std::vector<SeedFeature> seedingByFixedKmer(const std::string readSeq, size_t contaminatedCutoff=256);
+	
+	std::vector<SeedFeature> seedingByDynamicKmer(const std::string readSeq);
 
-	std::pair<size_t, size_t> refineRepeatSeed(const std::string readSeq, size_t repeatKmerSize, size_t seedStartPos, size_t seedEndPos);
+	// kmers around repeat seeds are often error seeds, split the repeat regions into high-confident seeds
+	// return kmer freq of beginning and ending kmers
+	std::pair<size_t, size_t> refineRepeatSeed(const std::string readSeq, size_t& seedStartPos, size_t& seedEndPos);
 
 	// return complexity of seq, default: 0.9
 	bool  isLowComplexity (std::string seq, float & GCratio, float threshold=0.7);
@@ -169,14 +182,14 @@ private:
 	// return <0: give up and break
 	// return 0: retry the same target
 	// return >0: continue to next target
-	int  FailureActions (size_t& largeKmerSize, size_t& smallKmerSize, size_t& numOfTrials, 
-						size_t sourceStrLen, size_t targetStrLen, int FMWalkReturnType, int prevFMWalkReturnType);
+	int  FMWalkFailedActions (size_t& smallKmerSize, size_t& numOfTrials, 
+						SeedFeature& sourceStrLen, SeedFeature& target, int FMWalkReturnType, int prevFMWalkReturnType);
 
 
 	// Perform FMindex extension between source and target seeds
 	// Return FMWalkReturnType
 	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& mergedseq,
-						size_t largeKmerSize, size_t smallKmerSize, size_t dis_between_src_target);
+							size_t smallKmerSize, size_t dis_between_src_target);
 	
 	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
 	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);

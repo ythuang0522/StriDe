@@ -108,15 +108,15 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 		if( (size_t) m_currentLength >= minLength)
 			isTerminated(results);
 
-		// if(src.length() == 710 ){
+		// if(src.length() == 22 ){
 			// printLeaves(hashKmerSize);
 		// }
 	}
 	
-	// select the kmer path with maximum average kmer coverage
 	if(results.size()>0)
 	{
 		double maxKmerCoverage = 0;
+		int minLengthDiff = 100000;
 
 		for (size_t i = 0 ; i < results.size() ;i++)
 		{
@@ -126,16 +126,25 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 				tmpseq=results[i].thread + dest.substr(hashKmerSize);
 			else
 				tmpseq=results[i].thread;
-							
+
+			int currLengthDiff = std::abs((int)tmpseq.length()-(int)expectedLength);
 			double avgCov = (double)results[i].SAICoverage / tmpseq.length();
-			// std::cout << avgCov << "\n";
-			if(avgCov > maxKmerCoverage)
+			
+			// std::cout << currLengthDiff << "\t" << avgCov <<  "\n";
+			
+			// PB135123_7431.fa
+			// Rule out apparent errors due to tandem repeats with large length difference
+			bool isLengthDiffBetter = currLengthDiff < minLengthDiff && std::abs(currLengthDiff - minLengthDiff) >3;
+			// But the length diff is not informative for small indels, where kmer coverage is more informative
+			bool isKmerCoverageBetter = std::abs(currLengthDiff - minLengthDiff) <=3 && (maxKmerCoverage<avgCov);
+			if(isLengthDiffBetter || isKmerCoverageBetter)
 			{
+				minLengthDiff = currLengthDiff;
 				maxKmerCoverage=avgCov;
 				mergedseq=tmpseq;
 			}
 		}
-		
+		// std::cout << "Selected: " << minLengthDiff << "\t" << maxKmerCoverage << "\n";
 		// std::cout << mergedseq << "\n";
 		return 1;
 	}
@@ -157,25 +166,26 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 // LF-mapping of each SA index in the interval independently using loop instead of BFS tree expansion
 // Contaminated reads often are simple repeats C* or T* with large freq
 // Give up this read if the freq is way too large
-size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, bool b_skippedRepeat, int expectedLength)
+size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t largeKmerSize, size_t smallKmerSize, size_t maxLength, bool skipRepeat, int expectedLength)
 {
 	// PacBio errors create repeat-like seeds with large interval
 	// limit the upper bound of interval for speedup
-	const int64_t maxIntervalSize = 40;
+	const int64_t maxIntervalSize = 30;
 	
-	size_t kmerFreq = 0;
 	// LF-mapping of each fwd index using largeKmerSize
 	// assert(seedStr.length() >= largeKmerSize);
 	std::string initKmer = seedStr.substr(seedStr.length() - largeKmerSize);
     BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(initKmer));
 	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(initKmer));
 
+	size_t kmerFreq = 0;
 	kmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
 	kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
 
-	// std::cout << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
+	// std::cout << initKmer << "\t" << smallKmerSize << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
 	
-	if(b_skippedRepeat && kmerFreq > maxIntervalSize) return kmerFreq;
+	// skip repeat only in the 1st round
+	if(skipRepeat && kmerFreq > 128) return kmerFreq;
 	
 	// extend each SA index and collect kmers of smallKmerSize along the extension
 	for(int64_t fwdRootIndex = fwdInterval.lower; 
@@ -261,8 +271,7 @@ void SAIPBSelfCorrectTree::insertKmerToHash(std::string& insertedKmer, size_t se
 void SAIPBSelfCorrectTree::printLeaves(size_t hashKmerSize)
 {
 	std::cout << m_leaves.size() << ":" << m_currentLength << "\n";
-	// cout << "GCGCGTCGCGAAGCGGAAGAAGAGTTGGGCATTGCCGGTGTCCCCCTTTGCCGAGCACGGGCAGTTCTATTTCGAAGATAAAAATTGCCGTGTCTGGGCGCATTGTTCAGCTGCGTCTCTCACGGTCCCTTCGCACTACAGGAAGATGAAGTCAGTGAAGTTTGCTGGCTGACGCCGGAAGAAATCACCGCACGCTGC\n";
-	cout << "TTGATCGCACAGTCACCGTAAACGTAAACCTGTTCCG-CAGCAGCATGAAGAACACGGAA\n";
+	cout << "AACACCGATCGTAATGGGCATGTTGCTGTCGATGGTGATGGTGTTCTGCAACTACGTCAACGTTGAGTGGATGATCATC\n";
 	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 	{
 		std::string STNodeStr = (*iter)->getFullString();

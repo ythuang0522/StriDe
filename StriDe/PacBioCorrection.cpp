@@ -74,10 +74,9 @@ namespace opt
 	static std::string discardFile;
 	static int sampleRate = BWT::DEFAULT_SAMPLE_RATE_SMALL;
 
-
 	static int kmerLength = 17;
 	static int kmerThreshold = 3;
-	static bool bLearnKmerParams = false;
+	// static bool bLearnKmerParams = false;
 
 	static int maxLeaves=32;
 	static int minOverlap=81;
@@ -155,8 +154,8 @@ int PacBioCorrectionMain(int argc, char** argv)
 
 	// Sample 100000 kmer counts into KmerDistribution from reverse BWT 
 	// Don't sample from forward BWT as Illumina reads are bad at the 3' end
-	ecParams.kd = BWTAlgorithms::sampleKmerCounts(opt::kmerLength, 100000, pBWT);
-	ecParams.kd.computeKDAttributes();
+	// ecParams.kd = BWTAlgorithms::sampleKmerCounts(opt::kmerLength, 100000, pBWT);
+	// ecParams.kd.computeKDAttributes();
 	// ecParams.kd.print(100);
 	// const size_t RepeatKmerFreq = ecParams.kd.getCutoffForProportion(0.95); 
 	// std::cout << "Median kmer frequency: " <<ecParams.kd.getMedian() << "\t Std: " <<  ecParams.kd.getSdv() 
