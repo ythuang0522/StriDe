@@ -260,8 +260,8 @@ int StrideMain(int argc, char** argv)
 	vec6.push_back("filter");
 	vec6.push_back("-t");
 	vec6.push_back(ssnumthread.str());
-	vec6.push_back("--rebuild-BWT");
-	vec6.push_back("--no-kmer-check");
+	//vec6.push_back("--rebuild-BWT");
+	//vec6.push_back("--no-kmer-check");
 	vec6.push_back("merged.fa");
 
 	char** arr6 = new char*[vec6.size()];
