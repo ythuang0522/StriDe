@@ -51,7 +51,6 @@ PacBioCorrectionResult PacBioCorrectionProcess::PBSelfCorrection(const SequenceW
 		seedVec = seedingByDynamicKmer(readSeq);
 		
 	result.totalSeedNum = seedVec.size();
-	
 
 	// push the first seed into pacbioCorrectedStrs, which will be popped later as source seed
 	if(seedVec.size() >= 2)
@@ -177,8 +176,9 @@ void PacBioCorrectionProcess::initCorrect(std::string& readSeq, std::vector<Seed
 				// return >0: move on to next target
 				else
 				{
-					target =  targetSeed+nextTargetSeed+1<seedVec.size()?seedVec[targetSeed+nextTargetSeed+1]:target;
-					smallKmerSize = std::min(source.endBestKmerSize, target.startBestKmerSize) - 2;
+					// target is a reference and can't be updated
+					// target =  targetSeed+nextTargetSeed+1<seedVec.size()?seedVec[targetSeed+nextTargetSeed+1]:target;
+					// smallKmerSize = std::min(source.endBestKmerSize, target.startBestKmerSize) - 2;
 				}
 			}
 			
@@ -256,18 +256,7 @@ void PacBioCorrectionProcess::realCorrect(std::string& readSeq, std::vector<Seed
 			// Estimate distance between source and target, but this may over-estimate due to more insertion errors
 			// Note that source seed has been updated and no long stands for the original seed, which is seedVec[targetSeed-1]
 			int dis_between_src_target = target.seedStartPos - seedVec.at(targetSeed-1).seedStartPos - seedVec.at(targetSeed-1).seedStr.length();
-			
-			// smallKmerSize should not be too small for repeat seeds
-			// smallKmerSize = std::min(source.endBestKmerSize, target.startBestKmerSize) - 2;
-			if(m_params.isFirst && (source.isRepeat || target.isRepeat) )
-			{
-				smallKmerSize = std::min((int)source.seedLength, (int)target.seedLength);
-				if(smallKmerSize > m_params.kmerLength+2) smallKmerSize = m_params.kmerLength+2;
-				
-				// source.endBestKmerSize = std::max(smallKmerSize, source.endBestKmerSize);
-				// target.startBestKmerSize = std::max(smallKmerSize, target.startBestKmerSize);
-			}
-			
+					
 			// skip seeds with large distance in between for speedup
 			if(dis_between_src_target >= (int)m_params.maxSeedInterval) 
 			{
@@ -281,6 +270,7 @@ void PacBioCorrectionProcess::realCorrect(std::string& readSeq, std::vector<Seed
 			// else if(m_params.isFirst && dis_between_src_target >= 50 && !source.isRepeat && !target.isRepeat && smallKmerSize>11)
 				// smallKmerSize -= 2;
 		
+
 			std::string mergedseq;
 			FMWalkReturnType = extendBetweenSeeds(source, target, mergedseq, smallKmerSize, dis_between_src_target);
 
@@ -317,8 +307,8 @@ void PacBioCorrectionProcess::realCorrect(std::string& readSeq, std::vector<Seed
 				// return >0: move on to next target
 				else
 				{
-					target =  targetSeed+nextTargetSeed+1<seedVec.size()?seedVec[targetSeed+nextTargetSeed+1]:target;
-					smallKmerSize = std::min(source.endBestKmerSize, target.startBestKmerSize) - 2;
+					// target =  targetSeed+nextTargetSeed+1<seedVec.size()?seedVec[targetSeed+nextTargetSeed+1]:target;
+					// smallKmerSize = std::min(source.endBestKmerSize, target.startBestKmerSize) - 2;
 				}
 			}
 			
@@ -671,7 +661,7 @@ int PacBioCorrectionProcess::extendBetweenSeeds(SeedFeature& source, SeedFeature
 	const int minOffSet = 30;	//PB159615_16774.fa contains large indels > 30bp
 	
 	SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
-
+	
 	// Collect local kmer frequency from source upto srcMaxLength
 	const int srcMaxLength = maxRatio*(dis_between_src_target+minOffSet) + source.seedLength + smallKmerSize;
 	size_t sourceFreq = SAITree.addHashBySingleSeed(source.seedStr, source.endBestKmerSize, smallKmerSize, srcMaxLength, m_params.isFirst);

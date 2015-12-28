@@ -190,27 +190,15 @@ size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t la
 	// LF-mapping of each fwd index using largeKmerSize
 	// assert(seedStr.length() >= largeKmerSize);
 	std::string initKmer = seedStr.substr(seedStr.length() - largeKmerSize);
-    BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(initKmer));
+	BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(initKmer));
 	BWTInterval rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(initKmer));
-
+    
 	size_t kmerFreq = 0;
 	kmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
 	kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
 
 	// std::cout << initKmer << "\t" << smallKmerSize << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
-	
-	if(kmerFreq >30)
-	{
-		if(expectedLength < 0)
-			m_isSourceRepeat = true;
-		else
-			m_isTargetRepeat = true;
-	}
-	
-	if(expectedLength < 0)
-		m_sourceKmerSize = largeKmerSize;
-	else
-		m_targetKmerSize = largeKmerSize;
+
 	
 	// skip repeat only in the 1st round
 	if(skipRepeat && kmerFreq > 128) return kmerFreq;
@@ -243,6 +231,7 @@ size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t la
 		}
 	}
 
+	
 	// LF-mapping of each rvc index	
 	for(int64_t rvcRootIndex=rvcInterval.lower; 
 		rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid() && rvcRootIndex - rvcInterval.lower < maxIntervalSize; 
