@@ -16,7 +16,7 @@ SAIPBSelfCorrectTree::SAIPBSelfCorrectTree(
 					size_t min_SA_threshold,
 					int maxLeavesAllowed) :
                     m_pBWT(pBWT), m_pRBWT(pRBWT), m_min_SA_threshold(min_SA_threshold), m_maxLeavesAllowed(maxLeavesAllowed),
-					m_expectedLength(0), m_currentLength(0), m_pRootNode(NULL), debug(false)
+					m_expectedLength(0), m_currentLength(0), m_pRootNode(NULL), m_isSourceRepeat(false), m_isTargetRepeat(false)
 {
 	// initialize google dense hashmap
 	kmerHash.set_empty_key("");
@@ -84,6 +84,7 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 	initializeSearchTree(src, hashKmerSize);
 	initializeTerminalIntervals(dest, hashKmerSize);
 	m_expectedLength = expectedLength;
+	size_t maxUsedLeaves=0;
 	
 	SAIntervalNodeResultVector results;
 	while(!m_leaves.empty() && m_leaves.size() <= maxLeaves &&  (size_t)m_currentLength <= maxLength)
@@ -97,6 +98,8 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 		// ACGT-extend the leaf nodes via updating existing SA interval
 		attempToExtendUsingHash(newLeaves, hashKmerSize);
 
+		if(m_leaves.size()> maxUsedLeaves) maxUsedLeaves=m_leaves.size();
+		
 		// extension succeed
 		if(!newLeaves.empty())
 			m_currentLength++;
@@ -108,9 +111,8 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 		if( (size_t) m_currentLength >= minLength)
 			isTerminated(results);
 
-		// if(src.length() == 22 ){
-			// printLeaves(hashKmerSize);
-		// }
+		// if(src.length()==198)
+			// printLeaves(hashK);
 	}
 	
 	if(results.size()>0)
@@ -129,8 +131,12 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 
 			int currLengthDiff = std::abs((int)tmpseq.length()-(int)expectedLength);
 			double avgCov = (double)results[i].SAICoverage / tmpseq.length();
-			
-			// std::cout << currLengthDiff << "\t" << avgCov <<  "\n";
+		
+			// if(src.length() == 198 )
+			// {
+				// std::cout << ">" << currLengthDiff << "\t" << avgCov <<  "\t" << tmpseq.length() << "\t" << expectedLength << "\n";
+				// std::cout << ">" << src.length() << "\n" << tmpseq.substr(src.length()) <<  "\n";
+			// }
 			
 			// PB135123_7431.fa
 			// Rule out apparent errors due to tandem repeats with large length difference
@@ -144,8 +150,17 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 				mergedseq=tmpseq;
 			}
 		}
-		// std::cout << "Selected: " << minLengthDiff << "\t" << maxKmerCoverage << "\n";
-		// std::cout << mergedseq << "\n";
+		
+		// chimera
+		// bool isChimera = (results.size()>=6 && maxUsedLeaves >=16) && mergedseq.length()-src.length()>100 
+			// && hashKmerSize <=11 && (m_isSourceRepeat || m_isTargetRepeat));
+
+		// if( (results.size()>=6 && maxUsedLeaves >=16) && mergedseq.length()-src.length()>100 
+			// && hashKmerSize <=13 && ( (m_isSourceRepeat && m_sourceKmerSize>=17) || (m_isTargetRepeat && m_targetKmerSize>=17) ) )
+		// {
+			// std::cout << ">Selected: " << results.size() << "\t" << maxUsedLeaves << "\t" << mergedseq.length()-expectedLength << "\t" <<hashKmerSize <<"\n";
+			// std::cout << mergedseq.substr(src.length()-hashKmerSize) << "\n";
+		// }
 		return 1;
 	}
 				
@@ -183,6 +198,19 @@ size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t la
 	kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
 
 	// std::cout << initKmer << "\t" << smallKmerSize << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
+	
+	if(kmerFreq >30)
+	{
+		if(expectedLength < 0)
+			m_isSourceRepeat = true;
+		else
+			m_isTargetRepeat = true;
+	}
+	
+	if(expectedLength < 0)
+		m_sourceKmerSize = largeKmerSize;
+	else
+		m_targetKmerSize = largeKmerSize;
 	
 	// skip repeat only in the 1st round
 	if(skipRepeat && kmerFreq > 128) return kmerFreq;
@@ -466,6 +494,7 @@ std::vector<std::pair<std::string, BWTIntervalPair> > SAIPBSelfCorrectTree::getF
 bool SAIPBSelfCorrectTree::isTerminated(SAIntervalNodeResultVector& results)
 {
 	bool found = false;
+	STNodePtrList newLeaves;
 
     for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
     {

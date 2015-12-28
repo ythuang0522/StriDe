@@ -21,14 +21,14 @@
 class SAIOverlapTree
 {
     public:
-        SAIOverlapTree(const std::string& query,
+         SAIOverlapTree(const std::string& query,
                        size_t minOverlap,
 					   size_t maxIndelSize,
 					   const BWT* pBWT, 
 					   const BWT* pRBWT, 
 					   AlignFlags af,
                        size_t maxLeaves=256,
-					   size_t seedSize=17, size_t seedDist=1);
+					   size_t seedSize=17, size_t seedDist=1, size_t repeatFreq=256);
 		
         ~SAIOverlapTree();
 
@@ -101,6 +101,7 @@ class SAIOverlapTree
         size_t m_maxLeaves;
 		size_t m_seedSize;
 		size_t m_seedDist;
+		size_t m_repeatFreq;
 
         SONodePtrList m_leaves;
 

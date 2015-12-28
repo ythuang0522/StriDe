@@ -197,7 +197,11 @@ class SAIPBSelfCorrectTree
 		DenseHashMap<std::string, KmerFeatures*, StringHasher> kmerHash;
 		typedef DenseHashMap<std::string, KmerFeatures*> :: iterator kmerHashiter;
 		
-		bool debug;
+		bool m_isSourceRepeat;
+		bool m_isTargetRepeat;
+		size_t m_sourceKmerSize;
+		size_t m_targetKmerSize;
+		// bool debug;
 };
 
 #endif

@@ -76,7 +76,6 @@ namespace opt
 
 	static int kmerLength = 17;
 	static int kmerThreshold = 3;
-	// static bool bLearnKmerParams = false;
 
 	static int maxLeaves=32;
 	static int minOverlap=81;
@@ -94,7 +93,7 @@ namespace opt
 	static PacBioCorrectionAlgorithm algorithm = PBC_SELF;
 }
 
-static const char* shortopts = "p:t:o:a:k:x:L:m:M:s:y:d:c:v";
+static const char* shortopts = "p:t:o:a:k:x:L:m:s:M:y:d:c:v";
 
 enum { OPT_HELP = 1, OPT_VERSION, OPT_DISCARD, OPT_SPLIT, OPT_FIRST };
 

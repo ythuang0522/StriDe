@@ -18,9 +18,6 @@ int asmlongMain(int argc, char** argv);
 void parseAsmLongOptions(int argc, char** argv);
 int asmlong();
 
-// void outputGraphAndFasta(StringGraph* pGraph , std::string  name , int phase = -1);
-// void graphTrimAndSmooth (StringGraph* pGraph, size_t trimLength = 400, bool bIsGapPrecent=true);
-// void RemoveVertexWithBothShortEdges (StringGraph* pGraph, size_t vertexLength, size_t overlapLength, BWT* pBWT = NULL, size_t kmerLength = 0, float threshold = 0 );
-// void RemoveSmallOverlapRatioEdges ( StringGraph* pGraph, size_t chimeraLength);
+void sequentialTrimAndSmooth (StringGraph* pGraph, size_t trimLength = 10000, bool bIsGapPrecent=true);
 
 #endif

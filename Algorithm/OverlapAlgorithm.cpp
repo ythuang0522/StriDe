@@ -63,8 +63,9 @@ OverlapResult OverlapAlgorithm::overlapReadInexact(const SeqRecord& read, int mi
 	OverlapBlockList oblPrefixFwd;
 	OverlapBlockList oblPrefixRev;
 
-	// Match the suffix of seq to prefixes
 	// std::cout << read.id << "\n"; 
+	
+	// Match the suffix of seq to prefixes
 	findOverlapBlocksInexact(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
 	
@@ -164,8 +165,13 @@ OverlapResult OverlapAlgorithm::overlapReadInexactFMWalk(const SeqRecord& read, 
 	OverlapBlockList oblPrefixFwd;
 	OverlapBlockList oblPrefixRev;
 
-	// Match the suffix of seq to prefixes
 	// std::cout << read.id << "\n"; 
+	
+	// skip short reads
+	if(seq.length() < (size_t) minOverlap)
+		return result;
+	
+	// Match the suffix of seq to prefixes
 	findOverlapBlocksInexactFMIndexWalk(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
 	if(result.isSubstring) return result;
 	
@@ -984,6 +990,7 @@ bool OverlapAlgorithm::findOverlapBlocksInexactFMIndexWalk(const std::string& w,
 			// getchar();
 			return false;
 		}
+		
 		// Store intervals with sufficient overlap reach $, if any.
 		for(size_t j=0; j<OBTmpResults.size(); j++)
 			pOverlapList->push_back(OBTmpResults.at(j));

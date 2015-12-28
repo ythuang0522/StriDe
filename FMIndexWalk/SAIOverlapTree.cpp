@@ -19,14 +19,16 @@
 SAIOverlapTree::SAIOverlapTree(const std::string& query,
 			   size_t minOverlap,
 			   size_t maxIndelSize,
-			   const BWT* pBWT, 
-			   const BWT* pRBWT, 
+			   const BWT* pBWT, const BWT* pRBWT, 
 			   AlignFlags af,
 			   size_t maxLeaves,
-			   size_t seedSize, size_t seedDist):
+			   size_t seedSize, size_t seedDist, 
+			   size_t repeatFreq):
                                m_Query(query), m_minOverlap(minOverlap),  
                                m_maxIndelSize(maxIndelSize), m_pBWT(pBWT), m_pRBWT(pRBWT), m_af(af),
-                               m_maxLeaves(maxLeaves), m_seedSize(seedSize), m_seedDist(seedDist)
+                               m_maxLeaves(maxLeaves), 
+							   m_seedSize(seedSize), m_seedDist(seedDist), 
+							   m_repeatFreq(repeatFreq)
 {
     // Create the root node containing the rightmost seed string
 	// std::string initStr = m_Query.substr(m_Query.length()-m_seedSize, m_seedSize);
@@ -34,14 +36,18 @@ SAIOverlapTree::SAIOverlapTree(const std::string& query,
 
 	// the initial seed may contain errors already, which is in real data
 	// greedily find the next best seed until m_seedSize+m_maxIndelSize
-	for(size_t initSeedOffset = 0; initSeedOffset<m_seedSize+m_maxIndelSize; initSeedOffset++)
+	for(size_t initSeedOffset = 0; initSeedOffset<m_seedSize+m_maxIndelSize
+		&& initSeedOffset+m_seedSize<=m_Query.length()	//bug fix: some short reads should be skipped
+		; initSeedOffset++)
 	{
 		std::string initSeed = m_Query.substr(m_Query.length()-m_seedSize-initSeedOffset, m_seedSize);
 		BWTIntervalPair bip = BWTAlgorithms::findIntervalPair( m_pBWT, m_pRBWT, initSeed);
 
-		// feasible initial seeds are found
-		if(bip.isValid())
+		// feasible initial seeds are found if it's not a repeat seed
+		if(bip.isValid() && bip.interval[0].size() < 256)
 		{
+			// std::cout << bip.interval[0].size() << "\n";
+				
 			// create one root node
 			SAIOverlapNode* m_pRootNode = new SAIOverlapNode(&initSeed, NULL);
 			m_pRootNode->currIntervalPair = bip;
@@ -192,8 +198,10 @@ void SAIOverlapTree::addNewRootNodes()
 	std::string	initStr = m_Query.substr(m_Query.length()-m_currentLength, m_seedSize);
 	BWTIntervalPair bip = BWTAlgorithms::findIntervalPair( m_pBWT, m_pRBWT, initStr);
 	
-	if(bip.isValid())
+	if(bip.isValid() && (size_t)bip.interval[0].size() < m_repeatFreq)
 	{
+		// std::cout << initStr << bip.interval[0].size() << "\n";
+		
 	    SAIOverlapNode* m_pRootNode = new SAIOverlapNode(&initStr, NULL);
 
 		m_pRootNode->currIntervalPair = bip;
@@ -267,7 +275,7 @@ bool SAIOverlapTree::PrunedBySeedSupport()
 
 		// give up if new seeds do not satisfy indel constraints
 		// this is not necessary if isSupportedByNewSeed is implemented 100% accurately
-		if(!isOverlapAcceptable(*iter)) continue;
+		// if(!isOverlapAcceptable(*iter)) continue;
 
 		// The current extension must be supported by sharing at least one seed with m_maxIndelSize		
 		if( (isLastSeedWithinRange || isNewSeedFound))
@@ -456,6 +464,8 @@ bool SAIOverlapTree::isTerminated(std::vector<OverlapBlock>& results)
 			std::list<BWTIntervalPair> normalTerminatedReads = collectToRightExtreme(probe, (*iter)->initSeedIdx, substrTerminatedReads);
 			
 			double errorRate = computeErrorRate(*iter);
+			// std::cout << errorRate << "\n";
+			
 			if(errorRate >= 0.3) continue;
 
 			size_t totalErrors = errorRate * m_Query.length()*2;

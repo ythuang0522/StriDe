@@ -418,7 +418,7 @@ bool SGSmoothingVisitor::visit(StringGraph* pGraph, Vertex* pVertex)
 		// The walks grow exponentially within repeats
 		const int MAX_WALKS = 240;
 		// The distance is the extended seq length excluding the starting vertex,
-		const int MAX_DISTANCE = 240000;
+		const int MAX_DISTANCE = 2400000;
 		bool bIsDegenerate=false;
 		bool bFailIndelSizeCheck=false;
 

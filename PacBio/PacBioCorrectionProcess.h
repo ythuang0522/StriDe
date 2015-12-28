@@ -24,12 +24,13 @@
 struct SeedFeature
 {
 	public:
-		SeedFeature(size_t startPos, std::string str, bool repeat=false, size_t kmerSize=17);
+		SeedFeature(size_t startPos, std::string str, bool repeat, size_t kmerSize, size_t repeatCutoff);
 		
 		// append current seed string with extendedStr
 		void append(std::string extendedStr);
 		void setBestKmerSize(size_t kmerSize);		
 		void estimateBestKmerSize(const BWT* pBWT);
+		bool inline isSmall(){return seedLength<=17?true:false ;}
 		
 		size_t seedStartPos;
 		size_t seedEndPos;
@@ -172,6 +173,10 @@ private:
 	
 	std::vector<SeedFeature> seedingByDynamicKmer(const std::string readSeq);
 
+	void initCorrect(std::string& readSeq, std::vector<SeedFeature>& seeds, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioCorrectionResult& result);
+	
+	void realCorrect(std::string& readSeq, std::vector<SeedFeature>& seeds, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioCorrectionResult& result);
+	
 	// kmers around repeat seeds are often error seeds, split the repeat regions into high-confident seeds
 	// return kmer freq of beginning and ending kmers
 	std::pair<size_t, size_t> refineRepeatSeed(const std::string readSeq, size_t& seedStartPos, size_t& seedEndPos);
