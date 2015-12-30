@@ -69,8 +69,8 @@ else
 fi
 
 # Set compiler flags.
-#AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Wno-unknown-pragmas -static")
-AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Wno-unknown-pragmas")
+AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Wno-unknown-pragmas -static")
+#AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Wno-unknown-pragmas")
 AC_SUBST(CXXFLAGS, "-O3")
 AC_SUBST(CFLAGS, "-O3")
 AC_SUBST(CPPFLAGS, "$CPPFLAGS $openmp_cppflags $sparsehash_include")

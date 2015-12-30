@@ -130,7 +130,15 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 				tmpseq=results[i].thread;
 
 			int currLengthDiff = std::abs((int)tmpseq.length()-(int)expectedLength);
-			double avgCov = (double)results[i].SAICoverage / tmpseq.length();
+
+			/**** Math bug: the division requires denominator larger than numerator for accurate average frequency
+					numerator denominator division
+					100	1000	0.1
+					99	999	0.099099099
+					100	10	10
+					99	9	11
+			***/			
+			double avgCov = (double)results[i].SAICoverage /(tmpseq.length()+1000000);
 		
 			// if(src.length() == 198 )
 			// {
@@ -151,15 +159,12 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 			}
 		}
 		
-		// chimera
-		// bool isChimera = (results.size()>=6 && maxUsedLeaves >=16) && mergedseq.length()-src.length()>100 
-			// && hashKmerSize <=11 && (m_isSourceRepeat || m_isTargetRepeat));
-
 		// if( (results.size()>=6 && maxUsedLeaves >=16) && mergedseq.length()-src.length()>100 
 			// && hashKmerSize <=13 && ( (m_isSourceRepeat && m_sourceKmerSize>=17) || (m_isTargetRepeat && m_targetKmerSize>=17) ) )
 		// {
-			// std::cout << ">Selected: " << results.size() << "\t" << maxUsedLeaves << "\t" << mergedseq.length()-expectedLength << "\t" <<hashKmerSize <<"\n";
+			// std::cout << ">Selected: " << results.size() << "\t" << maxKmerCoverage << "\t" << minLengthDiff << "\t" << maxUsedLeaves <<"\n";
 			// std::cout << mergedseq.substr(src.length()-hashKmerSize) << "\n";
+			// std::cout << mergedseq.length()-src.length() << "\n";
 		// }
 		return 1;
 	}
@@ -381,13 +386,22 @@ void SAIPBSelfCorrectTree::attempToExtendUsingHash(STNodePtrList &newLeaves, siz
                 pChildNode->rvcInterval=extensions[i].second.interval[1];
 			
 				std::string fwdkmer = pChildNode->getSuffix(hashKmerSize);
-				double currAvgFreq = (double)(*iter)->getKmerCount()/m_currentLength;
+				
+				/**** Math bug: the division requires denominator larger than numerator for accurate average frequency
+					numerator denominator division
+					100	1000	0.1
+					99	999	0.099099099
+					100	10	10
+					99	9	11
+				***/
+				// double currAvgFreq = (double)(*iter)->getKmerCount()/m_currentLength;
+				double currAvgFreq = (double)(*iter)->getKmerCount()/ (m_currentLength+1000000);
 				
 				size_t kmerfreqs=0;
 				if( isExtensionValid(fwdkmer, currAvgFreq, kmerfreqs) )
 				{
 					// inherit kmer freq from parents
-					pChildNode->addKmerCount((*iter)->getKmerCount());
+					// pChildNode->addKmerCount((*iter)->getKmerCount());
 					pChildNode->addKmerCount(kmerfreqs);
 					newLeaves.push_back(pChildNode);
 				}
@@ -402,7 +416,10 @@ bool SAIPBSelfCorrectTree::isExtensionValid(std::string fwdkmer, double& currAvg
 		kmerHashiter iter1 = kmerHash.find(fwdkmer);			
 		
 		// bubble removal by removing kmer path with avg kmer freq less than previous one
-		if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
+		// if( iter1!=kmerHash.end() && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
+		
+		// Bubble removal preoduces false removal, perform only when leaves are getting larger than 8
+		if( iter1!=kmerHash.end() && m_leaves.size()>8 && currAvgFreq < iter1->second->getMaxAvgFreq() ) 
 			return false;
 		
 		if( iter1!=kmerHash.end() && currAvgFreq > iter1->second->getMaxAvgFreq() )

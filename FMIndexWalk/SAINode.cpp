@@ -102,6 +102,9 @@ SAIntervalNode* SAIntervalNode::createChild(const std::string& label)
     m_children.push_back(pAdded);
     pAdded->extend(label);
 
+	// copy each member value to child
+	pAdded->addKmerCount(this->getKmerCount());
+	
     return pAdded;
 }
 
