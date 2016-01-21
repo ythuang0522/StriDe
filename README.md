@@ -1,6 +1,10 @@
 # Introduction
 The StriDe Assembler integrates string and de Bruijn graph by decomposing reads within error-prone regions, while extending paire-end read into long reads for assembly through repetitive regions. The entire implementation is done by revising Simpson's [SGA][1] components for our own purpose, porting Li's [ropebwt2][2] for FM-index construction, and adding key components of this assembler. 
 
+# Download binary version
+Download the StriDe_Linux64bit_v1.0.gz (compiled on linux 64bit) and type
+	tar zxvf StriDe_Linux64bit_v1.0.tar.gz
+
 # Compile by yourself
 To compile StriDe assembler in your specific environment, type 
 
