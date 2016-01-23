@@ -38,6 +38,10 @@ For instance, given two pair-end reads data sets in fastq format (A_R1.fq, A_R2.
 
 The entire preprocess, index, correction, fmwalk/decomposition, ... will be performed.
 
+For multiple PE libraries, each pair of reads of the same library should be appeneded. e.g., two PE lib of insert 200bp and 600bp with max read length 300bp.
+
+      ./stride all -r 300 -i 600 insert_200_1.fastq insert_200_2.fastq insert_600_1.fastq insert_600_2.fastq
+
 Example of a Step-by-step script
 
       stride preprocess --discard-quality -p 1 A_R1.fq A_R2.fq -o reads.fa
