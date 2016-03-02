@@ -86,7 +86,6 @@ struct PacBioCorrectionParameters
 	int seedKmerThreshold;
 	int numOfNextTarget;
 	int collectedSeeds;
-	std::vector<int> seedWalkDistance;
 
 	bool isSplit;
 	bool isFirst;
@@ -140,6 +139,7 @@ public:
 	// PacBio correction by Ya, v20150305.
 	PacBioCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
 	PacBioCorrectionResult PBHybridCorrection(const SequenceWorkItem& workItem);
+	PacBioCorrectionResult PBHybridCorrection_v2(const SequenceWorkItem& workItem);
 
 	PacBioCorrectionResult process(const SequenceWorkItem& workItem)
 	{
@@ -152,7 +152,7 @@ public:
 			}
 		case PBC_HYBRID:
 			{
-				return PBHybridCorrection(workItem);
+				return PBHybridCorrection_v2(workItem);
 				break;
 			}
 
@@ -196,6 +196,8 @@ private:
 	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& mergedseq,
 							size_t smallKmerSize, size_t dis_between_src_target);
 	
+	
+	std::vector<SeedFeature> PBHCSeedingByDynamicKmer(const std::string readSeq);
 	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
 	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
 	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);

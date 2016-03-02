@@ -79,6 +79,9 @@ class SAIntervalPBHybridCTree
 
         BWTInterval m_fwdTerminatedInterval;   //in rBWT
         BWTInterval m_rvcTerminatedInterval;   //in BWT
+		
+		size_t m_beginningIntervalSize;
+		size_t m_terminatedIntervalSize;
 };
 
 #endif

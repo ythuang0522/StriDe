@@ -38,7 +38,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(const std::string* pQuery,
     std::string beginningkmer=pQuery->substr(m_currentLength-m_minOverlap);
     m_pRootNode->fwdInterval=BWTAlgorithms::findInterval(m_pRBWT,reverse(beginningkmer));
     m_pRootNode->rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(beginningkmer));
-	
+
     //initialize the ending SA intervals with kmer length=m_minOverlap
     std::string endingkmer=secondread.substr(0,m_minOverlap);
 	m_MaxLength=(1.2*(MaxLength+10))+endingkmer.length()+m_currentLength;
@@ -46,6 +46,10 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(const std::string* pQuery,
     m_fwdTerminatedInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));
     m_rvcTerminatedInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
 
+	m_beginningIntervalSize = m_pRootNode->fwdInterval.size()+m_pRootNode->rvcInterval.size();
+	m_terminatedIntervalSize = m_fwdTerminatedInterval.size()+m_rvcTerminatedInterval.size();
+	//std::cout << m_pRootNode->fwdInterval.size()+m_pRootNode->rvcInterval.size() << " " << m_fwdTerminatedInterval.size()+m_rvcTerminatedInterval.size() << "\n";
+	//std::cout << beginningkmer.length() << " " << endingkmer.length() << "\n";
 	//std::cout << m_minOverlap << ":" << beginningkmer << ":" << endingkmer << "\n";
 }
 
@@ -171,8 +175,19 @@ void SAIntervalPBHybridCTree::extendLeaves()
 	
 	//attempt to extend one base for each leave
     attempToExtend(newLeaves);
-	if(m_kmerMode || m_currentKmerSize>=m_maxOverlap) 
+	//if(m_kmerMode || m_currentKmerSize >= m_maxOverlap) 
+		//refineSAInterval(m_minOverlap);
+	if(m_kmerMode) 
 		refineSAInterval(m_minOverlap);
+	else if(m_currentKmerSize >= m_maxOverlap)
+	{
+		if(m_minOverlap > 51)
+			refineSAInterval(m_minOverlap);
+		else if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
+			refineSAInterval(51);
+		else
+			refineSAInterval(m_minOverlap);
+	}
 	
     //shrink the SAIntervals in case overlap is larger than read length
     if(!m_kmerMode  &&  newLeaves.empty() )

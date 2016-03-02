@@ -211,15 +211,6 @@ int PacBioCorrectionMain(int argc, char** argv)
 		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
 		<< "search depth:\t1.2~0.8* (length between two seeds +- 10)" << std::endl
 		<< "kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
-		
-		// computing distance of various continuous matches length (dk)
-		for(int i = 0 ; i <= ecParams.kmerLength ; i++)
-		{
-			if(i >= ecParams.minKmerLength && i <= ecParams.kmerLength)
-			ecParams.seedWalkDistance.push_back(2*3.8649*pow(2.7183,0.1239*i));
-			else
-			ecParams.seedWalkDistance.push_back(0);
-		}
 	}
 	
 	// Setup post-processor
