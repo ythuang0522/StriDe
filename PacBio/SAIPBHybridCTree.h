@@ -68,6 +68,7 @@ class SAIntervalPBHybridCTree
         std::string m_secondread;
         size_t m_min_SA_threshold;
         bool m_kmerMode;
+		int m_expectedLength;
 
         SAIntervalNode* m_pRootNode;
         STNodePtrList m_leaves;
@@ -82,6 +83,8 @@ class SAIntervalPBHybridCTree
 		
 		size_t m_beginningIntervalSize;
 		size_t m_terminatedIntervalSize;
+		
+		bool debug;
 };
 
 #endif
