@@ -1,10 +1,10 @@
-///-----------------------------------------------
-// Copyright 2015 National Chung Cheng University
-// Written by Yao-Ting Huang
+//-----------------------------------------------
+// Copyright 2016 National Chung Cheng University
+// Written by Yao-Ting Huang & Ping-Yeh Chen
 // Released under the GPL
 //-----------------------------------------------
 //
-// PacBioCorrectionProcess.cpp - Correction of PacBio reads using FM-index
+// PacBioHybridCorrection - Hybrid correction using FM-index walk for PacBio reads
 //
 
 #include <iostream>
@@ -12,7 +12,7 @@
 #include <sstream>
 #include <iterator>
 #include "Util.h"
-#include "PacBioCorrection.h"
+#include "PacBioHybridCorrection.h"
 #include "SuffixArray.h"
 #include "BWT.h"
 #include "SGACommon.h"
@@ -22,7 +22,7 @@
 #include "ASQG.h"
 #include "gzstream.h"
 #include "SequenceProcessFramework.h"
-#include "PacBioCorrectionProcess.h"
+#include "PacBioHybridCorrectionProcess.h"
 #include "CorrectionThresholds.h"
 #include "BWTIntervalCache.h"
 
@@ -30,12 +30,12 @@
 //
 // Getopt
 //
-#define SUBPROGRAM "PacBioCorrection"
+#define SUBPROGRAM "PacBioHybridCorrection"
 static const char *CORRECT_VERSION_MESSAGE =
 SUBPROGRAM " Version " PACKAGE_VERSION "\n"
 "Written by Yao-Ting Huang & Ping-Yeh Chen.\n"
 "\n"
-"Copyright 2015 National Chung Cheng University\n";
+"Copyright 2016 National Chung Cheng University\n";
 
 static const char *CORRECT_USAGE_MESSAGE =
 "Usage: " PACKAGE_NAME " " SUBPROGRAM " [OPTION] ... READSFILE\n"
@@ -46,8 +46,6 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -p, --prefix=PREFIX              use PREFIX for the names of the index files (default: prefix of the input file)\n"
 "      -o, --outfile=FILE               write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
 "      -t, --threads=NUM                use NUM threads for the computation (default: 1)\n"
-"      -a, --algorithm=STR              pacbioH: pacbio hybrid correction (using NGS reads to correct PB reads)\n"
-"                                       pacbioS: pacbio self correction (using PB reads to correct PB reads)(default)\n"
 "\nPacBio correction parameters:\n"
 "      -k, --kmer-size=N                The length of the kmer to use. (default: 31, recommend: 31 (PacBioH), 17 (PacBioS).)\n"
 "      -s, --min-kmer-size=N            The minimum length of the kmer to use. (default: 9, recommend: 21 (PacBioH), 9 (PacBioS).)\n"
@@ -88,12 +86,10 @@ namespace opt
 	
 	static bool split = false;
 	static bool isFirst = false;
-	size_t maxSeedInterval = 500;
-
-	static PacBioCorrectionAlgorithm algorithm = PBC_SELF;
+	//size_t maxSeedInterval = 500;
 }
 
-static const char* shortopts = "p:t:o:a:k:x:L:m:s:M:y:d:c:v";
+static const char* shortopts = "p:t:o:k:x:L:m:s:M:y:d:c:v";
 
 enum { OPT_HELP = 1, OPT_VERSION, OPT_DISCARD, OPT_SPLIT, OPT_FIRST };
 
@@ -102,7 +98,6 @@ static const struct option longopts[] = {
 	{ "threads",       required_argument, NULL, 't' },
 	{ "outfile",       required_argument, NULL, 'o' },
 	{ "prefix",        required_argument, NULL, 'p' },
-	{ "algorithm",     required_argument, NULL, 'a' },
 	{ "kmer-size",     required_argument, NULL, 'k' },
 	{ "kmer-threshold" ,required_argument, NULL, 'x' },
 	{ "max-leaves",    required_argument, NULL, 'L' },
@@ -122,12 +117,12 @@ static const struct option longopts[] = {
 //
 // Main
 //
-int PacBioCorrectionMain(int argc, char** argv)
+int PacBioHybridCorrectionMain(int argc, char** argv)
 {
-	parsePacBioCorrectionOptions(argc, argv);
+	parsePacBioHybridCorrectionOptions(argc, argv);
 
 	// Set the error correction parameters
-	PacBioCorrectionParameters ecParams;
+	PacBioHybridCorrectionParameters ecParams;
 	BWT *pBWT, *pRBWT;
 	SampledSuffixArray* pSSA;
 
@@ -173,7 +168,7 @@ int PacBioCorrectionMain(int argc, char** argv)
 	std::ostream* pDiscardWriter = (!opt::discardFile.empty() ? createWriter(opt::discardFile) : NULL);
 	Timer* pTimer = new Timer(PROGRAM_IDENT);
 
-	ecParams.algorithm = opt::algorithm;
+	//ecParams.algorithm = opt::algorithm;
 	ecParams.kmerLength = opt::kmerLength;
 	ecParams.maxLeaves = opt::maxLeaves;
 	ecParams.minOverlap = opt::minOverlap;
@@ -185,48 +180,46 @@ int PacBioCorrectionMain(int argc, char** argv)
 	ecParams.collectedSeeds = opt::collect;
 	ecParams.isSplit = opt::split;
 	ecParams.isFirst = opt::isFirst;
-	ecParams.maxSeedInterval = opt::maxSeedInterval;
+	//ecParams.maxSeedInterval = opt::maxSeedInterval;
 	
-	if(ecParams.algorithm == PBC_SELF)
-	{
-		std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
+	std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 		<< "number of threads:\t" << opt::numThreads << std::endl
-		<< "large kmer size:\t" << ecParams.kmerLength << std::endl 
-		<< "large kmer freq. cutoff:\t" << ecParams.seedKmerThreshold << std::endl
-		<< "small kmer size:\t" << ecParams.minKmerLength << std::endl
-		<< "small kmer freq. cutoff:\t" << ecParams.FMWKmerThreshold << std::endl
+		<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
+		<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
+		<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
+		<< "max distance of searching seed:\t2* tendency distance" << std::endl							
+		<< "max overlap:\t" <<  ecParams.maxOverlap << std::endl 
 		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "max depth:\t1.2~0.8* (length between two seeds +- 20)" << std::endl
-		<< "num of next Targets:\t" << ecParams.numOfNextTarget << std::endl;
-	}
-	
+		<< "search depth:\t1.2~0.8* (length between two seeds +- 10)" << std::endl
+		<< "kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
+
 	// Setup post-processor
-	PacBioCorrectionPostProcess postProcessor(pWriter, pDiscardWriter, ecParams);
+	PacBioHybridCorrectionPostProcess postProcessor(pWriter, pDiscardWriter, ecParams);
 
 	if(opt::numThreads <= 1)
 	{
 		// Serial mode
-		PacBioCorrectionProcess processor(ecParams);
+		PacBioHybridCorrectionProcess processor(ecParams);
 
 		SequenceProcessFramework::processSequencesSerial<SequenceWorkItem,
-		PacBioCorrectionResult,
-		PacBioCorrectionProcess,
-		PacBioCorrectionPostProcess>(opt::readsFile, &processor, &postProcessor);
+		PacBioHybridCorrectionResult,
+		PacBioHybridCorrectionProcess,
+		PacBioHybridCorrectionPostProcess>(opt::readsFile, &processor, &postProcessor);
 	}
 	else
 	{
 		// Parallel mode
-		std::vector<PacBioCorrectionProcess*> processorVector;
+		std::vector<PacBioHybridCorrectionProcess*> processorVector;
 		for(int i = 0; i < opt::numThreads; ++i)
 		{
-			PacBioCorrectionProcess* pProcessor = new PacBioCorrectionProcess(ecParams);
+			PacBioHybridCorrectionProcess* pProcessor = new PacBioHybridCorrectionProcess(ecParams);
 			processorVector.push_back(pProcessor);
 		}
 
 		SequenceProcessFramework::processSequencesParallel<SequenceWorkItem,
-		PacBioCorrectionResult,
-		PacBioCorrectionProcess,
-		PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
+		PacBioHybridCorrectionResult,
+		PacBioHybridCorrectionProcess,
+		PacBioHybridCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
 
 		// SequenceProcessFramework::processSequencesParallelOpenMP<SequenceWorkItem,
 		// PacBioCorrectionResult,
@@ -259,7 +252,7 @@ int PacBioCorrectionMain(int argc, char** argv)
 //
 // Handle command line arguments
 //
-void parsePacBioCorrectionOptions(int argc, char** argv)
+void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 {
 	optind=1;	//reset getopt
 	std::string algo_str;
@@ -269,29 +262,28 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 		std::istringstream arg(optarg != NULL ? optarg : "");
 		switch (c)
 		{
-		case 'p': arg >> opt::prefix; break;
-		case 'o': arg >> opt::outFile; break;
-		case 't': arg >> opt::numThreads; break;
-		case 'a': arg >> algo_str; break;
-		case 'k': arg >> opt::kmerLength; break;
-		case 'x': arg >> opt::kmerThreshold; break;
-		case '?': die = true; break;
-		case 'v': opt::verbose++; break;
-		case 'L': arg >> opt::maxLeaves; break;
-		case 'm': arg >> opt::minOverlap; break;
-		case 'M': arg >> opt::maxOverlap; break;
-		case 's': arg >> opt::minKmerLength; break;
-		case 'y': arg >> opt::seedKmerThreshold; break;
-		case 'd': arg >> opt::numOfNextTarget; break;
-		case 'c': arg >> opt::collect; break;
-		case OPT_SPLIT: opt::split = true; break;
-		case OPT_FIRST: opt::isFirst = true; break;
-		case OPT_HELP:
-			std::cout << CORRECT_USAGE_MESSAGE;
-			exit(EXIT_SUCCESS);
-		case OPT_VERSION:
-			std::cout << CORRECT_VERSION_MESSAGE;
-			exit(EXIT_SUCCESS);
+			case 'p': arg >> opt::prefix; break;
+			case 'o': arg >> opt::outFile; break;
+			case 't': arg >> opt::numThreads; break;
+			case 'k': arg >> opt::kmerLength; break;
+			case 'x': arg >> opt::kmerThreshold; break;
+			case '?': die = true; break;
+			case 'v': opt::verbose++; break;
+			case 'L': arg >> opt::maxLeaves; break;
+			case 'm': arg >> opt::minOverlap; break;
+			case 'M': arg >> opt::maxOverlap; break;
+			case 's': arg >> opt::minKmerLength; break;
+			case 'y': arg >> opt::seedKmerThreshold; break;
+			case 'd': arg >> opt::numOfNextTarget; break;
+			case 'c': arg >> opt::collect; break;
+			case OPT_SPLIT: opt::split = true; break;
+			case OPT_FIRST: opt::isFirst = true; break;
+			case OPT_HELP:
+				std::cout << CORRECT_USAGE_MESSAGE;
+				exit(EXIT_SUCCESS);
+			case OPT_VERSION:
+				std::cout << CORRECT_VERSION_MESSAGE;
+				exit(EXIT_SUCCESS);
 		}
 	}
 
@@ -312,7 +304,6 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 		die = true;
 	}
 
-
 	if(opt::kmerLength <= 0)
 	{
 		std::cerr << SUBPROGRAM ": invalid kmer length: " << opt::kmerLength << ", must be greater than zero\n";
@@ -323,18 +314,6 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 	{
 		std::cerr << SUBPROGRAM ": invalid kmer threshold: " << opt::kmerThreshold << ", must be greater than zero\n";
 		die = true;
-	}
-
-	// Determine the correction algorithm to use
-	if(!algo_str.empty())
-	{
-		if(algo_str == "pacbioS")
-		opt::algorithm = PBC_SELF;
-		else
-		{
-			std::cerr << SUBPROGRAM << ": unrecognized -a,--algorithm parameter: " << algo_str << "\n";
-			die = true;
-		}
 	}
 
 	if (die)
@@ -361,11 +340,6 @@ void parsePacBioCorrectionOptions(int argc, char** argv)
 
 	std::string out_prefix = stripFilename(opt::readsFile);
 	if(opt::outFile.empty())
-	{
-		if (opt::algorithm == PBC_SELF)
-		opt::outFile = out_prefix + ".PBSelfCor.fa";
-		else
-		assert(false);
-	}
+		opt::outFile = out_prefix + ".PBHybridCor.fa";
 	opt::discardFile = out_prefix + ".discard.fa";
 }

@@ -4,8 +4,7 @@
 // Released under the GPL
 //-----------------------------------------------
 //
-// PacBioCorrectionProcess - Self-correction or hybrid correction using FM-index walk for PacBio reads
-//
+// PacBioCorrectionProcess - Self-correction using FM-index walk for PacBio reads
 //
 
 #ifndef PacBioCorrectionProcess_H
@@ -60,8 +59,7 @@ struct SeedFeature
 
 enum PacBioCorrectionAlgorithm
 {
-	PBC_SELF,	// PacBio self correction
-	PBC_HYBRID	// PacBio Hybrid Correction
+	PBC_SELF	// PacBio self correction
 };
 
 
@@ -150,12 +148,6 @@ public:
 				return PBSelfCorrection(workItem);
 				break;
 			}
-		case PBC_HYBRID:
-			{
-				return PBHybridCorrection_v2(workItem);
-				break;
-			}
-
 		default:
 			{
 				std::cout << "Unsupported algorithm\n";
@@ -195,12 +187,6 @@ private:
 	// Return FMWalkReturnType
 	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& mergedseq,
 							size_t smallKmerSize, size_t dis_between_src_target);
-	
-	
-	std::vector<SeedFeature> PBHCSeedingByDynamicKmer(const std::string readSeq);
-	std::vector<std::pair<int,std::string> > findSeedsUsingDynamicKmerLen(const std::string readSeq);
-	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
-	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
 	
 	PacBioCorrectionParameters m_params;
 

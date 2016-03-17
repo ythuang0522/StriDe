@@ -21,6 +21,7 @@
 #include "grep.h"
 #include "FMIndexWalk.h"
 #include "PacBioCorrection.h"
+#include "PacBioHybridCorrection.h"
 #include "strideall.h"
 #include "asmlong.h"
 
@@ -45,6 +46,7 @@ static const char *STRIDE_USAGE_MESSAGE =
 "      index       build FM-index for a set of reads\n"
 "      correct     correct sequencing errors in reads \n"
 "      pbcorrect   correct sequencing errors in PacBio reads \n"
+"      pbhc        correct sequencing errors in PacBio reads by short reads \n"
 "      fmwalk      merge paired reads into long reads via FM-index walk\n"
 "      filter      remove redundant reads from a data set\n"
 "      overlap     compute overlaps between reads\n"
@@ -91,6 +93,8 @@ int main(int argc, char** argv)
             correctMain(argc - 1, argv + 1);
         else if(command == "pbcorrect")
             PacBioCorrectionMain(argc - 1, argv + 1);
+		else if(command == "pbhc")
+            PacBioHybridCorrectionMain(argc - 1, argv + 1);
 		else if(command == "assemble")
             assembleMain(argc - 1, argv + 1);
         else if(command == "subgraph")

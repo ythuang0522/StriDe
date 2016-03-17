@@ -42,5 +42,6 @@ stride_SOURCES = StriDe.cpp \
 		grep.h grep.cpp \
 		FMIndexWalk.h FMIndexWalk.cpp \
 		PacBioCorrection.h PacBioCorrection.cpp \
+		PacBioHybridCorrection.h PacBioHybridCorrection.cpp \
 		asmlong.h asmlong.cpp \
               SGACommon.h 

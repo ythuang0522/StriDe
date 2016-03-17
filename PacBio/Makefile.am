@@ -16,4 +16,5 @@ libpacbio_a_SOURCES = \
 	RollingPBSelfCTree.h RollingPBSelfCTree.cpp \
 	SAIPBSelfCTree.h SAIPBSelfCTree.cpp \
 	SAIPBHybridCTree.h SAIPBHybridCTree.cpp \
-	PacBioCorrectionProcess.h PacBioCorrectionProcess.cpp
+	PacBioCorrectionProcess.h PacBioCorrectionProcess.cpp \
+	PacBioHybridCorrectionProcess.h PacBioHybridCorrectionProcess.cpp
