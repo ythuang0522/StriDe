@@ -1,5 +1,5 @@
 //----------------------------------------------
-// Copyright 2015 National Chung Cheng University
+// Copyright 2016 National Chung Cheng University
 // Written by Yao-Ting Huang & Ping-Yeh Chen
 // Released under the GPL
 //-----------------------------------------------
@@ -13,19 +13,25 @@
 #include "SAINode.h"
 #include "HashMap.h"
 
+// Parameter object for the FM-index Walk of PacBio Hybrid Correction
+struct PBHCFMWalkParameters
+{
+	BWTIndexSet indices;
+	std::string sourceSeed;
+	std::string targetSeed;
+    int disBetweenSrcTarget;
+	int maxLeaves;
+	int minOverlap;
+	int maxOverlap;
+    int SAThreshold = 3;
+	bool kmerMode = false;
+	bool lowCoverageHighErrorMode = false;
+};
+
 class SAIntervalPBHybridCTree
 {
     public:
-        SAIntervalPBHybridCTree(const std::string* pQuery,
-                       size_t minOverlap,
-					   size_t maxOverlap,
-                       int MaxLength,
-                       size_t MaxLeaves,
-                       const BWT* pBWT,
-                       const BWT* pRBWT,
-                       std::string secondread,
-                       size_t SA_threshold=3,
-                       bool KmerMode=false);
+        SAIntervalPBHybridCTree(PBHCFMWalkParameters parameters);
 
         ~SAIntervalPBHybridCTree();
 
@@ -57,7 +63,7 @@ class SAIntervalPBHybridCTree
         //
         // Data
         //
-        const std::string* m_pQuery;
+        const std::string* m_pSourceSeed;
         size_t m_minOverlap;
 		size_t m_maxOverlap;
         int m_MaxLength;
@@ -65,9 +71,11 @@ class SAIntervalPBHybridCTree
         size_t m_MaxLeaves;
         const BWT* m_pBWT;
         const BWT* m_pRBWT;
-        std::string m_secondread;
+        std::string m_targetSeed;
         size_t m_min_SA_threshold;
         bool m_kmerMode;
+		bool m_lowCoverageHighErrorMode;
+		int m_disBetweenSrcTarget;
 		int m_expectedLength;
 
         SAIntervalNode* m_pRootNode;

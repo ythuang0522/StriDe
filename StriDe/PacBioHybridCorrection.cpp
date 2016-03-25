@@ -71,22 +71,13 @@ namespace opt
 	static std::string outFile;
 	static std::string discardFile;
 	static int sampleRate = BWT::DEFAULT_SAMPLE_RATE_SMALL;
-
-	static int kmerLength = 17;
+	static int kmerLength = 31;
 	static int kmerThreshold = 3;
-
-	static int maxLeaves=32;
-	static int minOverlap=81;
-	static int maxOverlap=-1;
-	
-	static int minKmerLength = 15;
+	static int maxLeaves = 32;
+	static int minOverlap = 81;
+	static int maxOverlap = -1;
+	static int minKmerLength = 21;
 	static int seedKmerThreshold = 10;
-	static int numOfNextTarget = 1;
-	static int collect = 5;
-	
-	static bool split = false;
-	static bool isFirst = false;
-	//size_t maxSeedInterval = 500;
 }
 
 static const char* shortopts = "p:t:o:k:x:L:m:s:M:y:d:c:v";
@@ -162,13 +153,11 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 	indexSet.pSSA = pSSA;
 	ecParams.indices = indexSet;
 
-	
 	// Open outfiles and start a timer
 	std::ostream* pWriter = createWriter(opt::outFile);
 	std::ostream* pDiscardWriter = (!opt::discardFile.empty() ? createWriter(opt::discardFile) : NULL);
 	Timer* pTimer = new Timer(PROGRAM_IDENT);
 
-	//ecParams.algorithm = opt::algorithm;
 	ecParams.kmerLength = opt::kmerLength;
 	ecParams.maxLeaves = opt::maxLeaves;
 	ecParams.minOverlap = opt::minOverlap;
@@ -176,11 +165,6 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 	ecParams.minKmerLength = opt::minKmerLength;
 	ecParams.seedKmerThreshold = opt::seedKmerThreshold;
 	ecParams.FMWKmerThreshold = opt::kmerThreshold;
-	ecParams.numOfNextTarget = opt::numOfNextTarget;
-	ecParams.collectedSeeds = opt::collect;
-	ecParams.isSplit = opt::split;
-	ecParams.isFirst = opt::isFirst;
-	//ecParams.maxSeedInterval = opt::maxSeedInterval;
 	
 	std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 		<< "number of threads:\t" << opt::numThreads << std::endl
@@ -190,7 +174,7 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 		<< "max distance of searching seed:\t2* tendency distance" << std::endl							
 		<< "max overlap:\t" <<  ecParams.maxOverlap << std::endl 
 		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "search depth:\t1.2~0.8* (length between two seeds +- 10)" << std::endl
+		<< "search depth:\t1.3~0.7* (length between two seeds +- 30)" << std::endl
 		<< "kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
 
 	// Setup post-processor
@@ -227,23 +211,18 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 		// PacBioCorrectionPostProcess>(opt::readsFile, processorVector, &postProcessor);
 		
 		for(int i = 0; i < opt::numThreads; ++i)
-		{
 			delete processorVector[i];
-		}
 	}
 
 	delete pBWT;
 	if(pRBWT != NULL)
-	delete pRBWT;
-
+		delete pRBWT;
 	if(pSSA != NULL)
-	delete pSSA;
-
+		delete pSSA;
 	delete pTimer;
-
 	delete pWriter;
 	if(pDiscardWriter != NULL)
-	delete pDiscardWriter;
+		delete pDiscardWriter;
 	
 	return 0;
 }
@@ -274,10 +253,6 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 			case 'M': arg >> opt::maxOverlap; break;
 			case 's': arg >> opt::minKmerLength; break;
 			case 'y': arg >> opt::seedKmerThreshold; break;
-			case 'd': arg >> opt::numOfNextTarget; break;
-			case 'c': arg >> opt::collect; break;
-			case OPT_SPLIT: opt::split = true; break;
-			case OPT_FIRST: opt::isFirst = true; break;
 			case OPT_HELP:
 				std::cout << CORRECT_USAGE_MESSAGE;
 				exit(EXIT_SUCCESS);
@@ -326,9 +301,7 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 	opt::readsFile = argv[optind++];
 
 	if(opt::prefix.empty())
-	{
 		opt::prefix = stripFilename(opt::readsFile);
-	}
 
 	// Set the correction threshold
 	if(opt::kmerThreshold <= 0)

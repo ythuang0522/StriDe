@@ -1,5 +1,5 @@
 //----------------------------------------------
-// Copyright 2015 National Chung Cheng University
+// Copyright 2016 National Chung Cheng University
 // Written by Yao-Ting Huang & Ping-Yeh Chen
 // Released under the GPL
 //-----------------------------------------------
@@ -26,25 +26,17 @@ struct PacBioHybridCorrectionParameters
 {
 	BWTIndexSet indices;
 
-	int numKmerRounds;
 	int kmerLength;
 
 	// tree search parameters
 	int maxLeaves;
 	int minOverlap;
 	int maxOverlap;
-	
 
 	// PACBIO
 	int minKmerLength;
 	int FMWKmerThreshold;
 	int seedKmerThreshold;
-	int numOfNextTarget;
-	int collectedSeeds;
-
-	bool isSplit;
-	bool isFirst;
-	size_t maxSeedInterval;
 	
 	KmerDistribution kd;
 };
@@ -53,8 +45,8 @@ struct PacBioHybridCorrectionParameters
 class PacBioHybridCorrectionResult
 {
 public:
-	PacBioHybridCorrectionResult()
-	: merge(false),
+	PacBioHybridCorrectionResult():
+	merge(false),
 	totalReadsLen(0),
 	correctedLen(0),
 	totalSeedNum(0),
@@ -63,7 +55,7 @@ public:
 	highErrorNum(0),
 	exceedDepthNum(0),
 	exceedLeaveNum(0),
-	seedDis(0) {}
+	seedDis(0){}
 
 	DNAString correctSequence;
 	
@@ -104,12 +96,10 @@ public:
 
 private:
 
-	std::vector<SeedFeature> PBHCSeedingByDynamicKmer(const std::string readSeq);
-	int doubleFMWalkForPacbio(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
-	int solveHighError(std::pair<int,std::string> firstSeed, std::pair<int,std::string> secondSeed, int minOverlap, int needWalkLen, std::string* mergedseq);
+	std::vector<SeedFeature> seedingByDynamicKmer(const std::string readSeq);
+	int extendBetweenSeeds(SeedFeature source, SeedFeature target, int dis_between_src_target, std::string* mergedseq);
 	
 	PacBioHybridCorrectionParameters m_params;
-
 };
 
 // Write the results from the overlap step to an ASQG file
@@ -142,6 +132,5 @@ private:
 	int64_t m_seedDis;
 
 };
-
 
 #endif

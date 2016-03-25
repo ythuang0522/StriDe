@@ -136,9 +136,7 @@ public:
 
 	// PacBio correction by Ya, v20150305.
 	PacBioCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
-	PacBioCorrectionResult PBHybridCorrection(const SequenceWorkItem& workItem);
-	PacBioCorrectionResult PBHybridCorrection_v2(const SequenceWorkItem& workItem);
-
+	
 	PacBioCorrectionResult process(const SequenceWorkItem& workItem)
 	{
 		switch(m_params.algorithm)
