@@ -236,6 +236,7 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature source, SeedFe
 			PBHCFMWParams.targetSeed = reverseComplement(source.seedStr);
 			SAIntervalPBHybridCTree SAITree(PBHCFMWParams);
 			FMWalkReturnType = SAITree.mergeTwoReads(*mergedseq);
+			(*mergedseq) = reverseComplement((*mergedseq));
 		}
 	}
 	
