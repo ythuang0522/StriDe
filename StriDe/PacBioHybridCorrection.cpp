@@ -122,17 +122,17 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 	{
 		#pragma omp single nowait
 		{	//Initialization of large BWT takes some time, pass the disk to next job
-			std::cout << std::endl << "Loading BWT: " << opt::prefix + BWT_EXT << "\n";
+			std::cout << std::endl << "Loading BWT: " << opt::prefix + BWT_EXT << std::endl;
 			pBWT = new BWT(opt::prefix + BWT_EXT, opt::sampleRate);
 		}
 		#pragma omp single nowait
 		{
-			std::cout << "Loading RBWT: " << opt::prefix + RBWT_EXT << "\n";
+			std::cout << "Loading RBWT: " << opt::prefix + RBWT_EXT << std::endl;
 			pRBWT = new BWT(opt::prefix + RBWT_EXT, opt::sampleRate);
 		}
 		#pragma omp single nowait
 		{
-			std::cout << "Loading Sampled Suffix Array: " << opt::prefix + SAI_EXT << "\n";
+			std::cout << "Loading Sampled Suffix Array: " << opt::prefix + SAI_EXT << std::endl;
 			pSSA = new SampledSuffixArray(opt::prefix + SAI_EXT, SSA_FT_SAI);
 		}
 	}
@@ -174,7 +174,7 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 		<< "max distance of searching seed:\t2* tendency distance" << std::endl							
 		<< "max overlap:\t" <<  ecParams.maxOverlap << std::endl 
 		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "search depth:\t1.3~0.7* (length between two seeds +- 30)" << std::endl
+		<< "search depth:\t1.1~0.9* (length between two seeds +/- 10)" << std::endl
 		<< "kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
 
 	// Setup post-processor

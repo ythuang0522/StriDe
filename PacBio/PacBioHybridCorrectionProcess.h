@@ -97,7 +97,7 @@ public:
 private:
 
 	std::vector<SeedFeature> seedingByDynamicKmer(const std::string readSeq);
-	int extendBetweenSeeds(SeedFeature source, SeedFeature target, int dis_between_src_target, std::string* mergedseq);
+	int extendBetweenSeeds(SeedFeature source, SeedFeature target, std::string strBetweenSrcTarget, int dis_between_src_target, std::string* mergedseq, int debugTargetSeed);
 	
 	PacBioHybridCorrectionParameters m_params;
 };
