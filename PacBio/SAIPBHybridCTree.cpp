@@ -133,34 +133,34 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 	
 	for (size_t i = 0 ; i < results.size() ;i++)
 	{
-		std::string tmpseq;
+		std::string candidateSeq;
 		
 		// bug fix: m_targetSeed may be shorter than m_minOverlap
 		if(m_targetSeed.length() > m_minOverlap)
-			tmpseq = results[i].thread+m_targetSeed.substr(m_minOverlap);
+			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap);
 		else
-			tmpseq = results[i].thread;
+			candidateSeq = results[i].thread;
 		
 		// Do not use DP Alignment if there is one path only.
 		if(results.size() == 1)
 		{
-			mergedseq = tmpseq;
+			mergedseq = candidateSeq;
 			return 1;
 		}
 		
 		/*
 		if(m_debugMode)
-			std::cout << ">" << i << "." << m_pSourceSeed->length() << "." << tmpseq.length() << "." << tmpseq.substr(m_pSourceSeed->length()).length() << "\n" << tmpseq.substr(m_pSourceSeed->length()) << "\n";
+			std::cout << ">" << i << "." << m_pSourceSeed->length() << "." << candidateSeq.length() << "." << candidateSeq.substr(m_pSourceSeed->length()).length() << "\n" << candidateSeq.substr(m_pSourceSeed->length()) << "\n";
 		*/
 
 		// find the path with maximum match percent or kmer coverage
-		std::string candidateSeq = tmpseq.substr(m_pSourceSeed->length(), tmpseq.length()-m_pSourceSeed->length()-m_targetSeed.length());
-		if(m_disBetweenSrcTarget >= 20 && candidateSeq.length() > 0)
+		std::string pathBetweenSrcTarget = candidateSeq.substr(m_pSourceSeed->length(), candidateSeq.length()-m_pSourceSeed->length()-m_targetSeed.length());
+		if(m_disBetweenSrcTarget >= 20 && pathBetweenSrcTarget.length() > 0)
 		{			
 			// We want to compute the total matches and percent
 			int matchLen = 0;
 			AlnAln *aln_global;
-			aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), candidateSeq.c_str(), &aln_param_blast, 1, 1);
+			aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), pathBetweenSrcTarget.c_str(), &aln_param_blast, 1, 1);
 			
 			// Calculate the alignment patterns
 			for(int i = 0 ; aln_global->outm[i] != '\0' ; i++)
@@ -172,8 +172,8 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 			/*
 			if(m_debugMode)
 			{
-				std::cout << ">candidateSeq:" << i+1 << ",len:" << candidateSeq.length() <<  ",identity:" << matchPercent << "\n";
-				std::cout << candidateSeq << "\n";
+				std::cout << ">pathBetweenSrcTarget:" << i+1 << ",len:" << pathBetweenSrcTarget.length() <<  ",identity:" << matchPercent << "\n";
+				std::cout << pathBetweenSrcTarget << "\n";
 			}
 			*/
 			
@@ -181,24 +181,24 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 			if(isPercentMatchBetter)
 			{
 				maxMatchPercent = matchPercent;
-				mergedseq = tmpseq;
+				mergedseq = candidateSeq;
 			}
 		}
 		else
 		{
 			/*
-			int currLengthDiff = std::abs((int)tmpseq.length()-(int)m_expectedLength);
-			double avgCov = (double)results[i].SAICoverage /(tmpseq.length()+1000000);
+			int currLengthDiff = std::abs((int)candidateSeq.length()-(int)m_expectedLength);
+			double avgCov = (double)results[i].SAICoverage /(candidateSeq.length()+1000000);
 			bool isLengthDiffBetter = currLengthDiff < minLengthDiff && std::abs(currLengthDiff - minLengthDiff) > 3;
 			bool isKmerCoverageBetter = std::abs(currLengthDiff - minLengthDiff) <=3 && (maxKmerCoverage<avgCov);
 			*/
 			
-			double avgCov = (double)results[i].SAICoverage /(tmpseq.length()+1000000);
+			double avgCov = (double)results[i].SAICoverage /(candidateSeq.length()+1000000);
 			bool isKmerCoverageBetter = (maxKmerCoverage < avgCov);
 			if(isKmerCoverageBetter)
 			{
 				maxKmerCoverage = avgCov;
-				mergedseq = tmpseq;
+				mergedseq = candidateSeq;
 			}
 		}
 	}
