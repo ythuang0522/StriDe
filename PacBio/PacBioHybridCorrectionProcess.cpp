@@ -242,7 +242,14 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature source, SeedFe
 		PBHCFMWParams.debugMode = true;
 		std::cout << "\nfmwalk id: " << debugTargetSeed << ", dis_between_src_target length: " << dis_between_src_target << ".----\n";
 	*/
-	
+
+	/* Majority of long distance extensions often fail but require long computational time
+	   Give up long extensions > 2kb, by YTH, 20150419
+	*/ 
+	if(dis_between_src_target > 2000)
+		//std::cout << "Long dist: " << dis_between_src_target <<"\t";	
+		return -4;
+
 	do
 	{
 		// debug
@@ -270,7 +277,7 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature source, SeedFe
 		}
 		minOverlap--;		
 	}while(FMWalkReturnType < 0 && minOverlap >= m_params.minKmerLength);
-	
+
 	/*
 	if(FMWalkReturnType < 0)
 	{
