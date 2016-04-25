@@ -219,6 +219,23 @@ int aln_sm_blast[] = {
 	-2, -2, -2, -2, -2
 };
 
+int aln_sm_webblast[] = {
+	2, -3, -3, -3, -2,
+	-3, 2, -3, -3, -2,
+	-3, -3, 2, -3, -2,
+	-3, -3, -3, 2, -2,
+	-2, -2, -2, -2, -2
+};
+
+/* PacBio similarity matrix, mismatches are penaltized larger than gap opens */
+int aln_sm_pacbio[] = {
+	1, -8, -8, -8, -2,
+	-8, 1, -8, -8, -2,
+	-8, -8, 1, -8, -2,
+	-8, -8, -8, 1, -2,
+	-2, -2, -2, -2, -2
+};
+
 /********************/
 /* START OF align.c */
 /********************/
@@ -228,6 +245,8 @@ AlnParam aln_param_bwa     = { 26,  9,  5, aln_sm_maq, 5, 50 };
 AlnParam aln_param_nt2nt   = {  8,  2,  2, aln_sm_nt, 16, 75 };
 AlnParam aln_param_rd2rd   = {  1, 19, 19, aln_sm_read, 16, 75 };
 AlnParam aln_param_aa2aa   = { 10,  2,  2, aln_sm_blosum62, 22, 50 };
+AlnParam aln_param_pacbio   = { 1,  1,  0, aln_sm_pacbio, 5, 50 };
+AlnParam aln_param_webblast = {  5,  2,  2, aln_sm_webblast, 5, 50 };
 
 AlnAln *aln_init_AlnAln()
 {
