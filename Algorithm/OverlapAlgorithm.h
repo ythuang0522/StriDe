@@ -287,7 +287,7 @@ private:
 	// Implement inexact overlap using locality-sensitive backward search via FM-index walk
 	bool findOverlapBlocksInexactFMIndexWalk(const std::string& w, const BWT* pBWT, const BWT* pRevBWT, 
 								const AlignFlags& af, const int minOverlap, OverlapBlockList* pOverlapList, 
-								OverlapBlockList* pContainList, OverlapResult& result) const;
+								OverlapBlockList* pContainList, OverlapResult& result, double errorRate) const;
 
 	bool TrimOBLInterval(OverlapBlockList* pOverlapList, int MaxInterval) const;
 

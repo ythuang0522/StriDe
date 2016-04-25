@@ -172,25 +172,42 @@ OverlapResult OverlapAlgorithm::overlapReadInexactFMWalk(const SeqRecord& read, 
 		return result;
 	
 	// Match the suffix of seq to prefixes
-	findOverlapBlocksInexactFMIndexWalk(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result);
+	findOverlapBlocksInexactFMIndexWalk(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result, m_errorRate);
 	if(result.isSubstring) return result;
 	
 	// getchar();
-	// std::cout << complement(seq) << "\n";
-	findOverlapBlocksInexactFMIndexWalk(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result);
+	// std::cout << "complement(seq)" << "\n";
+	findOverlapBlocksInexactFMIndexWalk(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result, m_errorRate);
 	if(result.isSubstring) return result;
-	
+
+/*
+	if(oblSuffixFwd.empty() && oblSuffixRev.empty())
+	{
+		findOverlapBlocksInexactFMIndexWalk(seq, m_pBWT, m_pRevBWT, sufPreAF, minOverlap, &oblSuffixFwd, &oblFwdContain, result, 0.3);
+	        if(result.isSubstring) return result;
+		findOverlapBlocksInexactFMIndexWalk(complement(seq), m_pRevBWT, m_pBWT, prePreAF, minOverlap, &oblSuffixRev, &oblRevContain, result, 0.3);
+        	if(result.isSubstring) return result;
+	}
+*/
 	// Match the prefix of seq to suffixes
 	// getchar();
-	// std::cout << reverseComplement(seq) << "\n";
-	findOverlapBlocksInexactFMIndexWalk(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result);
+	// std::cout << "reverseComplement(seq)" << "\n";
+	findOverlapBlocksInexactFMIndexWalk(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result, m_errorRate);
 	if(result.isSubstring) return result;
 	
 	// getchar();
 	// std::cout << reverse(seq) << "\n";
-	findOverlapBlocksInexactFMIndexWalk(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result);
+	findOverlapBlocksInexactFMIndexWalk(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result, m_errorRate);
 	if(result.isSubstring) return result;
-	
+/*
+	if(oblPrefixFwd.empty() && oblPrefixRev.empty())
+	{
+		findOverlapBlocksInexactFMIndexWalk(reverseComplement(seq), m_pBWT, m_pRevBWT, sufSufAF, minOverlap, &oblPrefixFwd, &oblFwdContain, result, 0.3);
+        if(result.isSubstring) return result;
+		findOverlapBlocksInexactFMIndexWalk(reverse(seq), m_pRevBWT, m_pBWT, preSufAF, minOverlap, &oblPrefixRev, &oblRevContain, result, 0.3);
+        if(result.isSubstring) return result;
+	}
+*/
 	// Remove submaximal blocks for each block list including fully contained blocks
 	// Copy the containment blocks into the prefix/suffix lists
 	oblSuffixFwd.insert(oblSuffixFwd.end(), oblFwdContain.begin(), oblFwdContain.end());
@@ -965,11 +982,11 @@ void OverlapAlgorithm::terminateOverlapBlocks(const AlignFlags& af, BWTOverlapIn
 bool OverlapAlgorithm::findOverlapBlocksInexactFMIndexWalk(const std::string& w, const BWT* pBWT, const BWT* pRevBWT, 
 							const AlignFlags& af, const int minOverlap, 
 							OverlapBlockList* pOverlapList, OverlapBlockList* pContainList, 
-							OverlapResult& result) const
+							OverlapResult& result, double errorRate) const
 {
 	// int m_minOverlap = (int)w.length()<minOverlap?w.length()*0.8:minOverlap;
 
-	SAIOverlapTree OverlapTree(w, minOverlap, m_maxIndels, pBWT, pRevBWT, af);
+	SAIOverlapTree OverlapTree(w, minOverlap, m_maxIndels, pBWT, pRevBWT, af, errorRate);
 
 	// SAIOverlapTree has computed seedSize overlap during construction	
 	// Extend base by base for overlaps
@@ -986,7 +1003,7 @@ bool OverlapAlgorithm::findOverlapBlocksInexactFMIndexWalk(const std::string& w,
 
 		if(flag == -3)
 		{
-			std::cout << "Too many possible overlapping reads: " << "\t" << OverlapTree.size() << "\n"; 
+			// std::cout << "Too many possible overlapping reads: " << "\t" << OverlapTree.size() << "\n"; 
 			// getchar();
 			return false;
 		}
@@ -1003,6 +1020,7 @@ bool OverlapAlgorithm::findOverlapBlocksInexactFMIndexWalk(const std::string& w,
 
 			if(isSubstring)
 			{
+				// std::cout << "isSubstring\n";
 				result.isSubstring=true;
 				return false;
 			}

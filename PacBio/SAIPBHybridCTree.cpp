@@ -7,6 +7,8 @@
 #include "SAIPBHybridCTree.h"
 #include "BWTAlgorithms.h"
 #include "stdaln.h"
+#include "ssw_cpp.h"
+
 using namespace std;
 
 //
@@ -42,8 +44,12 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(PBHCFMWalkParameters parameters
 
     // initialize the ending SA intervals with kmer length = m_minOverlap
     std::string endingkmer = m_targetSeed.substr(0, m_minOverlap);
+
+	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
-	m_MinLength = (0.9*(m_disBetweenSrcTarget-10))+endingkmer.length()+m_currentLength;
+	m_MinLength = (0.9*(m_disBetweenSrcTarget-20))+endingkmer.length()+m_currentLength;
+	//std::cout << m_MaxLength << ":\t" << m_MinLength;
+
     m_fwdTerminatedInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));
     m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
 
@@ -114,6 +120,10 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(std::string &mergedseq)
 		return findTheBestPath(results, mergedseq);
 	}
 	
+
+	// std::cout << m_currentLength << ":" << m_MaxLength << "\n";
+	// printAll();
+
     // Did not reach the terminal kmer
     if(m_leaves.empty())
         return -1;	//high error
@@ -129,6 +139,7 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 {
 	double maxKmerCoverage = 0;
 	double maxMatchPercent = 0;
+	int maxAlgScore = -100;
 	int minLengthDiff = 100000;
 	
 	for (size_t i = 0 ; i < results.size() ;i++)
@@ -159,30 +170,56 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 		{			
 			// We want to compute the total matches and percent
 			int matchLen = 0;
+			/* 
+			int aln_sm_blast[] = {
+				2, -3, -3, -3, -2,
+				-3, 2, -3, -3, -2,
+				-3, -3, 2, -3, -2,
+				-3, -3, -3, 2, -2,
+				-2, -2, -2, -2, -2
+			};
+			
+			int aln_sm_pb[] = {
+                                1, -8, -8, -8, -2,
+                                -8, 1, -8, -8, -2,
+                                -8, -8, 1, -8, -2,
+                                -8, -8, -8, 1, -2,
+                                -2, -2, -2, -2, -2
+                        };*/
+                        // AlnParam aln_param_pb   = {  1, 1, 0, aln_sm_pb, 5, 60 };
+
 			AlnAln *aln_global;
-			aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), pathBetweenSrcTarget.c_str(), &aln_param_blast, 1, 1);
+			aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), pathBetweenSrcTarget.c_str(), &aln_param_pacbio, 1, 1);
 			
 			// Calculate the alignment patterns
 			for(int i = 0 ; aln_global->outm[i] != '\0' ; i++)
 				if(aln_global->outm[i] == '|')
 					matchLen++;
-			aln_free_AlnAln(aln_global);
+			// aln_free_AlnAln(aln_global);
 			double matchPercent = (double)matchLen / m_disBetweenSrcTarget;
 			
 			/*
-			if(m_debugMode)
+			if(m_disBetweenSrcTarget == 110)
 			{
-				std::cout << ">pathBetweenSrcTarget:" << i+1 << ",len:" << pathBetweenSrcTarget.length() <<  ",identity:" << matchPercent << "\n";
+				std::cout << ">pathBetweenSrcTarget:" << i+1 << ",len:" << pathBetweenSrcTarget.length() 
+					<<  ",identity:" << matchPercent 
+					<< ",aln score:" << aln_global->score << "\n";
 				std::cout << pathBetweenSrcTarget << "\n";
+				printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
+
 			}
 			*/
-			
-			bool isPercentMatchBetter = (maxMatchPercent < matchPercent);
-			if(isPercentMatchBetter)
+
+			bool isAlgScoreBetter = maxAlgScore < aln_global->score;
+			if(isAlgScoreBetter)
+			//bool isPercentMatchBetter = (maxMatchPercent < matchPercent);
+			//if(isPercentMatchBetter)
 			{
-				maxMatchPercent = matchPercent;
+				//maxMatchPercent = matchPercent;
+				maxAlgScore = aln_global->score;
 				mergedseq = candidateSeq;
 			}
+			aln_free_AlnAln(aln_global);
 		}
 		else
 		{
@@ -202,6 +239,8 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 			}
 		}
 	}
+
+	//std::cout << mergedseq << "\n";
 	
 	if(mergedseq.length() != 0)
 		return 1;
@@ -269,12 +308,18 @@ void SAIntervalPBHybridCTree::extendLeaves()
 		refineSAInterval(m_minOverlap);
 	else if(m_currentKmerSize >= m_maxOverlap)
 	{
+		/*
 		if(m_minOverlap > 51)
 			refineSAInterval(m_minOverlap);
 		else if(m_beginningIntervalSize >= 80 && m_terminatedIntervalSize >= 80)
 			refineSAInterval(81);
 		else if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
 			refineSAInterval(51);
+		else
+			refineSAInterval(m_minOverlap);
+		*/
+		if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
+			refineSAInterval(81);
 		else
 			refineSAInterval(m_minOverlap);
 	}
@@ -394,7 +439,8 @@ void SAIntervalPBHybridCTree::refineSAInterval(size_t newKmer)
         // reset the SA intervals using original m_minOverlap
         std::string pkmer = (*iter)->getSuffix(newKmer);
         (*iter)->fwdInterval=BWTAlgorithms::findInterval(m_pRBWT, reverse(pkmer));
-        (*iter)->rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(pkmer));;
+        (*iter)->rvcInterval=BWTAlgorithms::findInterval(m_pBWT, reverseComplement(pkmer));
+
     }
 	m_currentKmerSize=newKmer;
 }

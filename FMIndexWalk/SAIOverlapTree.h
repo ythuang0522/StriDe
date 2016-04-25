@@ -27,7 +27,8 @@ class SAIOverlapTree
 					   const BWT* pBWT, 
 					   const BWT* pRBWT, 
 					   AlignFlags af,
-                       size_t maxLeaves=256,
+                       			   double errorRate=0.3,	
+					size_t maxLeaves=256,
 					   size_t seedSize=17, size_t seedDist=1, size_t repeatFreq=256);
 		
         ~SAIOverlapTree();
@@ -91,11 +92,11 @@ class SAIOverlapTree
         //
         const std::string m_Query;
         size_t m_minOverlap;
-		size_t m_maxIndelSize;
-		double m_errorRate;
-		const BWT* m_pBWT;
-		const BWT* m_pRBWT;
-		AlignFlags m_af;
+	size_t m_maxIndelSize;
+	const BWT* m_pBWT;
+	const BWT* m_pRBWT;
+	AlignFlags m_af;
+	double m_errorRate;
 
 		// Optional parameters
         size_t m_maxLeaves;

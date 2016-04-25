@@ -21,11 +21,13 @@ SAIOverlapTree::SAIOverlapTree(const std::string& query,
 			   size_t maxIndelSize,
 			   const BWT* pBWT, const BWT* pRBWT, 
 			   AlignFlags af,
+			   double errorRate,
 			   size_t maxLeaves,
 			   size_t seedSize, size_t seedDist, 
 			   size_t repeatFreq):
                                m_Query(query), m_minOverlap(minOverlap),  
                                m_maxIndelSize(maxIndelSize), m_pBWT(pBWT), m_pRBWT(pRBWT), m_af(af),
+				m_errorRate(errorRate),
                                m_maxLeaves(maxLeaves), 
 							   m_seedSize(seedSize), m_seedDist(seedDist), 
 							   m_repeatFreq(repeatFreq)
@@ -44,9 +46,11 @@ SAIOverlapTree::SAIOverlapTree(const std::string& query,
 		BWTIntervalPair bip = BWTAlgorithms::findIntervalPair( m_pBWT, m_pRBWT, initSeed);
 
 		// feasible initial seeds are found if it's not a repeat seed
-		if(bip.isValid() && bip.interval[0].size() < 256)
+		if(bip.isValid() && bip.interval[0].size() < m_repeatFreq)
 		{
 			// std::cout << bip.interval[0].size() << "\n";
+			// require perfect overlap for repeat reads
+			// if(bip.interval[0].size() >= 4) m_errorRate = 0.01;
 				
 			// create one root node
 			SAIOverlapNode* m_pRootNode = new SAIOverlapNode(&initSeed, NULL);
@@ -105,8 +109,8 @@ int SAIOverlapTree::extendOverlapOneBase(std::vector<OverlapBlock>& results)
 		
 		// Initial seeding region may still contain errors
 		// Add seeds at m_currentLength
-		if(m_currentLength == m_seedSize*2)
-			addNewRootNodes();
+		 if(m_currentLength == m_seedSize*2)
+		  	addNewRootNodes();
 			
 		// Remove leaves without seed support within m_maxIndelSize
 		PrunedBySeedSupport();
@@ -369,18 +373,19 @@ double SAIOverlapTree::computeErrorRate(SAIOverlapNode* currNode)
 	// Compute accuracy via matched length in both query and subject
 	// SNP and indel will over-estimate the unmatched regions across error, --*--
 	int matchedLen = (int)currNode->totalSeeds*2;
-	// matchedLen += (int)(currNode->numOfErrors*(m_seedSize-1)*2) ;
+	matchedLen += (int)(currNode->numOfErrors*(m_seedSize-1)*2) ;
+
 	int totalLen = (int)currNode->queryOverlapLen + currNode->currOverlapLen- (m_seedSize*2) +2;
 	int unmatchedLen = totalLen - matchedLen;
 
 	// if(unmatchedLen<0 || totalLen<0)
 	// if(m_currentLength>=16570)
 	// {
-		// std::cout << currNode->queryOverlapLen  << "\t" << currNode->currOverlapLen
-			 // << "\t" << currNode->totalSeeds << "\n";
+		 //std::cout << currNode->queryOverlapLen  << "\t" << currNode->currOverlapLen
+		//	  << "\t" << currNode->totalSeeds << "\n";
 	
-		// std::cout << (double)unmatchedLen/totalLen << "\t" << matchedLen << "\t" << unmatchedLen 
-				// << "\t" << totalLen << "\t"<< currNode->numOfErrors <<"\n";
+		 // std::cout << (double)unmatchedLen/totalLen << "\t" << matchedLen << "\t" << unmatchedLen 
+		//		 << "\t" << totalLen << "\t"<< currNode->numOfErrors <<"\n";
 	// }
 	
 	return unmatchedLen/(double)totalLen;
@@ -466,7 +471,7 @@ bool SAIOverlapTree::isTerminated(std::vector<OverlapBlock>& results)
 			double errorRate = computeErrorRate(*iter);
 			// std::cout << errorRate << "\n";
 			
-			if(errorRate >= 0.3) continue;
+			if(errorRate >= m_errorRate) continue;
 
 			size_t totalErrors = errorRate * m_Query.length()*2;
 
@@ -482,11 +487,11 @@ bool SAIOverlapTree::isTerminated(std::vector<OverlapBlock>& results)
 			// normal overlap
 			for(std::list<BWTIntervalPair>::iterator it=normalTerminatedReads.begin(); it!=normalTerminatedReads.end(); it++)
 			{	
-				// std::cout << (*iter)->getFullString();
+				// std::cout << ">\n" << (*iter)->getFullString();
 				// if(m_currentLength>=3071)
 				// {
-					// std::cout << "Terminated: " << (*iter)->queryOverlapLen << "\t" << totalErrors << "\t" << insertionSize 
-					// << "\t" << deletionSize << "\t" << (*iter)->initSeedIdx << "\t"<<(*it).interval[0]<< "\t"<< errorRate << "\n";
+					 //std::cout << "Terminated: " << (*iter)->queryOverlapLen << "\t" << totalErrors << "\t" << insertionSize 
+					 //<< "\t" << deletionSize << "\t" << (*iter)->initSeedIdx << "\t"<<(*it).interval[0]<< "\t"<< errorRate << "\n";
 					// getchar();
 				// }
 				
@@ -501,8 +506,8 @@ bool SAIOverlapTree::isTerminated(std::vector<OverlapBlock>& results)
 			// substring
 			for(std::list<BWTIntervalPair>::iterator it=substrTerminatedReads.begin(); it!=substrTerminatedReads.end(); it++)
 			{
-				// std::cout << "Terminated substring: " << (*iter)->queryOverlapLen << "\t" << totalErrors  << "\t" << insertionSize 
-					// << "\t" << deletionSize << "\t" << (*iter)->initSeedIdx << "\t"<<(*it).interval[0]<<"\n";
+				//std::cout << "Terminated substring: " << (*iter)->queryOverlapLen << "\t" << totalErrors  << "\t" << insertionSize 
+				//	 << "\t" << deletionSize << "\t" << (*iter)->initSeedIdx << "\t"<<(*it).interval[0]<<"\n";
 
 				OverlapBlock ob(*it, (*iter)->currIntervalPair, (*iter)->queryOverlapLen,
 									totalErrors, insertionSize, deletionSize, m_af);
@@ -531,7 +536,7 @@ bool SAIOverlapTree::terminateContainedBlocks(std::vector<OverlapBlock>& results
 		}
 
 		double errorRate = computeErrorRate(*iter);
-		if( errorRate<0.3)
+		if( errorRate < m_errorRate)
 		{
 			BWTIntervalPair ranges = (*iter)->currIntervalPair;
 			AlphaCount64 left_ext = BWTAlgorithms::getExtCount(ranges.interval[0], m_pBWT);
@@ -559,9 +564,9 @@ bool SAIOverlapTree::terminateContainedBlocks(std::vector<OverlapBlock>& results
 					//substring still has DNA char after m_maxIndelSize
 					if(isLeftSubstring)
 					{
-						// std::cout << "Absolutely left substring:\t" << (*iter)->queryOverlapLen << ":\t" << totalErrors << "\t" << insertionSize 
-						// << "\t" << deletionSize<< "\t"<< ranges.interval[0] << "\t" 
-						// << (*iter)->initSeedIdx << "\t" << m_leaves.size() << "\n";
+						//std::cout << "Absolutely left substring:\t" << (*iter)->queryOverlapLen << ":\t" << totalErrors << "\t" << insertionSize 
+						// << "\t" << deletionSize<< "\t"<< ranges.interval[0] << "\t" << errorRate << "\t"
+						// << m_Query.length() << "\t" << m_currentLength << "\t" << (*iter)->initSeedIdx << "\t" << m_leaves.size() << "\n";
 						
 						return true;
 					}
@@ -658,7 +663,7 @@ bool SAIOverlapTree::terminateContainedBlocks(std::vector<OverlapBlock>& results
 	return false;
 }
 
-// extend to left or right extreme within maxIndelSize
+// extend to left for additional  maxIndelSize
 std::list<BWTIntervalPair> SAIOverlapTree::extendToLeftExtreme(BWTIntervalPair& currIntervalPair, int length, bool& isLeftSubstring)
 {
 	// assert(length > 0);
