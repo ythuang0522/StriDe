@@ -25,4 +25,6 @@ libthirdparty_a_SOURCES = \
 	ropebwt2/rld0.h ropebwt2/rld0.c \
 	rollinghash/characterhash.h \
 	rollinghash/cyclichash.h \
-	rollinghash/mersennetwister.h rollinghash/mersennetwister.cpp
+	rollinghash/mersennetwister.h rollinghash/mersennetwister.cpp \
+	ssw.h ssw.c \
+	ssw_cpp.h ssw_cpp.cpp 
