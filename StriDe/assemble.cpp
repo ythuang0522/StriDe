@@ -47,7 +47,7 @@ static const char *ASSEMBLE_USAGE_MESSAGE =
 "      -t, --kmer-threshold=N           filter average kmer frequency vertex less than N (default: 3)\n"
 "      -x, --max-chimera=LEN            maximum chimera length (default: read length(R)*2 )\n"
 "      -c, --credible-overlap=LEN       credible overlap length (default: 80) \n"
-"      -l, --min-branch-length=LEN      remove terminal branches only if they are less than LEN bases in length (default: 200)\n"
+"      -T, --min-overlap-ratio=double      min-overlap-ratio in double (default: 0.8)\n"
 "  -v, --verbose                        display verbose output\n"
 "      --help                           display this help and exit\n"
 "\nOther minor control options:\n"
@@ -83,7 +83,7 @@ namespace opt
 	static int maxIndelLength = 9;
 
 	//
-	static bool bExact = true;
+	static bool bExact = false;
 
 	//FM index files
 	BWTIndexSet indices;
@@ -111,7 +111,6 @@ static const struct option longopts[] = {
 	{ "prefix",                required_argument, NULL, 'p' },
 	{ "min-overlap",           required_argument, NULL, 'm' },
 	{ "min-overlap-ratio",           required_argument, NULL, 'T' },
-	{ "min-branch-length",     required_argument, NULL, 'l' },
 	{ "max-indel",             required_argument, NULL, OPT_MAXINDEL },
 	{ "max-edges",             required_argument, NULL, OPT_MAXEDGES },
 	{ "kmer-length",           required_argument, NULL, 'k' },
@@ -180,8 +179,8 @@ int assemble()
 	
 	pGraph=SGUtil::loadASQGEdge(opt::asqgFile, opt::minOverlap, true, opt::maxEdges, pGraph);
 
-	if(opt::bExact)
-		pGraph->setExactMode(true);
+	// if(opt::bExact)
+	pGraph->setExactMode(opt::bExact);
 	//pGraph->printMemSize();
 
 	// // Pre-assembly graph stats
@@ -194,14 +193,15 @@ int assemble()
 	// Remove containments from the graph
 	std::cout << "Removing contained vertices from graph\n";
 	SGContainRemoveVisitor containVisit;
-	if(pGraph->hasContainment())
+	while(pGraph->hasContainment())
 		pGraph->visit(containVisit);
 
 	/*---Remove Transitive Edges---*/
-	//std::cout << "Removing transitive edges\n";
-	//SGTransitiveReductionVisitor trVisit;
-	//pGraph->visit(trVisit);
+	std::cout << "Removing transitive edges\n";
+	SGTransitiveReductionVisitor trVisit;
+	pGraph->visit(trVisit);
 	/*---Remove Transitive Edges---*/
+	// getchar();
 
 	// Compact together unbranched chains of vertices
 	std::cout << "Start to simplify unipaths ...\n";
@@ -349,7 +349,7 @@ int assemble()
 	/*** 3. Join islands/tips with PE support using FM-index walk (depth,leaves,minoverlap)=(150, 2000, 19) ***/
 	SGJoinIslandVisitor sgjiv(100, 4000, opt::kmerLength/2+4, min_size_of_islandtip, &tslv, opt::indices, 3);
 	pGraph->visitProgress(sgjiv);
-	graphTrimAndSmooth (pGraph, opt::maxChimeraLength, false);
+	graphTrimAndSmooth (pGraph, opt::maxChimeraLength);
 
 	std::cout << "\n[Stats] Final graph statistic:\n";
 	pGraph->contigStats();

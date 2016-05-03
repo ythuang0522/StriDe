@@ -146,6 +146,8 @@ extern AlnParam aln_param_blast; /* = {  5,  2,  2, aln_sm_blast, 5, 50 }; */
 extern AlnParam aln_param_nt2nt; /* = { 10,  2,  2, aln_sm_nt, 16, 75 }; */
 extern AlnParam aln_param_aa2aa; /* = { 20, 19, 19, aln_sm_read, 16, 75 }; */
 extern AlnParam aln_param_rd2rd; /* = { 12,  2,  2, aln_sm_blosum62, 22, 50 }; */
+extern AlnParam aln_param_pacbio;
+extern AlnParam aln_param_webblast;
 
 /* common nucleotide score matrix for 16 bases */
 extern int           aln_sm_nt[], aln_sm_bwa[];
@@ -158,5 +160,11 @@ extern int           aln_sm_read[];
 
 /* human-mouse score matrix for 4 bases */
 extern int           aln_sm_hs[];
+
+/* web blast similarity matrix*/
+extern int aln_sm_webblast[];
+
+/* PacBio similarity matrix, mismatches are penaltized larger than gap opens */
+extern int aln_sm_pacbio[];
 
 #endif

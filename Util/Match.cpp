@@ -67,6 +67,19 @@ int Match::calculateTranslation() const
     }
 }
 
+int Match::calculateTranslationEnd() const
+{
+    if(!isRC())
+        return coord[1].interval.end - coord[0].interval.end;
+    else
+    {
+        SeqCoord f = coord[1];
+        f.flip();
+        return f.interval.end - coord[0].interval.end;
+    }
+}
+
+
 // Calculation the translation offset to shift
 // a coord[1] position to a coord[0]. This must be calculated
 // using canonical coordinates
@@ -82,36 +95,65 @@ int Match::calculateInverseTranslation() const
     }
 }
 
+// Calculation the translation offset to shift
+// a coord[1] position to a coord[0]. This must be calculated
+// using canonical coordinates
+int Match::calculateInverseTranslationEnd() const
+{
+    if(!isRC())
+        return coord[0].interval.end - coord[1].interval.end;
+    else
+    {
+        SeqCoord f = coord[0];
+        f.flip();
+        return f.interval.end - coord[1].interval.end;
+    }
+}
 
 // Translate the SeqCoord c from the frame of coord[0] to coord[1]
 SeqCoord Match::translate(const SeqCoord& c) const
 {
-    assert(coord[0].length() == coord[1].length()); // ensure translation is valid
-    int t = calculateTranslation();
-
+	// In overlap with indelsm the coord[] are not the same length
+    // assert(coord[0].length() == coord[1].length()); // ensure translation is valid
     SeqCoord out;
     out.seqlen = coord[1].seqlen;
-    out.interval.start = c.interval.start + t;
-    out.interval.end = c.interval.end + t;
+	
+	//The offset of start and end should be adjusted according to the indels.
+    out.interval.start = c.interval.start + calculateTranslation();
+	out.interval.end = c.interval.end + calculateTranslationEnd();
+			
     if(isRC())
         out.flip();
-    
+
+	// the offset t is not accurate under indels overlap
+	// if(out.interval.end >= out.seqlen)
+		// out.interval.end = out.seqlen-1;
+
+	// if(out.interval.start <0)
+		// out.interval.start = 0;
+
+
+	// assert(out.interval.start>=0 && out.interval.start<out.interval.end);
+		
     return out;
 }
 
 // Translate the SeqCoord c from the frame of coord[1] to coord[0]
 SeqCoord Match::inverseTranslate(const SeqCoord& c) const
 {
-    assert(coord[0].length() == coord[1].length()); // ensure translation is valid
-    int t = calculateInverseTranslation();
-    
+    // assert(c.isExtreme());    
     SeqCoord out;
-    out.seqlen = coord[0].seqlen;
-    out.interval.start = c.interval.start + t;
-    out.interval.end = c.interval.end + t;
-
+    out.seqlen = coord[0].seqlen; //seqlen was extended
+    out.interval.start = c.interval.start + calculateInverseTranslation();
+	out.interval.end = c.interval.end + calculateInverseTranslationEnd();
+	
     if(isRC())
         out.flip();
+
+	// if((int)c.length() !=(int)out.length())
+		// std::cout << c.length() << "\t"<< out.length() <<"\n";
+
+	// assert(out.interval.start>=0 && out.interval.start<out.interval.end);
 
     return out;
 }
@@ -184,12 +226,19 @@ void Match::expand()
     // This is simpler if the coordinates are in canonical form, so here were canonize
     // them and decanonize after
     bool flipped = false;
+	// std::cout << coord[0].interval.start << "\t" << coord[0].interval.end <<  "\t" <<coord[0].seqlen << "\n";
+	// std::cout << coord[1].interval.start << "\t" << coord[1].interval.end <<  "\t" <<coord[1].seqlen << "\n";
+	// std::cout << isRC() << "\n";
     if(isRC())
     {
         flipped = true;
         canonize();
     }
-
+	// std::cout << coord[0].interval.start << "\t" << coord[0].interval.end <<  "\t" <<coord[0].seqlen << "\n";
+	// std::cout << coord[1].interval.start << "\t" << coord[1].interval.end <<  "\t" <<coord[1].seqlen << "\n";
+	
+	assert(coord[0].isExtreme() || coord[1].isExtreme());
+		
     // left expansion
     if(!coord[0].isLeftExtreme() || !coord[1].isLeftExtreme())
     {
@@ -209,6 +258,9 @@ void Match::expand()
     if(flipped)
         decanonize();
     assert(coord[0].isValid() && coord[1].isValid());
+		
+	//Containment will be detected and removed later.
+	// assert(coord[0].isExtreme() && coord[1].isExtreme());
 }
 
 // Count the number of differences between the two strings based on the match

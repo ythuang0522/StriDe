@@ -19,8 +19,12 @@ SGAlgorithms::EdgeDescOverlapMap RemovalAlgorithm::computeRequiredOverlaps(const
     // this procedure is only valid for proper overlaps, the edge cannot be a containment
     assert(!pRemovalEdge->getOverlap().isContainment());
     SGAlgorithms::EdgeDescOverlapMap outMap;
+
     findPotentialOverlaps(pVertex, pRemovalEdge, maxER, minLength, outMap);
-    eliminateReachableEdges(pVertex, pRemovalEdge, maxER, minLength, outMap);   
+
+	//bug
+    // eliminateReachableEdges(pVertex, pRemovalEdge, maxER, minLength, outMap);
+	
     return outMap;
 }
 
@@ -202,6 +206,15 @@ void RemovalAlgorithm::enqueueEdges(const Vertex* pY, EdgeDir dirY, const Overla
         if(!ovrYZ.isContainment() && SGAlgorithms::hasTransitiveOverlap(ovrXY, ovrYZ))
         {
             Overlap ovrXZ = SGAlgorithms::inferTransitiveOverlap(ovrXY, ovrYZ);
+			// assert(!ovrXZ.isContainment());
+			//ovrXZ may be containment in indel overlap
+			if(ovrXZ.match.coord[1].isContained())
+			{
+				pZ->setContained(true);
+				continue;
+			}
+			// assert(!ovrXZ.match.coord[0].isContained());
+			
             EdgeDesc edXZ = SGAlgorithms::overlapToEdgeDesc(pZ, ovrXZ);
 
             if((pSeenSet == NULL || pSeenSet->count(edXZ) == 0) && ovrXZ.getOverlapLength(0) >= minOverlap)

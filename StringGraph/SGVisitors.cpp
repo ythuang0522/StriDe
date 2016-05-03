@@ -203,11 +203,14 @@ void SGContainRemoveVisitor::previsit(StringGraph* pGraph)
 bool SGContainRemoveVisitor::visit(StringGraph* pGraph, Vertex* pVertex)
 {
 	if(!pVertex->isContained())
-	return false;
+		return false;
+		
 	// Add any new irreducible edges that exist when pToRemove is deleted
 	// from the graph
+	// std::cout << pVertex->getID() << "\n";
 	EdgePtrVec neighborEdges = pVertex->getEdges();
 
+	// std::cout << pGraph->hasTransitive() << pGraph->isExactMode();
 	// If the graph has been transitively reduced, we have to check all
 	// the neighbors to see if any new edges need to be added. If the graph is a
 	// complete overlap graph we can just remove the edges to the deletion vertex
@@ -415,7 +418,7 @@ bool SGSmoothingVisitor::visit(StringGraph* pGraph, Vertex* pVertex)
 		// The walks grow exponentially within repeats
 		const int MAX_WALKS = 240;
 		// The distance is the extended seq length excluding the starting vertex,
-		const int MAX_DISTANCE = 2400;
+		const int MAX_DISTANCE = 2400000;
 		bool bIsDegenerate=false;
 		bool bFailIndelSizeCheck=false;
 

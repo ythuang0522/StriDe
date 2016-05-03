@@ -1,7 +1,12 @@
 //-----------------------------------------------
-// Copyright 2009 Wellcome Trust Sanger Institute
-// Written by Jared Simpson (js18@sanger.ac.uk)
+// Copyright 2015 National Chung Cheng University
+// Written by Yao-Ting Huang
+// Revised from Jared Simpson's overlap block
+// Implement new submaximal filtration for indel overlap
+// New data structure for indel overlap
 // Released under the GPL
+//-----------------------------------------------
+
 //-----------------------------------------------
 //
 // OverlapBlock - Data structures holding
@@ -122,13 +127,19 @@ EdgeDir OverlapBlock::getEdgeDir() const
 //
 Overlap OverlapBlock::toOverlap(const std::string queryID, const std::string targetID, int queryLen, int targetLen) const
 {
+	// std::cout << "###" << queryLen << "\t" << overlapLen << "\t" << targetLen <<"\t"
+			// << numInsertion << "\t" << numDeletion <<"\n";
     // Compute the sequence coordinates
     int s1 = queryLen - overlapLen;
     int e1 = s1 + overlapLen - 1;
     SeqCoord sc1(s1, e1, queryLen);
-
-    int s2 = 0; // The start of the second hit must be zero by definition of a prefix/suffix match
-    int e2 = s2 + overlapLen - 1;
+	
+	// The start of the second hit must be zero by definition of a prefix/suffix match
+	int s2 = 0; 
+	// deletion insertion
+	// AT--CC   GGAATT
+	//  TAACCC   G--TTA
+    int e2 = s2 + overlapLen - 1 - numInsertion + numDeletion;	
     SeqCoord sc2(s2, e2, targetLen);
 
     // The coordinates are always with respect to the read, so flip them if
@@ -143,6 +154,7 @@ Overlap OverlapBlock::toOverlap(const std::string queryID, const std::string tar
     }
     bool isRC = flags.isReverseComplement();
 
+	assert(sc1.isExtreme() && sc2.isExtreme());
     Overlap o(queryID, sc1, targetID, sc2, isRC, numDiff);
     return o;
 }
@@ -166,8 +178,8 @@ void printBlockList(const OverlapBlockList* pList)
     }
 }
 
-//
-void removeSubMaximalBlocks(OverlapBlockList* pList, const BWT* pBWT, const BWT* pRevBWT)
+// remove submaximal overlap due to errors
+void removeSubMaximalBlocks(OverlapBlockList* pList, const BWT* /*pBWT*/, const BWT* /*pRevBWT*/)
 {
     // This algorithm removes any sub-maximal OverlapBlocks from pList
     // The list is sorted by the left coordinate and iterated through
@@ -194,12 +206,15 @@ void removeSubMaximalBlocks(OverlapBlockList* pList, const BWT* pBWT, const BWT*
         if(Interval::isIntersecting(iter->ranges.interval[0].lower, iter->ranges.interval[0].upper, 
                                     next->ranges.interval[0].lower, next->ranges.interval[0].upper))
         {
-            OverlapBlockList resolvedList = resolveOverlap(*iter, *next, pBWT, pRevBWT);
+            // OverlapBlockList resolvedList = resolveOverlap(*iter, *next, pBWT, pRevBWT);
+            OverlapBlockList resolvedList = resolveOverlap(*iter, *next);
             
             // Merge the new elements in and start back from the beginning of the list
             pList->erase(iter);
             pList->erase(next);
             pList->merge(resolvedList, OverlapBlock::sortIntervalLeft);
+			
+			// Restart iteration from the beginning
             iter = pList->begin();
 
             //std::cout << "After splice: \n";
@@ -210,6 +225,20 @@ void removeSubMaximalBlocks(OverlapBlockList* pList, const BWT* pBWT, const BWT*
             ++iter;
         }
     }
+}
+
+// identify substring blocks after submaximal removal
+bool containSubstringBlocks(OverlapBlockList* pList, int querylength)
+{
+    OverlapBlockList::iterator iter = pList->begin();
+    while(iter != pList->end())
+    {
+		// substring has overlap length > query length
+		// After submaximal removal this substring block is still optimal
+        if( (*iter).getOverlapLength()>querylength) return true;
+        ++iter;
+	}
+	return false;
 }
 
 // A tracing interval maps an interval of an overlap block representing
@@ -225,206 +254,78 @@ struct TracingInterval
 
 typedef std::list<TracingInterval> TracingIntervalList;
 
-// In rare cases, the overlap blocks may represent sub-maximal overlaps between reads
-// we need to distinguish these cases and remove the sub-optimal hits. This
-// function splits two overlapping OverlapBlocks into up to three distinct
-// blocks, keeping the maximal (longest) overlap at each stage.
-OverlapBlockList resolveOverlap(const OverlapBlock& A, const OverlapBlock& B, const BWT* pBWT, const BWT* pRevBWT)
+
+// Resolve redundant overlap due to indels
+OverlapBlockList resolveOverlap(OverlapBlock& A, OverlapBlock& B)
 {
     OverlapBlockList outList;
 
     // Check if A and B have the same overlap length, if so they must be 
     // identical blocks (resulting from different seeds) and we can remove one
-    if(A.overlapLen == B.overlapLen)
-    {
-        if(A.ranges.interval[0].lower == B.ranges.interval[0].lower &&
-           A.ranges.interval[0].upper == B.ranges.interval[0].upper)
-        {
-            outList.push_back(A);
-            return outList;
-        }
-        else
-        {
-            std::cerr << "Error in resolveOverlap: Overlap blocks with same length do not "
-            "the have same coordinates\n";
-            assert(false);
-        }    
-    }
-    // A and B must have different overlap lengths
-    assert(A.overlapLen != B.overlapLen);
+    // if(/*A.overlapLen == B.overlapLen &&*/ A.ranges.interval[0].lower==0 || B.ranges.interval[0].lower==0)
+    // {
+        // if(A.ranges.interval[0].lower == B.ranges.interval[0].lower &&
+           // A.ranges.interval[0].upper == B.ranges.interval[0].upper)
+        // {
+			// std::cout << A.ranges.interval[0].lower << "\t"  << A.numDiff << "\t" << B.numDiff << "\n";
+            // // outList.push_back(A);
+            // // return outList;
+        // }
+    // }
 
-    // Determine which of A and B have a higher overlap
-    const OverlapBlock* pHigher;
-    const OverlapBlock* pLower;
-    if(A.overlapLen > B.overlapLen)
+    // Priority: 1. lower error rate 2. longer overlap length
+	// Empirical observation, this is often occurred in inexact overlap
+    OverlapBlock* pBetter;
+    OverlapBlock* pWorse;
+    if(A.numDiff < B.numDiff || 
+		(A.numDiff == B.numDiff && A.overlapLen > B.overlapLen))
     {
-        pHigher = &A;
-        pLower = &B;
+        pBetter = &A;
+        pWorse = &B;
     }
     else
     {
-        pHigher = &B;
-        pLower = &A;
+        pBetter = &B;
+        pWorse = &A;
     }
 
-    // Complicated logic follows
-    // We always want the entirity of the block with the longer
-    // overlap so it is added to outList unmodified
-    outList.push_back(*pHigher);
+	// always retain the better block
+    outList.push_back(*pBetter);
+	
+	//identify the duplicated interval
+	BWTInterval dupOverlap;
+	Interval::intersect(pBetter->ranges.interval[0].lower, pBetter->ranges.interval[0].upper, 
+						pWorse->ranges.interval[0].lower, pWorse->ranges.interval[0].upper,
+						dupOverlap.lower, dupOverlap.upper);
+	
+	assert(dupOverlap.isValid());
+	
+	// Remove the duplicated interval from the worse block
+	// case 1: skip identical block
+	// |------|	pBetter
+	// |------|	pWorse
+	if(pBetter->ranges.interval[0].size() != dupOverlap.size())
+	{
+		// case 2
+		// |------|		pBetter
+		//    |------|	pWorse
+		if(pBetter->ranges.interval[0].lower < pWorse->ranges.interval[0].lower)
+			pWorse->ranges.interval[0].lower += dupOverlap.size();
 
-    // The lower block can be split into up to two pieces:
-    // Case 1:
-    //     Lower  ------ 
-    //     Higher    ------
-    //     Result ---
-    //
-    // Case 2:
-    //     Lower  -----------
-    //     Higher    ------
-    //     Result ---      --
-    //
-    // Case 3:
-    //     Lower  ------
-    //     Higher ------
-    //     Result (empty set)
-
-    // It is unclear whether case 2 can happen in reality but we handle it 
-    // here anyway. Further complicating matters is that the BWTIntervalPair
-    // keeps track of both the BWT coordinates for the backwards search
-    // and forward search and we must take care to ensure that both intervals
-    // are updated and the mapping between them is correct. We do this
-    // by calculating the new forward interval using interval intersections
-    // and directly recalculating the coordinate of the reverse interval
-    //
-    OverlapBlock split = *pLower;
-
-    // Left-hand split
-    if( (pLower->ranges.interval[0].lower < pHigher->ranges.interval[0].lower) ||
-        (pLower->ranges.interval[0].upper > pHigher->ranges.interval[0].upper) )
-    {
-        // The intervals do not perfectly overlap and must be recalculated. 
-        // We start from the raw intervals in the lower block (the intervals representing
-        // overlaps that are not capped by '$' symbols) and search backwards through the
-        // bwt until the start of the sequence has been found. This maps the source reverse
-        // index position to the forward index position. We can then decide which intervals
-        // are redundant and can be removed.
-        //
-        // If the index has duplicates, it is possible that a given source reverse position
-        // will map to multiple forward positions. To handle this case, we record the used
-        // forward positions in a std::map so we can lookup the next lowest index that is available.
-        //
-        // A better algorithm (that doesn't required so many interval calculations) probably exists
-        // but this case is very rare so simplicity wins here.
-        //
-
-#ifdef DEBUG_RESOLVE
-        std::cout << "LOWER -- capped: " << pLower->ranges << "\n";
-        std::cout << "LOWER -- raw: " << pLower->rawRanges << "\n";
-        std::cout << "HIGHER -- capped: " << pHigher->ranges << "\n";
-        std::cout << "HIGHER -- raw: " << pHigher->rawRanges << "\n";
-#endif
-
-        std::map<int64_t, int64_t> usedMap;
-
-        // Remap every reverse position to a forward position
-        TracingIntervalList tracingList;
-        int64_t j = pLower->ranges.interval[1].lower;
-        while(j <= pLower->ranges.interval[1].upper)
-        {
-            TracingInterval ti;
-            ti.sourcePosReverse = j;
-
-            ti.tracing.lower = j;
-            ti.tracing.upper = j;
-
-            ti.updateRanges = pLower->rawRanges;
-
-            bool done = false;
-            while(!done)
-            {
-                char trace_base = pRevBWT->getChar(ti.tracing.lower);
-                if(trace_base == '$')
-                {
-                    BWTAlgorithms::updateBothL(ti.updateRanges, '$', pBWT);
-                    done = true;
-                }
-                BWTAlgorithms::updateInterval(ti.tracing, trace_base, pRevBWT);
-                BWTAlgorithms::updateBothR(ti.updateRanges, trace_base, pRevBWT);
-            }
-            
-            if(ti.updateRanges.interval[0].lower == ti.updateRanges.interval[0].upper)
-            {
-                // This read is not duplicated
-                ti.foundPosForward = ti.updateRanges.interval[0].lower;
-            }
-            else
-            {
-                // This read is duplicated, look up its value in the map
-                int64_t basePos = ti.updateRanges.interval[0].lower;
-                if(usedMap.find(basePos) != usedMap.end())
-                {
-                    // Use the value in the map and update it
-                    ti.foundPosForward = usedMap[basePos];
-                    assert(ti.foundPosForward > ti.updateRanges.interval[0].lower && 
-                           ti.foundPosForward <= ti.updateRanges.interval[0].upper);
-                    usedMap[basePos]++;
-                }
-                else
-                {
-                    // Use the base value and initialize the map
-                    ti.foundPosForward = basePos;
-                    usedMap[basePos] = basePos + 1;
-                }
-            }
-            ++j;
-            tracingList.push_back(ti);
-        }
-
-        // Reset the mapping between blocks
-        std::list<BWTIntervalPair> retainedIntervals;
-        TracingIntervalList::iterator tracingIter = tracingList.begin();
-        while(tracingIter != tracingList.end())
-        {
-            // Check if the forward position intersects the higher block, if so this block
-            // is redundant and can be removed.
-            if(!Interval::isIntersecting(tracingIter->foundPosForward, tracingIter->foundPosForward,
-                                         pHigher->ranges.interval[0].lower, pHigher->ranges.interval[0].upper))
-            {
-                BWTIntervalPair retained;
-                
-                retained.interval[0].lower = tracingIter->foundPosForward;
-                retained.interval[0].upper = tracingIter->foundPosForward;
-                retained.interval[1].lower = tracingIter->sourcePosReverse;
-                retained.interval[1].upper = tracingIter->sourcePosReverse;
-
-#ifdef DEBUG_RESOLVE
-                std::cout << "Retained coords: " << retained << "\n";
-#endif
-                retainedIntervals.push_back(retained);
-            }
-            ++tracingIter;
-        }
-        
-        // Write out the final blocks
-        std::list<BWTIntervalPair>::iterator iter = retainedIntervals.begin();
-        while(iter != retainedIntervals.end())
-        {
-#ifdef DEBUG_RESOLVE
-            std::cout << "OUTPUT: " << *iter << "\n";
-#endif
-            split.ranges = *iter;
-
-            // Sanity check
-            assert(split.ranges.interval[0].size() == split.ranges.interval[1].size());
-            assert(split.ranges.interval[0].isValid());
-            assert(split.ranges.interval[1].isValid());
-
-            outList.push_back(split);
-            ++iter;
-        }
-    }
-
-    // Sort the outlist by left coordinate
+		// case 3
+		//    |------|	pBetter
+		// |------|		pWorse
+		else
+			pWorse->ranges.interval[0].upper -= dupOverlap.size();
+			
+		// Case 4: The worse block may be entirely contained and invalid and don't push
+		//  |------|	pBetter
+		//    |--|		pWorse
+		if(pWorse->ranges.interval[0].isValid())
+			outList.push_back(*pWorse);
+	}
+	
+	// Sort the outlist by left coordinate
     outList.sort(OverlapBlock::sortIntervalLeft);
     return outList;
 }

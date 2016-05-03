@@ -32,16 +32,23 @@ std::string Edge::getLabel() const
 }
 
 
-// Join the edge pEdge into this edge, adding to the start
+// Join pEdge (V1->V2) to the start of this edge (V2->V3)
+// This edge will be added to V1 later
 void Edge::join(const Edge* pEdge)
 {
     // Update the match coordinate
     Match m12 = pEdge->getMatch();
     Match m23 = getMatch();
+	
+	// assert(m_matchCoord.isExtreme());
     m_matchCoord = m12.inverseTranslate(m23.coord[0]);
+	
+	// assert(m_matchCoord.isExtreme());
 
     if(pEdge->getComp() == EC_REVERSE)
         flip();
+
+	// assert(m_matchCoord.isValid());
 
     // Now, update the twin of this edge to extend to the twin of pEdge
     m_pTwin->extend(pEdge->getTwin());
@@ -103,7 +110,10 @@ void Edge::extendMatchFullLength()
     if(m_matchCoord.isLeftExtreme())
         m_matchCoord.interval.end = m_matchCoord.seqlen - 1;
     else
+	{
+		assert(m_matchCoord.isRightExtreme());
         m_matchCoord.interval.start = 0;
+	}
 }
 
 void Edge::updateSeqLen(int newLen)
