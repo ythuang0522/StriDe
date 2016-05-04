@@ -20,6 +20,7 @@
 #include "BWTAlgorithms.h"
 #include "KmerDistribution.h"
 #include "PacBioCorrectionProcess.h"
+#include "SAIPBHybridCTree.h"
 
 // Parameter object for the error corrector
 struct PacBioHybridCorrectionParameters
@@ -41,10 +42,10 @@ struct PacBioHybridCorrectionParameters
 	KmerDistribution kd;
 };
 
-
 class PacBioHybridCorrectionResult
 {
 public:
+
 	PacBioHybridCorrectionResult():
 	merge(false),
 	totalReadsLen(0),
@@ -80,6 +81,7 @@ public:
 class PacBioHybridCorrectionProcess
 {
 public:
+
 	PacBioHybridCorrectionProcess(const PacBioHybridCorrectionParameters params);
 	~PacBioHybridCorrectionProcess();
 
@@ -97,7 +99,7 @@ public:
 private:
 
 	std::vector<SeedFeature> seedingByDynamicKmer(const std::string readSeq);
-	int extendBetweenSeeds(SeedFeature source, SeedFeature target, std::string strBetweenSrcTarget, int dis_between_src_target, std::string* mergedseq, int debugTargetSeed);
+	int extendBetweenSeeds(SeedFeature source, SeedFeature target, std::string strBetweenSrcTarget, int dis_between_src_target, FMWalkResult* FMWResult, int debugTargetSeed);
 	
 	PacBioHybridCorrectionParameters m_params;
 };
@@ -106,6 +108,7 @@ private:
 class PacBioHybridCorrectionPostProcess
 {
 public:
+
 	PacBioHybridCorrectionPostProcess(std::ostream* pCorrectedWriter,
 	std::ostream* pDiscardWriter,
 	const PacBioHybridCorrectionParameters params);

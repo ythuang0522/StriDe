@@ -12,9 +12,10 @@
 #include "BWTAlgorithms.h"
 #include "SAINode.h"
 #include "HashMap.h"
+#include "stdaln.h"
 
-// Parameter object for the FM-index Walk of PacBio Hybrid Correction
-struct PBHCFMWalkParameters
+// Parameter Object for the FM-index Walk of PacBio Hybrid Correction
+struct FMWalkParameters
 {
 	BWTIndexSet indices;
 	std::string sourceSeed;
@@ -30,16 +31,24 @@ struct PBHCFMWalkParameters
 	bool debugMode = false;
 };
 
+// Result Object for the FM-index Walk of PacBio Hybrid Correction
+struct FMWalkResult
+{
+	std::string mergedSeq;
+	int alnScore;
+	double kmerFreq;
+};
+
 class SAIntervalPBHybridCTree
 {
     public:
-        SAIntervalPBHybridCTree(PBHCFMWalkParameters parameters);
+        SAIntervalPBHybridCTree(FMWalkParameters parameters);
 
         ~SAIntervalPBHybridCTree();
 
         //return the merged string
         //bool mergeTwoReads(StringVector & mergeReads);
-        int mergeTwoSeeds(std::string &mergedseq);
+        int mergeTwoSeeds(FMWalkResult &FMWResult);
 		size_t getKmerCoverage(){return m_maxKmerCoverage;};
 		size_t getMaxUsedLeaves(){return m_maxUsedLeaves;};
 
@@ -61,7 +70,7 @@ class SAIntervalPBHybridCTree
         size_t calculateKmerCoverage (const std::string & seq , size_t kmerLength , const BWT* pBWT);
 
         void removeLeavesByRepeatKmer();
-		int findTheBestPath(SAIntervalNodeResultVector results, std::string &mergedseq);
+		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
 
         //
         // Data

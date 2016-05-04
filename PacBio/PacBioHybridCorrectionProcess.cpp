@@ -53,43 +53,44 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		SeedFeature source = pacbioCorrectedStrs.back();
 		SeedFeature target = seedVec.at(targetSeed);
 		int dis_between_src_target = target.seedStartPos - preTarget.seedEndPos - 1;
-		string strBetweenSrcTarget = readSeq.substr(preTarget.seedEndPos+1, dis_between_src_target);
+		
+		// we need raw pacbio string between source and target seed and 10 bp around
+		// to do global alignmet with fmwalk result.
+		string strBetweenSrcTarget = readSeq.substr(preTarget.seedEndPos+1-10, dis_between_src_target+20);
+		
 		int FMWalkReturnType;
-		string mergedseq;
-		FMWalkReturnType = extendBetweenSeeds(source, target, strBetweenSrcTarget, dis_between_src_target, &mergedseq, targetSeed);
+		FMWalkResult FMWResult;
+		FMWalkReturnType = extendBetweenSeeds(source, target, strBetweenSrcTarget, dis_between_src_target, &FMWResult, targetSeed);
 		
-		/*
 		// debug
-		if(mergedseq.length() != 0)
-			if(targetSeed == 60)
-				std::cout << ">" << targetSeed << "." << seedVec.at(targetSeed-1).seedStartPos << "." << mergedseq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength).length() << "\n" << mergedseq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength) << "\n";
-		*/
+		// std::cout << targetSeed << " " << preTarget.seedStartPos << " " << FMWalkReturnType << "\n";
 		
-		/*
 		// debug
-		if(targetSeed == 4)
-		{
-			//std::cout << ">" << targetSeed << "." << seedVec.at(targetSeed-1).seedStartPos << "." << readSeq.substr(seedVec.at(targetSeed-1).seedStartPos,seedVec.at(targetSeed).seedEndPos-seedVec.at(targetSeed-1).seedStartPos+1).length() << "\n" << readSeq.substr(seedVec.at(targetSeed-1).seedStartPos,seedVec.at(targetSeed).seedEndPos-seedVec.at(targetSeed-1).seedStartPos+1) << "\n";
-			std::cout << ">" << targetSeed << "." << seedVec.at(targetSeed-1).seedStartPos << "." << mergedseq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength).length() << "\n" << mergedseq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength) << "\n";
-			std::cout << seedVec.at(targetSeed-1).seedStr << "\n";
-			std::cout << target.seedStr << "\n";
-		}
-		*/
+		// if(FMWResult.mergedSeq.length() != 0)
+		//	if(targetSeed == 34)
+		//		std::cout << ">" << targetSeed << "." << seedVec.at(targetSeed-1).seedStartPos << "." << FMWResult.mergedSeq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength).length() << "\n" << FMWResult.mergedSeq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength) << "\n";
 		
-		/*
 		// debug
-		if(targetSeed == 10 || targetSeed == 9)
-		{
-			for(int i=0;i<=(target.seedLength-21);i++)
-			{
-				string kmer = target.seedStr.substr(i, 21);
-				int fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
-				int rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
-				int kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
-				std::cout << kmer << " " << kmerFreqs << ".21" << endl;
-			}
-		}
-		*/
+		// if(targetSeed == 4)
+		// {
+			// std::cout << ">" << targetSeed << "." << seedVec.at(targetSeed-1).seedStartPos << "." << readSeq.substr(seedVec.at(targetSeed-1).seedStartPos,seedVec.at(targetSeed).seedEndPos-seedVec.at(targetSeed-1).seedStartPos+1).length() << "\n" << readSeq.substr(seedVec.at(targetSeed-1).seedStartPos,seedVec.at(targetSeed).seedEndPos-seedVec.at(targetSeed-1).seedStartPos+1) << "\n";
+			// std::cout << ">" << targetSeed << "." << seedVec.at(targetSeed-1).seedStartPos << "." << mergedseq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength).length() << "\n" << mergedseq.substr(source.seedLength - seedVec.at(targetSeed-1).seedLength) << "\n";
+			// std::cout << seedVec.at(targetSeed-1).seedStr << "\n";
+			// std::cout << target.seedStr << "\n";
+		// }
+		
+		// debug
+		// if(targetSeed == 10 || targetSeed == 9)
+		// {
+			// for(int i=0;i<=(target.seedLength-21);i++)
+			// {
+				// string kmer = target.seedStr.substr(i, 21);
+				// int fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
+				// int rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
+				// int kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
+				// std::cout << kmer << " " << kmerFreqs << ".21" << endl;
+			// }
+		// }
 		
 		// record corrected pacbio reads string
 		// FMWalk success
@@ -97,9 +98,9 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		{
 			size_t gainPos = source.seedLength;
 			// have gain ground
-			if(mergedseq.length() > gainPos)
+			if(FMWResult.mergedSeq.length() > gainPos)
 			{
-				string gainStr = mergedseq.substr(gainPos);
+				string gainStr = FMWResult.mergedSeq.substr(gainPos);
 				pacbioCorrectedStrs.back().append(gainStr);
 				result.correctedLen += gainStr.length();
 			}
@@ -122,14 +123,12 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		result.seedDis += dis_between_src_target;
 		if(FMWalkReturnType == 1)
 			result.correctedNum++;
-		/*
-		else if(FMWalkReturnType == -1)
-			result.highErrorNum++;
-		else if(FMWalkReturnType == -2)
-			result.exceedDepthNum++;
-		else if(FMWalkReturnType == -3)
-			result.exceedLeaveNum++;
-		*/
+		// else if(FMWalkReturnType == -1)
+			// result.highErrorNum++;
+		// else if(FMWalkReturnType == -2)
+			// result.exceedDepthNum++;
+		// else if(FMWalkReturnType == -3)
+			// result.exceedLeaveNum++;
 	}
 	
 	result.totalSeedNum = seedVec.size();
@@ -237,59 +236,65 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer(con
 	return seedVec;
 }
 
-int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature source, SeedFeature target, string strBetweenSrcTarget, int dis_between_src_target, string* mergedseq, int debugTargetSeed)
+int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature source, SeedFeature target, string strBetweenSrcTarget, int dis_between_src_target, FMWalkResult* FMWResult, int debugTargetSeed)
 {
 	int FMWalkReturnType;
 	int minOverlap = std::min(source.seedLength, target.seedLength);
 		minOverlap = std::min(minOverlap, m_params.maxOverlap);
-	PBHCFMWalkParameters PBHCFMWParams;
-	PBHCFMWParams.indices = m_params.indices;
-	PBHCFMWParams.maxOverlap = m_params.maxOverlap;
-	PBHCFMWParams.SAThreshold = m_params.FMWKmerThreshold;
-	PBHCFMWParams.disBetweenSrcTarget = dis_between_src_target;
-	PBHCFMWParams.maxLeaves = m_params.maxLeaves;
+	FMWalkParameters FMWParams;
+	FMWParams.indices = m_params.indices;
+	FMWParams.maxOverlap = m_params.maxOverlap;
+	FMWParams.SAThreshold = m_params.FMWKmerThreshold;
+	FMWParams.disBetweenSrcTarget = dis_between_src_target;
+	FMWParams.maxLeaves = m_params.maxLeaves;
 	
-	/*
+	
 	// debug
-	if(debugTargetSeed == 2)
-		PBHCFMWParams.debugMode = true;
-		std::cout << "\nfmwalk id: " << debugTargetSeed << ", dis_between_src_target length: " << dis_between_src_target << ".----\n";
-	*/
+	// if(debugTargetSeed == 95)
+	//	FMWParams.debugMode = true;
+	//	std::cout << "\nfmwalk id: " << debugTargetSeed << ", dis_between_src_target length: " << dis_between_src_target << ".----\n";
+	
 
-	/* Majority of long distance extensions often fail but require long computational time
-	   Give up long extensions > 2kb, by YTH, 20150419
-	*/ 
+	// Majority of long distance extensions often fail but require long computational time
+	// Give up long extensions > 2kb, by YTH, 20150419
 	if(dis_between_src_target > 4000)
 		//std::cout << "Long dist: " << dis_between_src_target <<"\t";	
 		return -4;
 
 	do
 	{
-		PBHCFMWParams.sourceSeed = source.seedStr;
-		PBHCFMWParams.targetSeed = target.seedStr;
-		PBHCFMWParams.strBetweenSrcTarget = strBetweenSrcTarget;
-		PBHCFMWParams.minOverlap = minOverlap;
-		SAIntervalPBHybridCTree SAITree(PBHCFMWParams);
-		FMWalkReturnType = SAITree.mergeTwoSeeds(*mergedseq);
+		FMWParams.sourceSeed = source.seedStr;
+		FMWParams.targetSeed = target.seedStr;
+		FMWParams.strBetweenSrcTarget = strBetweenSrcTarget;
+		FMWParams.minOverlap = minOverlap;
+		SAIntervalPBHybridCTree SAITree(FMWParams);
+		FMWalkReturnType = SAITree.mergeTwoSeeds(*FMWResult);
 
 		// debug
-                // std::cout << "minOverlap: " << minOverlap << "\t" << FMWalkReturnType << "\n";
+		if(FMWParams.debugMode)
+			std::cout << "minOverlap: " << minOverlap << "\t" << FMWalkReturnType << "\n";
 
 		if(FMWalkReturnType > 0)
 		{
-			assert((*mergedseq).empty() != true);
-			string mergedseq2;
-			PBHCFMWParams.sourceSeed = reverseComplement(target.seedStr);
-			PBHCFMWParams.targetSeed = reverseComplement(source.seedStr);
-			PBHCFMWParams.strBetweenSrcTarget = reverseComplement(strBetweenSrcTarget);
-			SAIntervalPBHybridCTree SAITree2(PBHCFMWParams);
-			FMWalkReturnType = SAITree2.mergeTwoSeeds(mergedseq2);
+			FMWalkResult FMWResult2;
+			FMWParams.sourceSeed = reverseComplement(target.seedStr);
+			FMWParams.targetSeed = reverseComplement(source.seedStr);
+			FMWParams.strBetweenSrcTarget = reverseComplement(strBetweenSrcTarget);
+			SAIntervalPBHybridCTree SAITree2(FMWParams);
+			FMWalkReturnType = SAITree2.mergeTwoSeeds(FMWResult2);
 
 			// std::cout << FMWalkReturnType << ":\t" << (*mergedseq).length() << "\t" << mergedseq2.length() << "\n";
 
-			if((*mergedseq).length() == mergedseq2.length())
+			if((*FMWResult).mergedSeq.length() == FMWResult2.mergedSeq.length())
+			{
+				if((*FMWResult).alnScore < FMWResult2.alnScore)
+				{
+					FMWResult2.mergedSeq = reverseComplement(FMWResult2.mergedSeq);
+					(*FMWResult) = FMWResult2;
+				}
 				break;
-			else if(FMWalkReturnType > 0)
+			}
+			if(FMWalkReturnType > 0)
 				FMWalkReturnType = -4;
 		}
 		minOverlap--;		
@@ -300,18 +305,18 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature source, SeedFe
 	/*
 	if(FMWalkReturnType < 0)
 	{
-		PBHCFMWParams.lowCoverageHighErrorMode = true;
-		PBHCFMWParams.minOverlap = m_params.minKmerLength;
-		PBHCFMWParams.maxOverlap = m_params.kmerLength;
-		PBHCFMWParams.sourceSeed = source.seedStr;
-		PBHCFMWParams.targetSeed = target.seedStr;
-		SAIntervalPBHybridCTree SAITree(PBHCFMWParams);
+		FMWParams.lowCoverageHighErrorMode = true;
+		FMWParams.minOverlap = m_params.minKmerLength;
+		FMWParams.maxOverlap = m_params.kmerLength;
+		FMWParams.sourceSeed = source.seedStr;
+		FMWParams.targetSeed = target.seedStr;
+		SAIntervalPBHybridCTree SAITree(FMWParams);
 		FMWalkReturnType = SAITree.mergeTwoSeeds(*mergedseq);
 		if(FMWalkReturnType < 0)
 		{
-			PBHCFMWParams.sourceSeed = reverseComplement(target.seedStr);
-			PBHCFMWParams.targetSeed = reverseComplement(source.seedStr);
-			SAIntervalPBHybridCTree SAITree(PBHCFMWParams);
+			FMWParams.sourceSeed = reverseComplement(target.seedStr);
+			FMWParams.targetSeed = reverseComplement(source.seedStr);
+			SAIntervalPBHybridCTree SAITree(FMWParams);
 			FMWalkReturnType = SAITree.mergeTwoSeeds(*mergedseq);
 			(*mergedseq) = reverseComplement((*mergedseq));
 		}
