@@ -6,7 +6,7 @@
 
 #include "SAIPBHybridCTree.h"
 #include "BWTAlgorithms.h"
-#include "ssw_cpp.h"
+#include "stdaln.h"
 
 using namespace std;
 
@@ -25,7 +25,8 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters parameters):
 	m_min_SA_threshold(parameters.SAThreshold),
 	m_kmerMode(parameters.kmerMode),
 	m_lowCoverageHighErrorMode(parameters.lowCoverageHighErrorMode),
-	m_debugMode(parameters.debugMode)
+	m_debugMode(parameters.debugMode),
+	m_coverage(parameters.coverage)
 {
 	// Create the root node containing the seed string
 	m_pRootNode = new SAIntervalNode(m_pSourceSeed, NULL);
@@ -89,11 +90,12 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 	//if(m_debugMode)
 	//	std::cout << m_disBetweenSrcTarget << " " << m_MinLength << "----\n";	
 	
-	// BFS search from 1st to 2nd read via FM-index walk
+    size_t alignCount = 0;
+    // BFS search from 1st to 2nd read via FM-index walk
     while(!m_leaves.empty() && m_leaves.size() <= m_MaxLeaves && m_currentLength <= m_MaxLength)
     {
-        // ACGT-extend the leaf nodes via updating existing SA interval
-        extendLeaves();
+		// ACGT-extend the leaf nodes via updating existing SA interval
+        	extendLeaves();
 		
 		// see if terminating string is reached
 		if(m_currentLength >= m_MinLength)
@@ -113,6 +115,15 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		
 		if(m_leaves.size() > m_maxUsedLeaves)
 			m_maxUsedLeaves = m_leaves.size();
+
+/*		// prune leaaves via alignment to raw read
+		if(m_leaves.size()>m_MaxLeaves/2 && m_strBetweenSrcTarget.length()>10 && alignCount < 2){
+			//std::cout << m_leaves.size() << ":";
+			pruneLeavesByAlignment();
+			alignCount++;
+			//std::cout << m_leaves.size() << "\n";
+		}
+*/
 		// std::cout << m_currentKmerSize << ":" << m_currentLength << ":" << m_leaves.size() << "\n";	
     }
 	
@@ -124,8 +135,13 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 	}
 	
 	// std::cout << m_currentLength << ":" << m_MaxLength << "\n";
-	// printAll();
-
+/*
+	if(m_disBetweenSrcTarget == 236) {
+	//	std::cout << "CCCGAACCAATATCCCTTCAAAAGACGAAAAGTCACTTTTTCCAAAACTACAGTGTCCCTACAGTACCCCGATTATATCCCCCACTAACCTGAAACCATCATCTCTTCCACAAAACGAAAACTATTTTTTCCATTACTACAGTAATCCTACAGTACTCCTGCAGTACTCCTACAGTACTACAGCATCCCCTTCAGTACTCCTACTGTACCCCCCCCCCCCCCCCCGGCACTACTACAGTACCCCGACCACATCCCTCACTAACCTCAAACCAATATTTCTTTTAAAATACGAAAACCAATTTTTCCCAAACTACAGTACCCCTACAGTACTCCTACAGTATCCCTACAGTACTCCTACAGTACCCCAAACATATCCCCCTACTAACCCGAACCAATAT\n";
+		std::cout << m_currentLength << ":" << m_MaxLength << "haha\n";
+		printAll();
+	}
+*/
     // Did not reach the terminal kmer
     if(m_leaves.empty())
         return -1;	//high error
@@ -137,8 +153,31 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		return -4;
 }
 
+void SAIntervalPBHybridCTree::pruneLeavesByAlignment()
+{
+	int maxAlnScore = -100;
+	STNodePtrList newLeaves;
+
+	std::string rawStr = m_strBetweenSrcTarget.substr(0, m_currentLength-m_pSourceSeed->length());
+	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
+	{
+		std::string currStr = (*iter)->getSuffix(rawStr.length());
+		AlnAln *aln_global = aln_stdaln(rawStr.c_str(), currStr.c_str(), &aln_param_pacbio, 1, 1);
+		if( maxAlnScore <= aln_global->score )
+		{
+			maxAlnScore = aln_global->score;
+			newLeaves.push_back(*iter);
+		}	
+		aln_free_AlnAln(aln_global);
+	}
+
+	m_leaves.clear();
+	m_leaves = newLeaves;
+}
+
 int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
+	double maxKmerCoverage = 0;
 	int maxAlgScore = -100;
 	
 	for (size_t i = 0 ; i < results.size() ;i++)
@@ -151,32 +190,8 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 		else
 			candidateSeq = results[i].thread;		
 		
-		//if(m_debugMode)
-		//	std::cout << ">" << i << "." << m_pSourceSeed->length() << "." << candidateSeq.length() << "." << candidateSeq.substr(m_pSourceSeed->length()).length() << "\n" << candidateSeq.substr(m_pSourceSeed->length()) << "\n";
-		
-
 		// find the path with maximum alignment score
 		std::string pathBetweenSrcTarget = candidateSeq.substr(m_pSourceSeed->length()-10, candidateSeq.length()-m_pSourceSeed->length()-m_targetSeed.length()+20);
-		
-		// compute the alignment score
-		/* 
-		int aln_sm_blast[] = {
-			2, -3, -3, -3, -2,
-			-3, 2, -3, -3, -2,
-			-3, -3, 2, -3, -2,
-			-3, -3, -3, 2, -2,
-			-2, -2, -2, -2, -2
-		};
-		int aln_sm_pb[] = {
-			1, -8, -8, -8, -2,
-			-8, 1, -8, -8, -2,
-			-8, -8, 1, -8, -2,
-			-8, -8, -8, 1, -2,
-			-2, -2, -2, -2, -2
-		};
-		*/
-		// AlnParam aln_param_pb = { 1, 1, 0, aln_sm_pb, 5, 60};
-
 		AlnAln *aln_global;
 		aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), pathBetweenSrcTarget.c_str(), &aln_param_pacbio, 1, 1);
 		
@@ -188,9 +203,7 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 				<< ",aln score:" << aln_global->score << "\n";
 			std::cout << pathBetweenSrcTarget << "\n";
 			printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
-
-		}
-		*/
+		}*/
 
 		bool isAlgScoreBetter = maxAlgScore < aln_global->score;
 		if(isAlgScoreBetter)
@@ -203,11 +216,8 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 		aln_free_AlnAln(aln_global);
 	}
 
-	//std::cout << mergedSeq << "\n";
-	
 	if(FMWResult.mergedSeq.length() != 0)
 		return 1;
-	//assert(false);
 	return -4;
 }
 
@@ -266,11 +276,12 @@ void SAIntervalPBHybridCTree::extendLeaves()
 	
 	//attempt to extend one base for each leave
     attempToExtend(newLeaves);
-	if(m_kmerMode) 
+/*	if(m_kmerMode) 
 		refineSAInterval(m_minOverlap);
 	else if(m_lowCoverageHighErrorMode && m_currentKmerSize >= m_maxOverlap) 
 		refineSAInterval(m_minOverlap);
-	else if(m_currentKmerSize >= m_maxOverlap)
+	else */
+	if(m_currentKmerSize >= m_maxOverlap)
 	{
 		/*
 		if(m_minOverlap > 51)
@@ -282,7 +293,8 @@ void SAIntervalPBHybridCTree::extendLeaves()
 		else
 			refineSAInterval(m_minOverlap);
 		*/
-		if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
+		if(m_beginningIntervalSize >= m_coverage*0.8 || m_terminatedIntervalSize >= m_coverage*0.8) // 256: 16, extension may exceed max leaves soon after
+		//if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
 			refineSAInterval(81);
 		else
 			refineSAInterval(m_minOverlap);
@@ -291,7 +303,7 @@ void SAIntervalPBHybridCTree::extendLeaves()
     //shrink the SAIntervals in case overlap is larger than read length
     if(!m_kmerMode  &&  newLeaves.empty() )
     {
-        refineSAInterval(m_minOverlap);
+	refineSAInterval(m_minOverlap);
         attempToExtend(newLeaves);
     }
 

@@ -183,7 +183,7 @@ private:
 
 	// Perform FMindex extension between source and target seeds
 	// Return FMWalkReturnType
-	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& mergedseq,
+	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& rawSeq, std::string& mergedseq,
 							size_t smallKmerSize, size_t dis_between_src_target);
 	
 	PacBioCorrectionParameters m_params;

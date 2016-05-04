@@ -6,16 +6,19 @@
 
 #include "SAIPBSelfCTree.h"
 #include "BWTAlgorithms.h"
+#include "ssw_cpp.h"
+#include "stdaln.h"
 using namespace std;
 
 //
 // Class: SAIPBSelfCorrectTree
 SAIPBSelfCorrectTree::SAIPBSelfCorrectTree(
 					const BWT* pBWT,
-                    const BWT* pRBWT,
+                    			const BWT* pRBWT,
+					std::string rawSeq,
 					size_t min_SA_threshold,
 					int maxLeavesAllowed) :
-                    m_pBWT(pBWT), m_pRBWT(pRBWT), m_min_SA_threshold(min_SA_threshold), m_maxLeavesAllowed(maxLeavesAllowed),
+                    m_pBWT(pBWT), m_pRBWT(pRBWT), m_rawSeq(rawSeq), m_min_SA_threshold(min_SA_threshold), m_maxLeavesAllowed(maxLeavesAllowed),
 					m_expectedLength(0), m_currentLength(0), m_pRootNode(NULL), m_isSourceRepeat(false), m_isTargetRepeat(false)
 {
 	// initialize google dense hashmap
@@ -112,14 +115,14 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 			isTerminated(results);
 
 		// if(src.length()==198)
-			// printLeaves(hashK);
+			printLeaves(hashKmerSize);
 	}
 	
 	if(results.size()>0)
 	{
 		double maxKmerCoverage = 0;
 		int minLengthDiff = 100000;
-
+		double maxMatchPercent = -100;
 		for (size_t i = 0 ; i < results.size() ;i++)
 		{
 			std::string tmpseq;
@@ -149,9 +152,65 @@ int SAIPBSelfCorrectTree::mergeTwoSeedsUsingHash(const std::string &src, const s
 			// PB135123_7431.fa
 			// Rule out apparent errors due to tandem repeats with large length difference
 			bool isLengthDiffBetter = currLengthDiff < minLengthDiff && std::abs(currLengthDiff - minLengthDiff) >3;
+			
 			// But the length diff is not informative for small indels, where kmer coverage is more informative
 			bool isKmerCoverageBetter = std::abs(currLengthDiff - minLengthDiff) <=3 && (maxKmerCoverage<avgCov);
-			if(isLengthDiffBetter || isKmerCoverageBetter)
+			
+			// sequency identify used for repeat extensions
+			if(results.size()>1)
+			{
+				/*
+				// Declares a default Aligner
+  				StripedSmithWaterman::Aligner aligner;
+  				// Declares a default filter
+  				StripedSmithWaterman::Filter filter(0,0,0,300);
+  				// Declares an alignment that stores the result
+  				StripedSmithWaterman::Alignment alignment;
+  				// Aligns the query to the ref
+  				aligner.Align(tmpseq.c_str(), m_rawSeq.c_str(), m_rawSeq.size(), filter, &alignment);
+
+				//std::cout << alignment.sw_score << "\n";
+				*/
+
+				// We want to compute the total matches and percent
+				int matchLen = 0;
+				AlnAln *aln_global;
+				aln_global = aln_stdaln(m_rawSeq.c_str(), tmpseq.c_str(), &aln_param_pacbio, 1, 1);
+			
+				// Calculate the alignment patterns
+				for(int i = 0 ; aln_global->outm[i] != '\0' ; i++)
+					if(aln_global->outm[i] == '|')
+						matchLen++;
+				aln_free_AlnAln(aln_global);
+				double matchPercent = (double)matchLen / m_rawSeq.length();
+			
+			/*
+			if(m_debugMode)
+			{
+				std::cout << ">pathBetweenSrcTarget:" << i+1 << ",len:" << pathBetweenSrcTarget.length() <<  ",identity:" << matchPercent << "\n";
+				std::cout << pathBetweenSrcTarget << "\n";
+			}
+			*/
+			
+				bool isPercentMatchBetter = (maxMatchPercent < matchPercent);
+				if(isPercentMatchBetter)
+				{
+					maxMatchPercent = matchPercent;
+					mergedseq = tmpseq;
+				}
+
+/*
+				if((alignment.sw_score > bestAlignmentScore) || 
+				   (alignment.sw_score == bestAlignmentScore && (isLengthDiffBetter || isKmerCoverageBetter)))
+				{
+					bestAlignmentScore = alignment.sw_score;
+					minLengthDiff = currLengthDiff;
+                                	maxKmerCoverage=avgCov;
+					mergedseq = tmpseq;
+				}
+*/
+			}
+			else if(isLengthDiffBetter || isKmerCoverageBetter)
 			{
 				minLengthDiff = currLengthDiff;
 				maxKmerCoverage=avgCov;
@@ -202,7 +261,7 @@ size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t la
 	kmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
 	kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
 
-	// std::cout << initKmer << "\t" << smallKmerSize << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
+	std::cout << initKmer << "\t" << smallKmerSize << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
 
 	
 	// skip repeat only in the 1st round
@@ -261,7 +320,7 @@ size_t SAIPBSelfCorrectTree::addHashBySingleSeed(std::string& seedStr, size_t la
 		}
 	}
 	
-	// std::cout << kmerHash.size() << "\n";
+	std::cout << kmerHash.size() << "\n";
 	return kmerFreq;
 }
 
@@ -293,7 +352,7 @@ void SAIPBSelfCorrectTree::insertKmerToHash(std::string& insertedKmer, size_t se
 void SAIPBSelfCorrectTree::printLeaves(size_t hashKmerSize)
 {
 	std::cout << m_leaves.size() << ":" << m_currentLength << "\n";
-	cout << "AACACCGATCGTAATGGGCATGTTGCTGTCGATGGTGATGGTGTTCTGCAACTACGTCAACGTTGAGTGGATGATCATC\n";
+	cout << "CTCAAGATATTTCTTCCATCATGCAAAAAAAATTTGCAGTGCATGATGTTAATCATAAATGTCGGTGTCATCATGCGCTACGCTCTATGGCTCCCTGACGTTTTTTTAGC\n";
 	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 	{
 		std::string STNodeStr = (*iter)->getFullString();

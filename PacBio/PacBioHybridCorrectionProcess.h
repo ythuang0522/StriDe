@@ -25,8 +25,12 @@
 // Parameter object for the error corrector
 struct PacBioHybridCorrectionParameters
 {
+	// FM-index of high-quality short reads
 	BWTIndexSet indices;
 
+	// FM-index of low-quality long reads
+	BWTIndexSet lq_indices;
+	
 	int kmerLength;
 
 	// tree search parameters
@@ -38,7 +42,8 @@ struct PacBioHybridCorrectionParameters
 	int minKmerLength;
 	int FMWKmerThreshold;
 	int seedKmerThreshold;
-	
+
+	size_t coverage;	// coverage of high-quality short reads	
 	KmerDistribution kd;
 };
 
@@ -100,6 +105,7 @@ private:
 
 	std::vector<SeedFeature> seedingByDynamicKmer(const std::string readSeq);
 	int extendBetweenSeeds(SeedFeature source, SeedFeature target, std::string strBetweenSrcTarget, int dis_between_src_target, FMWalkResult* FMWResult, int debugTargetSeed);
+	void trimRepeatSeed(const std::string readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
 	
 	PacBioHybridCorrectionParameters m_params;
 };

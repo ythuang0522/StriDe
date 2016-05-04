@@ -141,7 +141,7 @@ void PacBioCorrectionProcess::initCorrect(std::string& readSeq, std::vector<Seed
 
 			// extension using local kmer hashtable collected from overlapping reads
 			std::string mergedseq;
-			FMWalkReturnType = extendBetweenSeeds(source, target, mergedseq, extendKmerSize, dis_between_src_target);
+			FMWalkReturnType = extendBetweenSeeds(source, target, readSeq, mergedseq, extendKmerSize, dis_between_src_target);
 
 			if(FMWalkReturnType > 0)
 			{
@@ -268,7 +268,7 @@ void PacBioCorrectionProcess::realCorrect(std::string& readSeq, std::vector<Seed
 		
 
 			std::string mergedseq;
-			FMWalkReturnType = extendBetweenSeeds(source, target, mergedseq, extendKmerSize, dis_between_src_target);
+			FMWalkReturnType = extendBetweenSeeds(source, target, readSeq, mergedseq, extendKmerSize, dis_between_src_target);
 
 			if(FMWalkReturnType > 0)
 			{
@@ -652,21 +652,24 @@ std::vector<SeedFeature> PacBioCorrectionProcess::seedingByDynamicKmer(const std
 
 // Perform FMindex extension between source and target seeds
 // Return FMWalkReturnType
-int PacBioCorrectionProcess::extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& mergedseq, 
+int PacBioCorrectionProcess::extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& rawSeq, std::string& mergedseq, 
 												size_t extendKmerSize, size_t dis_between_src_target)
 {
 	const double maxRatio = 1.1;
 	const double minRatio = 0.9;
 	const int minOffSet = 30;	//PB159615_16774.fa contains large indels > 30bp
-	
-	SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, m_params.FMWKmerThreshold);
+
+	size_t srcKmerSize = std::max(source.endBestKmerSize, extendKmerSize);
+
+	std::string rawSubseq = rawSeq.substr(target.seedStartPos+1-dis_between_src_target-srcKmerSize, target.seedEndPos-source.seedStartPos+1);	
+	SAIPBSelfCorrectTree SAITree(m_params.indices.pBWT, m_params.indices.pRBWT, rawSubseq, m_params.FMWKmerThreshold);
 		
 	// this occurs when one end is repeat requiring larger extendKmerSize while the other requires small extendKmerSize
 	// the source str should be the longest one
 	// const int srcMaxLength = maxRatio*(dis_between_src_target+minOffSet) + source.seedLength + extendKmerSize;
 	// size_t sourceFreq = SAITree.addHashBySingleSeed(source.seedStr, source.endBestKmerSize, extendKmerSize, srcMaxLength, m_params.isFirst);
 	
-	size_t srcKmerSize = std::max(source.endBestKmerSize, extendKmerSize);
+	//size_t srcKmerSize = std::max(source.endBestKmerSize, extendKmerSize);
 	std::string srcStr = source.seedStr.substr(source.seedStr.length()-srcKmerSize);
 	const int srcMaxLength = maxRatio*(dis_between_src_target+minOffSet) + srcStr.length() + extendKmerSize;
 	size_t sourceFreq = SAITree.addHashBySingleSeed(srcStr, source.endBestKmerSize, extendKmerSize, srcMaxLength, m_params.isFirst);
@@ -996,6 +999,7 @@ void SeedFeature::append(std::string extendedStr)
 {
 	seedStr += extendedStr;
 	seedLength += extendedStr.length();
+	seedStartPos += extendedStr.length();
 	seedEndPos += extendedStr.length();
 }
 

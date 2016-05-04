@@ -126,7 +126,7 @@ class KmerFeatures{
 class SAIPBSelfCorrectTree
 {
     public: 
-		SAIPBSelfCorrectTree(const BWT* pBWT, const BWT* pRBWT, size_t min_SA_threshold=3, int m_maxLeavesAllowed=64);
+		SAIPBSelfCorrectTree(const BWT* pBWT, const BWT* pRBWT, std::string rawSeq, size_t min_SA_threshold=3, int m_maxLeavesAllowed=64);
 		
         ~SAIPBSelfCorrectTree();
 
@@ -177,7 +177,8 @@ class SAIPBSelfCorrectTree
         
         const BWT* m_pBWT;
         const BWT* m_pRBWT;
-        
+        std::string m_rawSeq;
+
         size_t m_min_SA_threshold;
 		size_t m_maxLeavesAllowed;
 		

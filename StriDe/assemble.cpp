@@ -209,6 +209,8 @@ int assemble()
 	std::cout << "[Stats] Simplified graph:\n";
 	pGraph->visitP(statsVisit);
 
+        outputGraphAndFasta(pGraph,"",++phase);
+
 
 	/**********************Compute overlap raio and diff (for debug)**************
 	std::ofstream ssol  ("simpleOverlapLength.histo", std::ofstream::out);
@@ -236,10 +238,13 @@ int assemble()
 	pGraph->visitP(ikeVisit);
 	pGraph->simplify();
 
+        outputGraphAndFasta(pGraph,"",++phase);
+
 	/*** trim dead end vertices from small to large***/
-	size_t trimLen = opt::kmerLength+1 , stepsize=opt::insertSize/5;
-    while (trimLen < opt::insertSize *3/2)
-    {
+/*
+	size_t trimLen = opt::kmerLength+1 , stepsize=opt::readLength/5;
+	while (trimLen < opt::readLength)
+	{
 			SGTrimVisitor shortTrimVisit("",trimLen);
 			std::cout << "[ Trimming short vertices (<" << trimLen  << ") ]\n";
 
@@ -247,12 +252,12 @@ int assemble()
 				pGraph->simplify();
 
 			 trimLen=trimLen+stepsize;
-    }
-
+	}
+*/
 	/*** Pop Bubbles ***/
 	std::cout << "\n[ Remove bubbles and tips ]\n";
-	graphTrimAndSmooth (pGraph, opt::maxChimeraLength);
-	// outputGraphAndFasta(pGraph,"popBubbles",++phase);
+	graphTrimAndSmooth (pGraph, opt::readLength);
+	outputGraphAndFasta(pGraph,"",++phase);
 
 	/*** Remove small chimeric vertices ***/
 	std::cout << "\n[ Remove small chimera vertices ]\n";

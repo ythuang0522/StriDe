@@ -72,7 +72,7 @@ namespace asmlongopt
 	static size_t maxEdges = 512;
 
 	// Bubble parameters
-	static int maxIndelLength = 9;
+	static int maxIndelLength = 100;
 
 	//
 	static bool bExact = false;
@@ -169,7 +169,7 @@ int asmlong()
 	std::cout << "[Stats] Input graph:\n";
 	pGraph->visitP(statsVisit);
 	
-	// int phase = 0 ;
+	int phase = 0 ;
 
 	// Remove containments from the graph
 	std::cout << "Removing contained vertices from graph\n";
@@ -194,8 +194,8 @@ int asmlong()
 	sequentialTrimAndSmooth(pGraph, asmlongopt::maxChimeraLength);
 	pGraph->contigStats();
 	pGraph->visit(statsVisit);
-	// outputGraphAndFasta(pGraph,"",++phase);
-	// pGraph->writeDot("debug.dot",0);
+	outputGraphAndFasta(pGraph,"",++phase);
+	pGraph->writeDot("debug.dot",0);
 	// getchar();
 
     std::cout << "\n[ Remove chimeric edges with insufficient overlap or large-overlap difference from large vertices]\n";

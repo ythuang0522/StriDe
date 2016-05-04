@@ -29,6 +29,7 @@ struct FMWalkParameters
 	bool kmerMode = false;
 	bool lowCoverageHighErrorMode = false;
 	bool debugMode = false;
+	size_t coverage;
 };
 
 // Result Object for the FM-index Walk of PacBio Hybrid Correction
@@ -72,6 +73,8 @@ class SAIntervalPBHybridCTree
         void removeLeavesByRepeatKmer();
 		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
 
+	void pruneLeavesByAlignment();
+
         //
         // Data
         //
@@ -106,6 +109,8 @@ class SAIntervalPBHybridCTree
 		bool m_lowCoverageHighErrorMode;
 		bool m_repeatMode=false;
 		bool m_debugMode;
+
+	size_t m_coverage;
 };
 
 #endif

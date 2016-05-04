@@ -273,6 +273,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 	//get parameters
 	size_t kmerLength = m_params.kmerLength ;
 	size_t threshold = (size_t)CorrectionThresholds::Instance().getRequiredSupport(0)-1;
+	//std::cout<< threshold << "\n";
 
 	std::string seqFirst  = workItem.read.seq.toString() ;
 	
@@ -368,7 +369,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 		// firstMainIdx = splitRepeat( seqFirstKC, firstKR);
 	// }	
 
-	firstMainIdx = splitRead( seqFirst, firstKR, threshold, m_params.indices);
+	firstMainIdx = splitRead( seqFirst, firstKR, threshold-1, m_params.indices);
 	
 	/*** write kmernized results***/
 	if (!firstKR.empty()) result.kmerize =true ;
@@ -378,7 +379,7 @@ FMIndexWalkResult FMIndexWalkProcess::ValidateReads(const SequenceWorkItem& work
 		std::string kmerRead = firstKR.at(i);
 		float GCratio =0 ;
 		if ( isLowComplexity (kmerRead,GCratio) ) continue;
-		
+
 		if (i==firstMainIdx)  
 			result.correctSequence = kmerRead ;
 		else
