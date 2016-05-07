@@ -137,6 +137,7 @@ struct OverlapperParams
 // Global variables
 extern OverlapperParams default_params; // { 2, -5, -3 };
 extern OverlapperParams ungapped_params; // { 2, -10000, -3 };
+extern OverlapperParams webblast_params; // { 2, -10000, -3 };
 
 //
 namespace Overlapper
@@ -150,7 +151,8 @@ SequenceOverlap computeOverlap(const std::string& s1, const std::string& s2, con
 // start_1/start_2 give the starting positions of the current partial alignment. These coordinates
 // are used to estimate where the overlap begins. The estimated alignment is refined by calculating
 // the overlap with banded dynamic programming
-SequenceOverlap extendMatch(const std::string& s1, const std::string& s2, int start_1, int start_2, int bandwidth);
+SequenceOverlap extendMatch(const std::string& s1, const std::string& s2, int start_1, int start_2, 
+					int bandwidth, const int MATCH_SCORE = 2, const int GAP_PENALTY = -5,const int MISMATCH_PENALTY = -3);
 
 // Perform an alignment using affine gap penalties
 SequenceOverlap computeOverlapAffine(const std::string& s1, const std::string& s2, const OverlapperParams params = default_params);

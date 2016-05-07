@@ -33,6 +33,8 @@
 #include <stdio.h>
 
 OverlapperParams default_params = { 2, -6, -3 };
+OverlapperParams webblast_params = { 1, -8, -2 };	//
+
 OverlapperParams ungapped_params = { 2, -10000, -3 };
 
 
@@ -401,15 +403,16 @@ inline int _getBandedCellScore(const DPCells& cells, int i, int j, int band_widt
 }
 
 SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string& s2, 
-                                        int start_1, int start_2, int band_width)
+                                        int start_1, int start_2, int band_width,
+										const int MATCH_SCORE, const int GAP_PENALTY,const int MISMATCH_PENALTY)
 {
     SequenceOverlap output;
     int num_columns = s1.size() + 1;
     int num_rows = s2.size() + 1;
 
-    const int MATCH_SCORE = 2;
-    const int GAP_PENALTY = -5;
-    const int MISMATCH_PENALTY = -3;
+    // const int MATCH_SCORE = 1;
+    // const int GAP_PENALTY = -1;
+    // const int MISMATCH_PENALTY = -8;
     
     // Calculate the number of cells off the diagonal to compute
     int half_width = band_width / 2;

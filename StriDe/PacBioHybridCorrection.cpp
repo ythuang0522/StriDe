@@ -79,7 +79,12 @@ namespace opt
 	static int minSeedLength = 21;	// min seed size
 	static int seedKmerThreshold = 10;	// min seed frequency threshold
 	static int coverage = -1;	// coverage of high-quality short reads
+	
+	// PacBio Parameteres
 	static std::string lqprefix;	// prefix of FM-index of low quality long reads
+	static size_t PBKmerLength = 17;
+	static size_t PBcoverage = 60;
+	static size_t PBSearchDepth = 1000;	// PB seed searh depth
 
 }
 
@@ -143,23 +148,25 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 			pSSA = new SampledSuffixArray(opt::prefix + SAI_EXT, SSA_FT_SAI);
 		}
 
-		// Load FM-index of low-quality long reads
-		#pragma omp single nowait
-		{	//Initialization of large BWT takes some time, pass the disk to next job
-			std::cout << std::endl << "Loading BWT: " << opt::lqprefix + BWT_EXT << std::endl;
-			plqBWT = new BWT(opt::lqprefix + BWT_EXT, opt::sampleRate);
-		}
-		#pragma omp single nowait
+		if(!opt::lqprefix.empty())
 		{
-			std::cout << "Loading RBWT: " << opt::lqprefix + RBWT_EXT << std::endl;
-			plqRBWT = new BWT(opt::lqprefix + RBWT_EXT, opt::sampleRate);
+			// Load FM-index of low-quality long reads
+			#pragma omp single nowait
+			{		//Initialization of large BWT takes some time, pass the disk to next job
+				std::cout << std::endl << "Loading BWT: " << opt::lqprefix + BWT_EXT << std::endl;
+				plqBWT = new BWT(opt::lqprefix + BWT_EXT, opt::sampleRate);
+			}
+			#pragma omp single nowait
+			{
+				std::cout << "Loading RBWT: " << opt::lqprefix + RBWT_EXT << std::endl;
+				plqRBWT = new BWT(opt::lqprefix + RBWT_EXT, opt::sampleRate);
+			}
+			#pragma omp single nowait
+			{
+				std::cout << "Loading Sampled Suffix Array: " << opt::lqprefix + SAI_EXT << std::endl;
+				plqSSA = new SampledSuffixArray(opt::lqprefix + SAI_EXT, SSA_FT_SAI);
+			}
 		}
-		#pragma omp single nowait
-		{
-			std::cout << "Loading Sampled Suffix Array: " << opt::lqprefix + SAI_EXT << std::endl;
-			plqSSA = new SampledSuffixArray(opt::lqprefix + SAI_EXT, SSA_FT_SAI);
-		}
-
 	}
 
 	// Sample 100000 kmer counts into KmerDistribution from reverse BWT 
@@ -178,11 +185,12 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 	indexSet.pSSA = pSSA;
 	ecParams.indices = indexSet;
 
+	// PacBio index
 	BWTIndexSet lqindexSet;
 	lqindexSet.pBWT = plqBWT;
 	lqindexSet.pRBWT = plqRBWT;
 	lqindexSet.pSSA = plqSSA;
-	ecParams.lq_indices = lqindexSet;
+	ecParams.PBindices = lqindexSet;
 
 	// Open outfiles and start a timer
 	std::ostream* pWriter = createWriter(opt::outFile);
@@ -197,6 +205,10 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 	ecParams.seedKmerThreshold = opt::seedKmerThreshold;
 	ecParams.FMWKmerThreshold = opt::kmerThreshold;
 	ecParams.coverage = opt::coverage;
+	ecParams.PBKmerLength = opt::PBKmerLength;
+	ecParams.PBcoverage = opt::PBcoverage;
+	ecParams.PBSearchDepth = opt::PBSearchDepth;
+
 	
 	std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 		<< "number of threads:\t" << opt::numThreads << std::endl
@@ -325,13 +337,13 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 		std::cerr << SUBPROGRAM ": invalid kmer threshold: " << opt::kmerThreshold << ", must be greater than zero\n";
 		die = true;
 	}
-
+/*
 	if(opt::coverage <= 0)
 	{
 		std::cerr << SUBPROGRAM ": coverage is invalid or not provided: " << opt::coverage << ", must be greater than zero\n";
 		die = true;
 	}
-
+*/
 	if(opt::prefix.empty())
 	{
 		std::cerr << SUBPROGRAM ": FM-index of high-quality short reads is not provided.\n";
@@ -347,8 +359,10 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 	// Parse the input filenames
 	opt::readsFile = argv[optind++];
 
+	/*
 	if(opt::lqprefix.empty())
 		opt::lqprefix = stripFilename(opt::readsFile);
+	*/
 
 	// Set the correction threshold
 	if(opt::kmerThreshold <= 0)

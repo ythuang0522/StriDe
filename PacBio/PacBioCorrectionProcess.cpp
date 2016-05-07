@@ -980,7 +980,7 @@ void PacBioCorrectionPostProcess::process(const SequenceWorkItem& item, const Pa
 /*** Seed Feature Body *****/
 /***************************/
 SeedFeature::SeedFeature(size_t startPos, std::string str, bool repeat, size_t kmerSize, size_t repeatCutoff)
-:seedStartPos(startPos), seedStr(str), isRepeat(repeat), freqUpperBound(repeatCutoff), freqLowerBound(15), minKmerSize(13)
+:seedStartPos(startPos), seedStr(str), isRepeat(repeat), freqUpperBound(repeatCutoff), freqLowerBound(15), minKmerSize(13), isPBSeed(false)
 {
 	seedEndPos = seedStartPos + seedStr.length() -1;
 	seedLength = seedStr.length();

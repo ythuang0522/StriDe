@@ -36,6 +36,7 @@ struct SeedFeature
 		size_t seedLength;
 		std::string seedStr;
 		bool isRepeat;
+		bool isPBSeed;
 		
 		// estimated by calling estimateBestKmerSize
 		size_t startBestKmerSize;

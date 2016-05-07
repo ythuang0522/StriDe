@@ -19,4 +19,4 @@ libalgorithm_a_SOURCES = \
         ErrorCorrectProcess.h ErrorCorrectProcess.cpp \
         QCProcess.h QCProcess.cpp \
         FMMergeProcess.h FMMergeProcess.cpp \
-        KmerOverlaps.h KmerOverlaps.cpp
+        KmerOverlaps.h KmerOverlaps.cpp 

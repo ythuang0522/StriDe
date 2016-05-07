@@ -17,4 +17,6 @@ libpacbio_a_SOURCES = \
 	SAIPBSelfCTree.h SAIPBSelfCTree.cpp \
 	SAIPBHybridCTree.h SAIPBHybridCTree.cpp \
 	PacBioCorrectionProcess.h PacBioCorrectionProcess.cpp \
-	PacBioHybridCorrectionProcess.h PacBioHybridCorrectionProcess.cpp
+	PacBioHybridCorrectionProcess.h PacBioHybridCorrectionProcess.cpp \
+        LongReadOverlap.h LongReadOverlap.cpp
+
