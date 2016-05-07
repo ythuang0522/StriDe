@@ -39,23 +39,25 @@ SUBPROGRAM " Version " PACKAGE_VERSION "\n"
 
 static const char *CORRECT_USAGE_MESSAGE =
 "Usage: " PACKAGE_NAME " " SUBPROGRAM " [OPTION] ... READSFILE\n"
-"Correct PacBio reads via FM-index walk\n"
+"Correct PacBio reads using hybrid FM-indices of short and long reads\n"
 "\n"
-"      --help                           display this help and exit\n"
-"      -c, --coverage=N                 coverage of high-quality short reds\n"
-"      -v, --verbose                    display verbose output\n"
-"      -p, --prefix=PREFIX              use PREFIX for the names of the high-quality index files \n"
-"      -f, --lqprefix=PREFIX              use PREFIX for the names of the low-quality index files (default: prefix of the input file)\n"
-"      -o, --outfile=FILE               write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
-"      -t, --threads=NUM                use NUM threads for the computation (default: 1)\n"
+"\nMandatory parameters:\n"
+"      -p, --prefix=PREFIX              PREFIX of the names of the high-quality index files \n"
+"      -f, --PBprefix=PREFIX            PREFIX of the names of the low-quality index files (default: prefix of the input file)\n"
+"      -r, --readlen=NUM                Length of high-quality short reads\n"
+"      -c, --coverage=N                 Coverage of high-quality short reds\n"
 "\nPacBio correction parameters:\n"
-"      -k, --kmer-size=N                The length of the kmer to use. (default: 31, recommend: 31 (PacBioH), 17 (PacBioS).)\n"
-"      -s, --min-seed-size=N            The minimum length of the kmer to use. (default: 9, recommend: 21 (PacBioH), 9 (PacBioS).)\n"
-"      -x, --kmer-threshold=N           Attempt to correct kmers that are seen less than N times. (default: 3)\n"
-"      -y, --seed-kmer-threshold=N      Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
-"      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 32)\n"
-"      -M, --max-overlap=N              the max overlap (default: -1, recommend: avg read length*0.9 (PacBioH).)\n"
-"      --split                  		split the uncorrected reads (default: false)\n"
+"      -o, --outfile=FILE               Write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
+"      -t, --threads=NUM                NUM threads for the computation (default: 1)\n"
+"      -k, --max-seed-size=N            Length of max seed size in high-quality sshort reads. (default: 31)\n"
+"      -s, --min-seed-size=N            Length of min seed size in high-quality short reads. (default: 21)\n"
+"      -y, --seed-threshold=N           Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
+"      -x, --kmer-threshold=N           FM-index extension threshold. (default: 3)\n"
+"      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 256)\n"
+"      -M, --max-overlap=N              the max overlap during extension (default: read length*0.9)\n"
+"      -m, --min-overlap=N              the min overlap during extension (default: read length*0.8)\n"
+"      -v, --verbose                    display verbose output\n"
+"      --help                           display this help and exit\n"
 
 "\nReport bugs to " PACKAGE_BUGREPORT "\n\n";
 
@@ -74,21 +76,22 @@ namespace opt
 	static int kmerLength = 31;
 	static int kmerThreshold = 3;	// FM-index extension threshold
 	static int maxLeaves = 256;
-	static int minOverlap = 81;
+	static int minOverlap = -1;
 	static int maxOverlap = -1;
 	static int minSeedLength = 21;	// min seed size
 	static int seedKmerThreshold = 10;	// min seed frequency threshold
 	static int coverage = -1;	// coverage of high-quality short reads
+	static int readLen = -1;	// read length of high-quality short reads
 	
 	// PacBio Parameteres
-	static std::string lqprefix;	// prefix of FM-index of low quality long reads
-	static size_t PBKmerLength = 17;
-	static size_t PBcoverage = 60;
+	static std::string PBprefix;	// prefix of FM-index of low quality long reads
+	static size_t PBKmerLength = 17;	// seed size in PacBio index
+	static size_t PBcoverage = 60;		// coverage of PacBio
 	static size_t PBSearchDepth = 1000;	// PB seed searh depth
 
 }
 
-static const char* shortopts = "p:t:o:k:x:L:m:s:M:y:f:c:v";
+static const char* shortopts = "p:t:o:k:x:L:m:s:M:y:f:c:v:r";
 
 enum { OPT_HELP = 1, OPT_VERSION };
 
@@ -97,14 +100,15 @@ static const struct option longopts[] = {
 	{ "threads",       required_argument, NULL, 't' },
 	{ "outfile",       required_argument, NULL, 'o' },
 	{ "prefix",        required_argument, NULL, 'p' },
-	{ "kmer-size",     required_argument, NULL, 'k' },
+	{ "max-seed-size",     required_argument, NULL, 'k' },
 	{ "kmer-threshold" ,required_argument, NULL, 'x' },
 	{ "max-leaves",    required_argument, NULL, 'L' },
 	{ "min-overlap"    ,required_argument, NULL, 'm' },
 	{ "min-seed-size"  ,required_argument, NULL, 's' },
-	{ "seed-kmer-threshold"   ,required_argument, NULL, 'y' },
+	{ "seed-threshold"   ,required_argument, NULL, 'y' },
 	{ "coverage"        ,required_argument, NULL, 'c' },
-	{ "lqprefix",       required_argument,  NULL, 'f' },
+	{ "PBprefix",       required_argument,  NULL, 'f' },
+	{ "readLen",       required_argument,  NULL, 'r' },
 	{ "help",          no_argument,       NULL, OPT_HELP },
 	{ "version",       no_argument,       NULL, OPT_VERSION },
 	{ NULL, 0, NULL, 0 }
@@ -148,23 +152,23 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 			pSSA = new SampledSuffixArray(opt::prefix + SAI_EXT, SSA_FT_SAI);
 		}
 
-		if(!opt::lqprefix.empty())
+		if(!opt::PBprefix.empty())
 		{
 			// Load FM-index of low-quality long reads
 			#pragma omp single nowait
 			{		//Initialization of large BWT takes some time, pass the disk to next job
-				std::cout << std::endl << "Loading BWT: " << opt::lqprefix + BWT_EXT << std::endl;
-				plqBWT = new BWT(opt::lqprefix + BWT_EXT, opt::sampleRate);
+				std::cout << std::endl << "Loading BWT: " << opt::PBprefix + BWT_EXT << std::endl;
+				plqBWT = new BWT(opt::PBprefix + BWT_EXT, opt::sampleRate);
 			}
 			#pragma omp single nowait
 			{
-				std::cout << "Loading RBWT: " << opt::lqprefix + RBWT_EXT << std::endl;
-				plqRBWT = new BWT(opt::lqprefix + RBWT_EXT, opt::sampleRate);
+				std::cout << "Loading RBWT: " << opt::PBprefix + RBWT_EXT << std::endl;
+				plqRBWT = new BWT(opt::PBprefix + RBWT_EXT, opt::sampleRate);
 			}
 			#pragma omp single nowait
 			{
-				std::cout << "Loading Sampled Suffix Array: " << opt::lqprefix + SAI_EXT << std::endl;
-				plqSSA = new SampledSuffixArray(opt::lqprefix + SAI_EXT, SSA_FT_SAI);
+				std::cout << "Loading Sampled Suffix Array: " << opt::PBprefix + SAI_EXT << std::endl;
+				plqSSA = new SampledSuffixArray(opt::PBprefix + SAI_EXT, SSA_FT_SAI);
 			}
 		}
 	}
@@ -212,13 +216,12 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 	
 	std::cout << std::endl << "Correcting PacBio reads for " << opt::readsFile << " using--" << std::endl
 		<< "number of threads:\t" << opt::numThreads << std::endl
-		<< "max kmer size:\t" << ecParams.kmerLength << std::endl 
-		<< "min kmer size:\t" << ecParams.minKmerLength << std::endl
-		<< "seed kmer threshold:\t" << ecParams.seedKmerThreshold << std::endl
-		<< "max distance of searching seed:\t2* tendency distance" << std::endl							
+		<< "max seed size:\t" << ecParams.kmerLength << std::endl 
+		<< "min seed size:\t" << ecParams.minKmerLength << std::endl
+		<< "seed threshold:\t" << ecParams.seedKmerThreshold << std::endl
 		<< "max overlap:\t" <<  ecParams.maxOverlap << std::endl 
+		<< "min overlap:\t" <<  ecParams.minOverlap << std::endl 
 		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "search depth:\t1.1~0.9* (length between two seeds +/- 10)" << std::endl
 		<< "kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
 
 	// Setup post-processor
@@ -298,7 +301,8 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 			case 's': arg >> opt::minSeedLength; break;
 			case 'y': arg >> opt::seedKmerThreshold; break;
 			case 'c': arg >> opt::coverage; break;
-			case 'f': arg >> opt::lqprefix; break;
+			case 'f': arg >> opt::PBprefix; break;
+			case 'r': arg >> opt::readLen; break;
 
 			case OPT_HELP:
 				std::cout << CORRECT_USAGE_MESSAGE;
@@ -337,16 +341,28 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 		std::cerr << SUBPROGRAM ": invalid kmer threshold: " << opt::kmerThreshold << ", must be greater than zero\n";
 		die = true;
 	}
-/*
+
 	if(opt::coverage <= 0)
 	{
-		std::cerr << SUBPROGRAM ": coverage is invalid or not provided: " << opt::coverage << ", must be greater than zero\n";
-		die = true;
+		std::cerr << "Warnning: coverage of high-quality short reads is invalid or not provided: " << opt::coverage << ", reset to 100 by default\n";
+		opt::coverage = 100;
 	}
-*/
+
+	if(opt::readLen <= 0)
+	{
+		std::cerr << "Warnning: read length of high-quality short reads is invalid or not provided: " << opt::readLen << ", reset to 100 by default\n";
+		opt::readLen = 100;
+	}
+
+	if(opt::minOverlap < 0)
+		opt::minOverlap = opt::readLen * 0.8 +1;
+
+	if(opt::maxOverlap < 0)
+		opt::maxOverlap = opt::readLen * 0.9 +1;
+	
 	if(opt::prefix.empty())
 	{
-		std::cerr << SUBPROGRAM ": FM-index of high-quality short reads is not provided.\n";
+		std::cerr << SUBPROGRAM ": FM-index of short reads is not provided.\n";
 		die = true;
 	}
 	
@@ -359,11 +375,11 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 	// Parse the input filenames
 	opt::readsFile = argv[optind++];
 
-	/*
-	if(opt::lqprefix.empty())
-		opt::lqprefix = stripFilename(opt::readsFile);
-	*/
-
+	if(opt::PBprefix.empty())
+	{
+		opt::PBprefix = stripFilename(opt::readsFile);
+		std::cout << "Warning: FM-index of long reads is not provided. Search for index " << opt::PBprefix << ".bwt/sai/rbwt/rsai\n";
+	}
 	// Set the correction threshold
 	if(opt::kmerThreshold <= 0)
 	{
