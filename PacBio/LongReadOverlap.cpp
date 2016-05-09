@@ -108,73 +108,83 @@ void LongReadOverlap::retrieveStr(const std::string& query, size_t seedSize, siz
 					BWTIndexSet& indices, bool isRC, size_t coverage, std::vector<std::string>& ovlStr)
 {	
 	std::string initKmer;
-	if(isRC)
-		initKmer = reverseComplement( query.substr(query.length()-seedSize) );
-	else
-		initKmer = query.substr(0, seedSize);
+	BWTInterval fwdInterval, rvcInterval;
+	size_t totalKmerFreq = 0;
+	size_t seedOffSet = 0;
+	
+	// do
+	// {
+		if(isRC)
+			initKmer = reverseComplement( query.substr(query.length()-seedSize-seedOffSet, seedSize) );
+		else
+			initKmer = query.substr(0+seedOffSet, seedSize);
 
-	BWTInterval fwdInterval=BWTAlgorithms::findInterval(indices.pRBWT, reverse(initKmer));
-	BWTInterval rvcInterval=BWTAlgorithms::findInterval(indices.pBWT, reverseComplement(initKmer));
-    
-	size_t kmerFreq = 0;
-	kmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
-	kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
-	
-	// std::cout << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
-	
-	// skip repeat and low-complexity seeds
-	if(kmerFreq >= coverage*2 || kmerFreq >= 128) return;
-	
-	// extend each SA index and collect kmers of smallKmerSize along the extension
-	for(int64_t fwdRootIndex = fwdInterval.lower; 
-		fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper; 
-		fwdRootIndex++)
-	{		
-		// extract the string of fwdIndex via LF mapping
-		std::string currStr = initKmer;
+		fwdInterval=BWTAlgorithms::findInterval(indices.pRBWT, reverse(initKmer));
+		rvcInterval=BWTAlgorithms::findInterval(indices.pBWT, reverseComplement(initKmer));
 
-		int64_t fwdIndex = fwdRootIndex;
-		for(size_t currentLength = initKmer.length(); currentLength < maxLength; currentLength++)
-		{
-			char b = indices.pRBWT->getChar(fwdIndex);
-			if(b == '$') break;
-			currStr = currStr + b;
-            fwdIndex = indices.pRBWT->getPC(b) + indices.pRBWT->getOcc(b, fwdIndex - 1);			
+		size_t kmerFreq = 0;
+		kmerFreq += fwdInterval.isValid()?fwdInterval.size():0;
+		kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
+		totalKmerFreq += kmerFreq;
+			
+		// std::cout << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
+		
+		// skip repeat and low-complexity seeds
+		if(kmerFreq >= coverage*2 || kmerFreq >= 128) return;
+		
+		// extend each SA index and collect kmers of smallKmerSize along the extension
+		for(int64_t fwdRootIndex = fwdInterval.lower; 
+			fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper; 
+			fwdRootIndex++)
+		{		
+			// extract the string of fwdIndex via LF mapping
+			std::string currStr = initKmer;
+
+			int64_t fwdIndex = fwdRootIndex;
+			for(size_t currentLength = initKmer.length(); currentLength < maxLength; currentLength++)
+			{
+				char b = indices.pRBWT->getChar(fwdIndex);
+				if(b == '$') break;
+				currStr = currStr + b;
+				fwdIndex = indices.pRBWT->getPC(b) + indices.pRBWT->getOcc(b, fwdIndex - 1);			
+			}
+			
+			if(isRC)
+				ovlStr.push_back( reverseComplement(currStr) );
+			else
+				ovlStr.push_back(currStr);
+			
+			// if(isRC)
+				// std::cout << query << "\n";
+				// std::cout << maxLength << ":" << currStr.length() << "\n";
 		}
 		
-		if(isRC)
-			ovlStr.push_back( reverseComplement(currStr) );
-		else
-			ovlStr.push_back(currStr);
-		
-		// if(isRC)
-			// std::cout << query << "\n";
-			// std::cout << maxLength << ":" << currStr.length() << "\n";
-	}
-	
-	// LF-mapping of each rvc index	
-	for(int64_t rvcRootIndex=rvcInterval.lower; 
-		rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid(); 
-		rvcRootIndex++)
-	{
-		std::string currStr = reverseComplement(initKmer);
-		int64_t rvcIndex = rvcRootIndex;
-		
-		for(size_t currentLength = initKmer.length(); currentLength < maxLength; currentLength++)
+		// LF-mapping of each rvc index	
+		for(int64_t rvcRootIndex=rvcInterval.lower; 
+			rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid(); 
+			rvcRootIndex++)
 		{
-			char b = indices.pBWT->getChar(rvcIndex);
-			if(b == '$') break;
-			currStr = b + currStr;	// in reverse complement, currStr is before b
-            rvcIndex = indices.pBWT->getPC(b) + indices.pBWT->getOcc(b, rvcIndex - 1);
+			std::string currStr = reverseComplement(initKmer);
+			int64_t rvcIndex = rvcRootIndex;
+			
+			for(size_t currentLength = initKmer.length(); currentLength < maxLength; currentLength++)
+			{
+				char b = indices.pBWT->getChar(rvcIndex);
+				if(b == '$') break;
+				currStr = b + currStr;	// in reverse complement, currStr is before b
+				rvcIndex = indices.pBWT->getPC(b) + indices.pBWT->getOcc(b, rvcIndex - 1);
+			}
+			
+			if(isRC)
+				ovlStr.push_back(currStr);
+			else
+				ovlStr.push_back( reverseComplement(currStr) );
+
+
 		}
-		
-		if(isRC)
-			ovlStr.push_back(currStr);
-		else
-			ovlStr.push_back( reverseComplement(currStr) );
-
-
-	}
 	
+		// seedOffSet += 2;
+	// }
+	// while(totalKmerFreq <= 2 && seedOffSet <=4);
 
 }
