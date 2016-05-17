@@ -109,6 +109,7 @@ private:
 
 	std::vector<SeedFeature> seedingByDynamicKmer(const std::string& readSeq);
 	std::vector<SeedFeature> seedingByDynamicKmer_v2(const std::string& readSeq);
+	std::vector<SeedFeature> seedingByDynamicKmer_v3(const std::string& readSeq);
 	int calculateKmerFreqsEachPBPos(const std::string& readSeq, std::vector<std::vector<size_t> >& PBKmerFreqsVec);
 	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, int dis_between_src_target, FMWalkResult* FMWResult, int debugTargetSeed);
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
