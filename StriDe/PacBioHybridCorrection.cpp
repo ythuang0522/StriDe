@@ -49,9 +49,8 @@ static const char *CORRECT_USAGE_MESSAGE =
 "\nPacBio correction parameters:\n"
 "      -o, --outfile=FILE               Write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
 "      -t, --threads=NUM                NUM threads for the computation (default: 1)\n"
-"      -k, --max-seed-size=N            Length of max seed size in high-quality sshort reads. (default: 31)\n"
-"      -s, --min-seed-size=N            Length of min seed size in high-quality short reads. (default: 21)\n"
-"      -y, --seed-threshold=N           Attempt to find kmers of seed that are seen large than N times. (default: 10)\n"
+"      -K, --max-seed-size=N            Length of max seed size in high-quality sshort reads. (default: 31)\n"
+"      -k, --min-seed-size=N            Length of min seed size in high-quality short reads. (default: 21)\n"
 "      -x, --kmer-threshold=N           FM-index extension threshold. (default: 3)\n"
 "      -L, --max-leaves=N               Number of maximum leaves in the search tree. (default: 256)\n"
 "      -M, --max-overlap=N              the max overlap during extension (default: read length*0.9)\n"
@@ -79,7 +78,7 @@ namespace opt
 	static int minOverlap = -1;
 	static int maxOverlap = -1;
 	static int minSeedLength = 21;	// min seed size
-	static int seedKmerThreshold = 10;	// min seed frequency threshold
+	static int seedKmerThreshold = 30;	// min seed frequency threshold
 	static int coverage = -1;	// coverage of high-quality short reads
 	static int readLen = -1;	// read length of high-quality short reads
 	
@@ -91,7 +90,7 @@ namespace opt
 
 }
 
-static const char* shortopts = "p:t:o:k:x:L:m:s:M:y:f:c:v:r";
+static const char* shortopts = "p:t:o:K:x:L:m:k:M:f:c:v:r";
 
 enum { OPT_HELP = 1, OPT_VERSION };
 
@@ -100,12 +99,11 @@ static const struct option longopts[] = {
 	{ "threads",       required_argument, NULL, 't' },
 	{ "outfile",       required_argument, NULL, 'o' },
 	{ "prefix",        required_argument, NULL, 'p' },
-	{ "max-seed-size",     required_argument, NULL, 'k' },
+	{ "max-seed-size",     required_argument, NULL, 'K' },
 	{ "kmer-threshold" ,required_argument, NULL, 'x' },
 	{ "max-leaves",    required_argument, NULL, 'L' },
 	{ "min-overlap"    ,required_argument, NULL, 'm' },
-	{ "min-seed-size"  ,required_argument, NULL, 's' },
-	{ "seed-threshold"   ,required_argument, NULL, 'y' },
+	{ "min-seed-size"  ,required_argument, NULL, 'k' },
 	{ "coverage"        ,required_argument, NULL, 'c' },
 	{ "PBprefix",       required_argument,  NULL, 'f' },
 	{ "readLen",       required_argument,  NULL, 'r' },
@@ -218,11 +216,13 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 		<< "number of threads:\t" << opt::numThreads << std::endl
 		<< "max seed size:\t" << ecParams.kmerLength << std::endl 
 		<< "min seed size:\t" << ecParams.minKmerLength << std::endl
-		<< "seed threshold:\t" << ecParams.seedKmerThreshold << std::endl
-		<< "max overlap:\t" <<  ecParams.maxOverlap << std::endl 
-		<< "min overlap:\t" <<  ecParams.minOverlap << std::endl 
-		<< "max leaves:\t" << ecParams.maxLeaves  << std::endl
-		<< "kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl << std::endl;
+		// << "seed threshold:\t" << ecParams.seedKmerThreshold << std::endl
+		<< "max overlap:\t" << ecParams.maxOverlap << std::endl 
+		<< "min overlap:\t" << ecParams.minOverlap << std::endl 
+		<< "max leaves:\t" << ecParams.maxLeaves << std::endl
+		<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
+		<< "short reads coverage:\t" << ecParams.coverage << std::endl
+		<< std::endl;
 
 	// Setup post-processor
 	PacBioHybridCorrectionPostProcess postProcessor(pWriter, pDiscardWriter, ecParams);
@@ -291,15 +291,14 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 			case 'p': arg >> opt::prefix; break;
 			case 'o': arg >> opt::outFile; break;
 			case 't': arg >> opt::numThreads; break;
-			case 'k': arg >> opt::kmerLength; break;
+			case 'K': arg >> opt::kmerLength; break;
 			case 'x': arg >> opt::kmerThreshold; break;
 			case '?': die = true; break;
 			case 'v': opt::verbose++; break;
 			case 'L': arg >> opt::maxLeaves; break;
 			case 'm': arg >> opt::minOverlap; break;
 			case 'M': arg >> opt::maxOverlap; break;
-			case 's': arg >> opt::minSeedLength; break;
-			case 'y': arg >> opt::seedKmerThreshold; break;
+			case 'k': arg >> opt::minSeedLength; break;
 			case 'c': arg >> opt::coverage; break;
 			case 'f': arg >> opt::PBprefix; break;
 			case 'r': arg >> opt::readLen; break;

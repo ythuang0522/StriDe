@@ -101,17 +101,16 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		if(m_currentLength >= m_MinLength)
 			isTerminated(results);
 		
-		/*
 		if(m_debugMode)
 		{	
 			//std::cout << results.size() << "\n";
 			for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 			{
+				std::cout << "ATCAGGTAGTCGATACCGTACAGCGCAACGCGACGGTAGTCACCGATGATACGGCCACGGCCATATGCATCTGGCAGACCGGTCAGAACACCAGATTTACGGCAACGCAGGATGTCCGGAGTGTAAACGTCGAACACGCCCTGGTTGTGAGTTTTACGGTATTCAGTGAAGATTTTTTTGATCATCGGATCCAGTTCGCGGTTGTACGCTTTGCAGGAACCTTCGATCATTTTGATACCACCGAACGGGATAAG" << endl;
 				std::cout << (*iter)->getSuffix(m_currentLength-m_pSourceSeed->length()) << " ";
 				std::cout << m_currentLength << " " << m_currentKmerSize << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << "\n";
 			}
 		}
-		*/
 		
 		if(m_leaves.size() > m_maxUsedLeaves)
 			m_maxUsedLeaves = m_leaves.size();
@@ -303,7 +302,7 @@ void SAIntervalPBHybridCTree::extendLeaves()
     //shrink the SAIntervals in case overlap is larger than read length
     if(!m_kmerMode  &&  newLeaves.empty() )
     {
-	refineSAInterval(m_minOverlap);
+		refineSAInterval(m_minOverlap);
         attempToExtend(newLeaves);
     }
 
