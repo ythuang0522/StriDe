@@ -50,7 +50,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		result.merge = false;
 		return result;
 	}
-	
+
 	// FMWalk for each pair of seeds
 	for(size_t targetSeed = 1 ; targetSeed < seedVec.size() ; targetSeed++)
 	{
@@ -58,15 +58,13 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		SeedFeature source = pacbioCorrectedStrs.back();
 		SeedFeature target = seedVec.at(targetSeed);
 		int dis_between_src_target = target.seedStartPos - preTarget.seedEndPos - 1;
-		
 		// we need raw pacbio string between source and target seed and 10 bp around
 		// to do global alignmet with fmwalk result.
 		string strBetweenSrcTarget = readSeq.substr(preTarget.seedEndPos+1-10, dis_between_src_target+20);
-		
 		int FMWalkReturnType;
 		FMWalkResult FMWResult;
 		FMWalkReturnType = extendBetweenSeeds(source, target, strBetweenSrcTarget, dis_between_src_target, &FMWResult, targetSeed);
-		
+
 		// debug
 		// if(targetSeed < seedVec.size())
 		// {
@@ -477,9 +475,6 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 	if(readSeq.length()<=maxKmerSize)
 		return seedVec;
 	
-	// computing maximum interval of the max kmer size
-	int maxSeedInterval=2*3.8649*pow(2.7183,0.1239*maxKmerSize);
-	
 	// computing kmer threshold of various kmer size
 	// kmer size	kmer threshold*(short reads coverage/100)
 	// 21	31*(short reads coverage/100)
@@ -518,14 +513,14 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 			// seeds from PB index will be serached instead
 			int prevSeedEndPos=seedEndPosVec.empty()?0:seedEndPosVec.back()+1;
 			int distToPrevSeed=pos+1-prevSeedEndPos;
-			if(distToPrevSeed>=maxSeedInterval)
+			if(distToPrevSeed>=m_params.PBSearchDepth)
 			{
-				if(distToPrevSeed >= m_params.PBSearchDepth)
-					seedingByPacBio(readSeq,seedVec,seedEndPosVec,prevSeedEndPos);
-				
-				// no seeds can be found even using minKmerSize, 
-				// so we reset start position of searching to give up the maximum interval of minKmerSize.
-				seedEndPosVec.push_back(pos);
+				if(seedingByPacBio(readSeq,seedVec,seedEndPosVec,prevSeedEndPos))
+					;
+				else
+					seedEndPosVec.push_back(pos);
+				//cout << seedEndPosVec.size() << endl;
+				pos=seedEndPosVec.back();
 			}
 			continue;
 		}
@@ -577,7 +572,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 
 		// super repeat seeds with frequency > 2000 are troublesome, often lead to -3 but no good solution so far, mark first
 		bool isSuperRepeat=maxKmerFreq>m_params.coverage*15?true:false;
-		SeedFeature newSeed(seedStartPos,readSeq.substr(seedStartPos,dynamicKmerSize),isSuperRepeat,dynamicKmerSize,dynamicKmerThreshold*4);
+		SeedFeature newSeed(seedStartPos,readSeq.substr(seedStartPos,seedEndPos-seedStartPos+1),isSuperRepeat,dynamicKmerSize,dynamicKmerThreshold*4);
 
 		// skip low-complexity sequencing errors of PacBio
 		// bool isShortAndHighFreq = i-seedStartPos <= 2 && maxKmerFreq > 80;
@@ -656,9 +651,9 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio(const string& readSeq, std::
 
 				newSeed.isPBSeed = true;
 				seedVec.push_back(newSeed);
-				seedEndPosVec.push_back(seedEndPos);			
+				seedEndPosVec.push_back(seedEndPos);
+				return true;
 			}
-			return true;
 		}
 		
 		// reduce kmer size if no seeds can be found within a maximum interval
@@ -750,8 +745,9 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature& source, SeedF
 		/*** Extension Failed 1) try smaller minOverlap 2) try correction by MSA for sequencing gap ***/
 		// Sequencing gaps in short reads often lead to -1 or -2
 		// But over-reduced minOverlap size also lead to -2 due to error seeds
-		if( (FMWalkReturnType == -2 && minOverlap >= m_params.kmerLength) || 
-			(FMWalkReturnType == -1 && minOverlap == initMinOverlap) )
+		//if( (FMWalkReturnType == -2 && minOverlap >= m_params.kmerLength) || 
+		//	(FMWalkReturnType == -1 && minOverlap == initMinOverlap) )
+		if(minOverlap==initMinOverlap&&(FMWalkReturnType==-2||FMWalkReturnType==-1))
 			isSequencingGap = true;
 		
 		// The FMWalkReturnType may switch from -1 to -3 due to over-reduced minOverlap
