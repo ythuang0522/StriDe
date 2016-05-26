@@ -114,35 +114,9 @@ private:
 	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, int dis_between_src_target, FMWalkResult* FMWResult, int debugTargetSeed);
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
 	bool seedingByPacBio(const std::string& readSeq, std::vector<SeedFeature>& seedVec, 	std::vector<int>& seedEndPosVec, size_t prevEndPos);
-
+	bool seedingByPacBio_v2(const std::string& readSeq, std::vector<SeedFeature>& seedVec, 	std::vector<int>& seedEndPosVec, size_t prevEndPos);
+	bool isLowComplexity(std::string& seq ,const float& ratioThreshold);
 	PacBioHybridCorrectionParameters m_params;
-
-	bool isLowComplexity (std::string seq, float threshold=0.9)
-	{
-		size_t seqLen = seq.length();
-		size_t countG =0 ;
-		size_t countC =0 ;
-		size_t countT =0 ;
-		size_t countA =0 ;
-
-		for (size_t i=0; i<seqLen; i++)
-		{
-			switch(seq[i]){
-				case 'A': countA ++ ;break;
-				case 'T': countT ++ ;break;
-				case 'C': countC ++ ;break;
-				case 'G': countG ++ ;break;
-				default:  assert(false);
-			}
-		}
-
-		if (  ((float) countA/seqLen >= threshold ) || ((float) countT/seqLen >= threshold)
-				|| ((float) countC/seqLen >= threshold ) || ((float) countG/seqLen >= threshold) )
-			return true;
-
-		return false;
-
-	}
 };
 
 // Write the results from the overlap step to an ASQG file

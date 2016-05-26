@@ -46,6 +46,7 @@ static const char *CORRECT_USAGE_MESSAGE =
 "      -f, --PBprefix=PREFIX            PREFIX of the names of the low-quality index files (default: prefix of the input file)\n"
 "      -r, --readlen=NUM                Length of high-quality short reads\n"
 "      -c, --coverage=N                 Coverage of high-quality short reds\n"
+"      -C, --PBcoverage=N               Coverage of PacBio reads\n"
 "\nPacBio correction parameters:\n"
 "      -o, --outfile=FILE               Write the corrected reads to FILE (default: READSFILE.ec.fa)\n"
 "      -t, --threads=NUM                NUM threads for the computation (default: 1)\n"
@@ -90,7 +91,7 @@ namespace opt
 
 }
 
-static const char* shortopts = "p:t:o:K:x:L:m:k:M:f:c:v:r";
+static const char* shortopts = "p:t:o:K:x:L:m:k:M:f:c:C:v:r";
 
 enum { OPT_HELP = 1, OPT_VERSION };
 
@@ -99,13 +100,14 @@ static const struct option longopts[] = {
 	{ "threads",       required_argument, NULL, 't' },
 	{ "outfile",       required_argument, NULL, 'o' },
 	{ "prefix",        required_argument, NULL, 'p' },
-	{ "max-seed-size",     required_argument, NULL, 'K' },
-	{ "kmer-threshold" ,required_argument, NULL, 'x' },
+	{ "max-seed-size", required_argument, NULL, 'K' },
+	{ "kmer-threshold",required_argument, NULL, 'x' },
 	{ "max-leaves",    required_argument, NULL, 'L' },
-	{ "min-overlap"    ,required_argument, NULL, 'm' },
-	{ "min-seed-size"  ,required_argument, NULL, 'k' },
-	{ "coverage"        ,required_argument, NULL, 'c' },
-	{ "PBprefix",       required_argument,  NULL, 'f' },
+	{ "min-overlap",   required_argument, NULL, 'm' },
+	{ "min-seed-size", required_argument, NULL, 'k' },
+	{ "coverage",      required_argument, NULL, 'c' },
+	{ "PBcoverage",    required_argument, NULL, 'C' },
+	{ "PBprefix",      required_argument,  NULL, 'f' },
 	{ "readLen",       required_argument,  NULL, 'r' },
 	{ "help",          no_argument,       NULL, OPT_HELP },
 	{ "version",       no_argument,       NULL, OPT_VERSION },
@@ -222,6 +224,9 @@ int PacBioHybridCorrectionMain(int argc, char** argv)
 		<< "max leaves:\t" << ecParams.maxLeaves << std::endl
 		<< "FMW kmer threshold:\t" << ecParams.FMWKmerThreshold << std::endl
 		<< "short reads coverage:\t" << ecParams.coverage << std::endl
+		<< "PB kmer length:\t" << ecParams.PBKmerLength << std::endl
+		<< "PB reads coverage:\t" << ecParams.PBcoverage << std::endl
+		<< "PB search depth:\t" << ecParams.PBSearchDepth << std::endl
 		<< std::endl;
 
 	// Setup post-processor
@@ -300,6 +305,7 @@ void parsePacBioHybridCorrectionOptions(int argc, char** argv)
 			case 'M': arg >> opt::maxOverlap; break;
 			case 'k': arg >> opt::minSeedLength; break;
 			case 'c': arg >> opt::coverage; break;
+			case 'C': arg >> opt::PBcoverage; break;
 			case 'f': arg >> opt::PBprefix; break;
 			case 'r': arg >> opt::readLen; break;
 
