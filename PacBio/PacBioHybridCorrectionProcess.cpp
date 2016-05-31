@@ -492,7 +492,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 	kmerThreshold.resize(201+1,3);
 	for(size_t kmerSize=0 ; kmerSize<=91 ; kmerSize++)
 	{
-		float kmerThresholdValue=(0.005*pow(kmerSize,2)-0.96*kmerSize+45.955)*(m_params.coverage/100);
+		float kmerThresholdValue=(0.005*pow(kmerSize,2)-0.96*kmerSize+45.955)*((float)m_params.coverage/100);
 		kmerThreshold.at(kmerSize)+=kmerThresholdValue;
 	}
 	
@@ -688,7 +688,7 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio_v2(const string& readSeq, st
 	kmerThreshold.resize(97+1,5);
 	for(size_t kmerSize=0 ; kmerSize<=97 ; kmerSize++)
 	{
-		float kmerThresholdValue=(-0.1*kmerSize+9.7)*(m_params.PBcoverage/60);
+		float kmerThresholdValue=(-0.1*kmerSize+9.7)*((float)m_params.PBcoverage/60);
 		kmerThreshold.at(kmerSize)+=kmerThresholdValue;
 	}
 	
