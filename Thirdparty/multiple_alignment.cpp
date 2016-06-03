@@ -556,7 +556,7 @@ std::string MultipleAlignment::calculateBaseConsensus(int min_call_coverage, int
         // if has been seen less than min_call_coverage times and the max
         // base in the column has been seen more times than the base symbol
         char consensus_symbol;
-        if(max_count > base_count && base_count < min_call_coverage)
+        if(max_count >= base_count && base_count < min_call_coverage)
             consensus_symbol = max_symbol;
         else
             consensus_symbol = base_symbol;
