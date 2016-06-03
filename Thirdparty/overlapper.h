@@ -138,6 +138,7 @@ struct OverlapperParams
 extern OverlapperParams default_params; // { 2, -5, -3 };
 extern OverlapperParams ungapped_params; // { 2, -10000, -3 };
 extern OverlapperParams webblast_params; // { 2, -10000, -3 };
+extern OverlapperParams pacbio_params; // { 2, -10000, -3 };
 
 //
 namespace Overlapper
@@ -157,6 +158,9 @@ SequenceOverlap extendMatch(const std::string& s1, const std::string& s2, int st
 // Perform an alignment using affine gap penalties
 SequenceOverlap computeOverlapAffine(const std::string& s1, const std::string& s2, const OverlapperParams params = default_params);
 
+SequenceOverlap bandedAffineOverlap(const std::string& s1, const std::string& s2, 
+                                        int start_1, int start_2, int band_width, const OverlapperParams params);
+										
 // Compact an expanded CIGAR string into a regular cigar string
 std::string compactCigar(const std::string& ecigar);
 

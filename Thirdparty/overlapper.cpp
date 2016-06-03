@@ -33,7 +33,8 @@
 #include <stdio.h>
 
 OverlapperParams default_params = { 2, -6, -3 };
-OverlapperParams webblast_params = { 1, -8, -2 };	//
+OverlapperParams webblast_params = { 2, -2, -3 };	//
+OverlapperParams pacbio_params = { 1, -1, -8 };	//
 
 OverlapperParams ungapped_params = { 2, -10000, -3 };
 
@@ -394,13 +395,14 @@ inline int _getBandedCellIndex(int i, int j, int band_width, int band_origin_row
     return (band_row_index >= 0 && band_row_index < band_width) ? i * band_width + band_row_index : -1;
 }
 
-// Returns the score for (i,j) in the 
+// Returns the score for (i,j) in the band
 inline int _getBandedCellScore(const DPCells& cells, int i, int j, int band_width, int band_origin_row, int invalid_score)
 {
     int band_start = band_origin_row + i;
     int band_row_index = j - band_start;
     return (band_row_index >= 0 && band_row_index < band_width) ? cells[i * band_width + band_row_index] : invalid_score;
 }
+
 
 SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string& s2, 
                                         int start_1, int start_2, int band_width,
@@ -633,7 +635,7 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
 // The score for this cell coming from a match, deletion and insertion
 struct AffineCell
 {
-    AffineCell() : G(0), I(-std::numeric_limits<int>::max()), D(-std::numeric_limits<int>::max()) {}
+    AffineCell() : G(0), I(std::numeric_limits<int>::min()), D(std::numeric_limits<int>::min()) {}
 
     //
     int G;
@@ -643,6 +645,14 @@ struct AffineCell
 
 typedef std::vector<AffineCell> AffineCells;
 typedef std::vector<AffineCells> AffineMatrix;
+
+// Returns the score for (i,j) in the band
+inline int _getBandedAffineCellScore(AffineCells& cells, int i, int j, int band_width, int band_origin_row, int invalid_score)
+{
+    int band_start = band_origin_row + i;
+    int band_row_index = j - band_start;
+    return (band_row_index >= 0 && band_row_index < band_width) ? cells[i * band_width + band_row_index].G : invalid_score;
+}
 
 SequenceOverlap Overlapper::computeOverlapAffine(const std::string& s1, const std::string& s2, const OverlapperParams params)
 {
@@ -657,14 +667,31 @@ SequenceOverlap Overlapper::computeOverlapAffine(const std::string& s1, const st
     size_t num_columns = s1.size() + 1;
     size_t num_rows = s2.size() + 1;
 
-    int gap_open = 5;
-    int gap_ext = 2;
+	// PacBio parameters
+    int gap_open = 1; 
+    int gap_ext = 1; 
 
     AffineMatrix score_matrix;
     score_matrix.resize(num_columns);
     for(size_t i = 0; i < score_matrix.size(); ++i)
         score_matrix[i].resize(num_rows);
 
+	// initialize score_matrix, x:i:deletion, y:j:insertion
+	// bug fix by YT, initialization needed for affine gaps
+	score_matrix[1][0].D = -gap_open - gap_ext;
+	for(size_t i = 2; i < num_columns; ++i)
+	{
+		score_matrix[i][0].D = score_matrix[i-1][0].D - gap_ext;
+		score_matrix[i][0].G = score_matrix[i][0].D;
+	}
+	
+	score_matrix[0][1].I = -gap_open - gap_ext;
+	for(size_t j = 2; j < num_rows; ++j)
+	{
+		score_matrix[0][j].I = score_matrix[0][j-1].I - gap_ext;
+		score_matrix[0][j].G = score_matrix[0][j].I;
+	}
+	
     // Calculate scores
     for(size_t i = 1; i < num_columns; ++i) {
         for(size_t j = 1; j < num_rows; ++j) {
@@ -673,18 +700,21 @@ SequenceOverlap Overlapper::computeOverlapAffine(const std::string& s1, const st
             int idx_1 = i - 1;
             int idx_2 = j - 1;
 
+			// match or mismatch from diagonal
             int diagonal = score_matrix[i-1][j-1].G + (s1[idx_1] == s2[idx_2] ? params.match_score : params.mismatch_penalty);
 
             // When computing the score starting from the left/right cells, we have to determine
             // whether to extend an existing gap or start a new one.
             AffineCell& curr = score_matrix[i][j];
 
+			// insertion gap from up
             AffineCell& up = score_matrix[i][j-1];
             if(up.I > up.G - gap_open)
                 curr.I = up.I - gap_ext;
             else
                 curr.I = up.G - (gap_open + gap_ext);
 
+			// deletion gap from left
             AffineCell& left = score_matrix[i-1][j];
             if(left.D > left.G - gap_open)
                 curr.D = left.D - gap_ext;
@@ -764,6 +794,300 @@ SequenceOverlap Overlapper::computeOverlapAffine(const std::string& s1, const st
         int left2 = score_matrix[i-1][j].D - gap_ext;
 
         int curr = score_matrix[i][j].G;
+
+        // If there are multiple possible paths to this cell
+        // we break ties in order of insertion,deletion,match
+        // this helps left-justify matches for homopolymer runs
+        // of unequal lengths
+        if(curr == up1 || curr == up2) {
+            cigar.push_back('I');
+            j -= 1;
+            output.edit_distance += 1;
+        } else if(curr == left1 || curr == left2) {
+            cigar.push_back('D');
+            i -= 1;
+            output.edit_distance += 1;
+        } else {
+            assert(curr == diagonal);
+            if(!is_match)
+                output.edit_distance += 1;
+            cigar.push_back('M');
+            i -= 1;
+            j -= 1;
+        }
+
+        output.total_columns += 1;
+    }
+
+    // Set the alignment startpoints
+    output.match[0].start = i;
+    output.match[1].start = j;
+
+    // Compact the expanded cigar string into the canonical run length encoding
+    // The backtracking produces a cigar string in reversed order, flip it
+    std::reverse(cigar.begin(), cigar.end());
+    assert(!cigar.empty());
+    output.cigar = compactCigar(cigar);
+    return output;
+}
+
+SequenceOverlap Overlapper::bandedAffineOverlap(const std::string& s1, const std::string& s2, 
+                                        int start_1, int start_2, int band_width, const OverlapperParams params)
+{
+    SequenceOverlap output;
+    int num_columns = s1.size() + 1;
+    int num_rows = s2.size() + 1;
+    
+	int gap_open = 1; //5;
+    int gap_ext = 1; //2;
+
+    // Calculate the number of cells off the diagonal to compute
+    int half_width = band_width / 2;
+    band_width = half_width * 2 + 1; // the total number of cells per band
+
+    // Calculate the number of columns that we need to extend to for s1
+    size_t num_cells_required = num_columns * band_width;
+
+    // Allocate bands with uninitialized scores
+    int INVALID_SCORE = std::numeric_limits<int>::min();
+	AffineCell tmp;
+	AffineCells cells(num_cells_required, tmp);
+	// cells.resize(num_cells_required);	// resize also initializes AffineCell values using default constructor
+
+    // Calculate the band center coordinates in the first
+    // column of the multiple alignment. These are calculated by
+    // projecting the match diagonal onto the first column. It is possible
+    // that these are negative.
+    int band_center = start_2 - start_1 + 1;
+    int band_origin = band_center - (half_width + 1);
+
+#ifdef DEBUG_EXTEND
+    printf("Match start: [%d %d]\n", start_1, start_2);
+    printf("Band center, origin: [%d %d]\n", band_center, band_origin);
+    printf("Num cells: %zu\n", cells.size());
+#endif
+
+    // Fill in the bands column by column
+    for(int i = 1; i < num_columns; ++i) {
+        int j = band_origin + i; // start row of this band
+        int end_row = j + band_width;
+
+        // Trim band coordinates to only compute valid positions
+        if(j < 1)
+            j = 1;
+        if(end_row > num_rows)
+            end_row = num_rows;
+
+        if(end_row <= 0 || j >= num_rows || j >= end_row)
+            continue; // nothing to do for this column
+
+#ifdef DEBUG_EXTEND
+        printf("Filling column %d rows [%d %d]\n", i, j, end_row);
+#endif
+
+        // Fill in this band. To avoid the need to perform many tests whether a particular cell
+        // is stored in a band, we do some of the calculations outside of the main loop below. 
+        // We first calculate the score for the first cell in the band. This calculation cannot
+        // involve the cell above the first row so we ignore it below. We then fill in the main
+        // part of the band, which can perform valid reads from all its neighboring cells. Finally
+        // we calculate the last row, which does not use the cell to its left.
+
+        // Set up initial indices and scores
+        int curr_idx = _getBandedCellIndex(i, j, band_width, band_origin);
+        int left_idx = _getBandedCellIndex(i - 1, j, band_width, band_origin);
+        int diagonal_idx = _getBandedCellIndex(i - 1, j - 1, band_width, band_origin);
+
+        // Fill in the initial row, here we ignore the up cell which is now out of band		
+        // int diagonal_score = cells[diagonal_idx] + (s1[i - 1] == s2[j - 1] ? MATCH_SCORE : MISMATCH_PENALTY);
+		// match or mismatch from diagonal
+        int diagonal_score = cells[diagonal_idx].G + (s1[i - 1] == s2[j - 1] ? params.match_score : params.mismatch_penalty);
+
+		// deletion gap from left
+		if(left_idx != -1 && cells[left_idx].D > cells[left_idx].G - gap_open)
+		{
+			// assert(cells[left_idx].D != INVALID_SCORE);
+			cells[curr_idx].D = cells[left_idx].D - gap_ext;
+		}
+		else if(left_idx != -1)
+		{
+			// assert(cells[left_idx].G != INVALID_SCORE);
+			cells[curr_idx].D = cells[left_idx].G - (gap_open + gap_ext);
+		}
+		else
+			assert(false);
+
+		// out of band
+		// cells[curr_idx].I = 0;
+
+        // Set the first row score
+        cells[curr_idx].G = std::max(cells[curr_idx].D, diagonal_score);
+
+#ifdef DEBUG_EXTEND
+        printf("Filled [%d %d] = %d\n", i , j, cells[curr_idx]);
+        assert(_getBandedCellIndex(i,j, band_width, band_origin) != -1);
+        assert(diagonal_idx != -1);
+#endif
+
+        // Update indices
+        curr_idx += 1;
+        left_idx += 1;
+        diagonal_idx += 1;
+        j += 1;
+
+        // Fill in the main part of the band, stopping before the last row
+        while(j < end_row - 1) {
+
+#ifdef DEBUG_EXTEND
+            assert(diagonal_idx == _getBandedCellIndex(i - 1, j - 1, band_width, band_origin));
+            assert(left_idx == _getBandedCellIndex(i - 1, j, band_width, band_origin));
+            assert(curr_idx - 1 == _getBandedCellIndex(i, j - 1, band_width, band_origin));
+#endif
+
+            diagonal_score = cells[diagonal_idx].G + (s1[i - 1] == s2[j - 1] ? params.match_score : params.mismatch_penalty);
+
+            // left_score = cells[left_idx] + GAP_PENALTY;
+            if(cells[left_idx].D > cells[left_idx].G - gap_open)
+			{
+				assert(cells[left_idx].D != INVALID_SCORE); 
+				cells[curr_idx].D = cells[left_idx].D - gap_ext;
+			}
+			else
+			{
+				assert(cells[left_idx].G != INVALID_SCORE);
+				cells[curr_idx].D = cells[left_idx].G - (gap_open + gap_ext);
+			}
+			
+			// insertion gap from up
+			int up_idx = _getBandedCellIndex(i, j - 1, band_width, band_origin);
+			if(cells[up_idx].I > cells[up_idx].G - gap_open)
+			{
+				assert(cells[up_idx].I != INVALID_SCORE);
+                cells[curr_idx].I = cells[up_idx].I - gap_ext;
+			}
+            else
+			{
+				assert(cells[up_idx].G != INVALID_SCORE);
+                cells[curr_idx].I = cells[up_idx].G - (gap_open + gap_ext);
+			}
+
+            cells[curr_idx].G = max3(diagonal_score, cells[curr_idx].D, cells[curr_idx].I);
+
+// #ifdef DEBUG_EXTEND
+            // printf("Filled [%d %d] = %d\n", i , j, cells[curr_idx]);
+            assert(_getBandedCellIndex(i,j, band_width, band_origin) != -1);
+// #endif
+            // Update indices
+            curr_idx += 1;
+            left_idx += 1;
+            diagonal_idx += 1;
+            j += 1;
+        }
+
+        // Fill in the last row, here we ignore the left cell which is now out of band
+        if(j != end_row) {
+            diagonal_score = cells[diagonal_idx].G + (s1[i - 1] == s2[j - 1] ? params.match_score : params.mismatch_penalty);
+            
+			// up_score = cells[curr_idx - 1] + GAP_PENALTY;
+			int up_idx = _getBandedCellIndex(i, j - 1, band_width, band_origin);
+			if(cells[up_idx].I > cells[up_idx].G - gap_open)
+			{
+				assert(cells[up_idx].I != INVALID_SCORE);
+                cells[curr_idx].I = cells[up_idx].I - gap_ext;
+			}
+            else
+			{
+				assert(cells[up_idx].G != INVALID_SCORE);
+                cells[curr_idx].I = cells[up_idx].G - (gap_open + gap_ext);
+			}
+			
+            cells[curr_idx].G = std::max(diagonal_score, cells[curr_idx].I);
+
+#ifdef DEBUG_EXTEND
+            printf("Filled [%d %d] = %d\n", i , j, cells[curr_idx]);
+            assert(_getBandedCellIndex(i,j, band_width, band_origin) != -1);
+#endif        
+        }
+    }
+
+    // The location of the highest scoring match in the
+    // last row or last column is the maximum scoring overlap
+    // for the pair of strings. We start the backtracking from
+    // that cell
+    int max_row_value = std::numeric_limits<int>::min();
+    int max_column_value = std::numeric_limits<int>::min();
+    size_t max_row_index = 0;
+    size_t max_column_index = 0;
+
+    // Check every column of the last row
+    // The first column is skipped to avoid empty alignments
+    for(int i = 1; i < num_columns; ++i) {
+        int v = _getBandedAffineCellScore(cells, i, num_rows - 1, band_width, band_origin, INVALID_SCORE); 
+        if(v > max_row_value) {
+            max_row_value = v;
+            max_row_index = i;
+        }
+    }
+
+    // Check every row of the last column
+    for(int j = 1; j < num_rows; ++j) {
+        int v = _getBandedAffineCellScore(cells, num_columns - 1, j, band_width, band_origin, INVALID_SCORE); 
+        if(v > max_column_value) {
+            max_column_value = v;
+            max_column_index = j;
+        }
+    }
+
+    // Compute the location at which to start the backtrack
+    size_t i;
+    size_t j;
+
+    if(max_column_value > max_row_value) {
+        i = num_columns - 1;
+        j = max_column_index;
+        output.score = max_column_value;
+    }
+    else {
+        i = max_row_index;
+        j = num_rows - 1;
+        output.score = max_row_value;
+    }    
+
+#ifdef DEBUG_EXTEND
+    printf("BEST: %zu %zu %d\n", i, j, output.score);
+#endif
+
+    // Backtrack to fill in the cigar string and alignment start position
+    // Set the alignment endpoints to be the index of the last aligned base
+    output.match[0].end = i - 1;
+    output.match[1].end = j - 1;
+    output.length[0] = s1.length();
+    output.length[1] = s2.length();
+#ifdef DEBUG_EXTEND
+    printf("Endpoints selected: (%d %d) with score %d\n", output.match[0].end, output.match[1].end, output.score);
+#endif
+
+    output.edit_distance = 0;
+    output.total_columns = 0;
+
+	// backtract to construct cigar string
+    std::string cigar;
+    while(i > 0 && j > 0) {
+        // Compute the possible previous locations of the path
+        int idx_1 = i - 1;
+        int idx_2 = j - 1;
+
+        bool is_match = s1[idx_1] == s2[idx_2];
+        int diagonal = _getBandedAffineCellScore(cells, i - 1, j - 1, band_width, band_origin, INVALID_SCORE) + (is_match ? params.match_score : params.mismatch_penalty);
+
+		int upidx = _getBandedCellIndex(i,j-1, band_width, band_origin);
+        int up1 = cells[upidx].G - (gap_open + gap_ext);
+        int up2 = cells[upidx].I - gap_ext;
+
+		int leftidx = _getBandedCellIndex(i-1,j, band_width, band_origin);
+        int left1 = cells[leftidx].G - (gap_open + gap_ext);
+        int left2 = cells[leftidx].D - gap_ext;
+
+        int curr = _getBandedAffineCellScore(cells, i, j, band_width, band_origin, INVALID_SCORE);
 
         // If there are multiple possible paths to this cell
         // we break ties in order of insertion,deletion,match

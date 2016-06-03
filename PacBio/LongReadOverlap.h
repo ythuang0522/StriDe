@@ -26,6 +26,13 @@ namespace LongReadOverlap
                                          size_t coverage,
                                          BWTIndexSet& indices);
 
+	MultipleAlignment endMultipleAlignment(const std::string& query,
+                                                       size_t srcKmerLength,
+													   size_t min_overlap,
+                                                       double min_identity,
+                                                       size_t coverage,
+                                                       BWTIndexSet& indices);
+
 	// Retrieve matches to the query sequence
 	void retrieveMatches(const std::string& query,
                                           size_t k,
