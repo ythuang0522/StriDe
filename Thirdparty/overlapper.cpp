@@ -499,6 +499,7 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
             diagonal_score = cells[diagonal_idx] + (s1[i - 1] == s2[j - 1] ? MATCH_SCORE : MISMATCH_PENALTY);
             left_score = cells[left_idx] + GAP_PENALTY;
             up_score = cells[curr_idx - 1] + GAP_PENALTY;
+			
             cells[curr_idx] = max3(diagonal_score, left_score, up_score);
 
 #ifdef DEBUG_EXTEND
@@ -600,21 +601,66 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
         // we break ties in order of insertion,deletion,match
         // this helps left-justify matches for homopolymer runs
         // of unequal lengths
-        if(curr == up) {
-            cigar.push_back('I');
-            j -= 1;
-            output.edit_distance += 1;
-        } else if(curr == left) {
-            cigar.push_back('D');
-            i -= 1;
-            output.edit_distance += 1;
-        } else {
-            assert(curr == diagonal);
-            if(!is_match)
-                output.edit_distance += 1;
-            cigar.push_back('M');
-            i -= 1;
-            j -= 1;
+		// if( (curr == up && curr == left) || (curr == diagonal && curr == left) || (curr == diagonal && curr == up))
+			// std::cout << (curr == up && curr == left) << (curr == diagonal && curr == left) << (curr == diagonal && curr == up) << "\n";
+
+		// s2 homopolymer, prefer s2 extension
+		if(s2[idx_2] == s2[j])
+		{
+			if(curr == up) {
+				cigar.push_back('I');
+				j -= 1;
+				output.edit_distance += 1;
+			} else if(curr == left) {
+				cigar.push_back('D');
+				i -= 1;
+				output.edit_distance += 1;
+			} else {
+				assert(curr == diagonal);
+				if(!is_match)
+					output.edit_distance += 1;
+				cigar.push_back('M');
+				i -= 1;
+				j -= 1;
+			}
+		}
+		// s1 homopolymer, prefer s1 extension
+		else if(s1[idx_1] == s1[i])
+		{
+			if(curr == left) {
+				cigar.push_back('D');
+				i -= 1;
+				output.edit_distance += 1;
+			} else if(curr == up) {
+				cigar.push_back('I');
+				j -= 1;
+				output.edit_distance += 1;
+			} else {
+				assert(curr == diagonal);
+				if(!is_match)
+					output.edit_distance += 1;
+				cigar.push_back('M');
+				i -= 1;
+				j -= 1;
+			}
+		}
+		else
+		{
+			if(curr == diagonal) {
+				if(!is_match)
+					output.edit_distance += 1;
+				cigar.push_back('M');
+				i -= 1;
+				j -= 1;
+			} else if(curr == left) {
+				cigar.push_back('D');
+				i -= 1;
+				output.edit_distance += 1;
+			} else {
+				cigar.push_back('I');
+				j -= 1;
+				output.edit_distance += 1;
+			}
         }
 
         output.total_columns += 1;

@@ -21,17 +21,22 @@ MultipleAlignment LongReadOverlap::buildMultipleAlignment(const std::string& que
                                                        size_t coverage,
                                                        BWTIndexSet& indices)
 {
+    MultipleAlignment multiple_alignment;
+    multiple_alignment.addBaseSequence("query", query, "");
+
 	// forward overlap from source seed
     SequenceOverlapPairVector overlap_vector;
 	retrieveMatches(query, srcKmerLength, min_overlap, min_identity, coverage, indices, false, overlap_vector);
 
+    for(size_t i = 0; i < overlap_vector.size(); ++i)
+        multiple_alignment.addOverlap("Src", overlap_vector[i].sequence[1], "", overlap_vector[i].overlap);
+
+	size_t srcSize = overlap_vector.size();
 	// reverse overlap from target seed
 	retrieveMatches(query, tarKmerLength, min_overlap, min_identity, coverage, indices, true, overlap_vector);
 	
-    MultipleAlignment multiple_alignment;
-    multiple_alignment.addBaseSequence("query", query, "");
-    for(size_t i = 0; i < overlap_vector.size(); ++i)
-        multiple_alignment.addOverlap("null", overlap_vector[i].sequence[1], "", overlap_vector[i].overlap);
+    for(size_t i = srcSize; i < overlap_vector.size(); ++i)
+        multiple_alignment.addOverlap("Tar", overlap_vector[i].sequence[1], "", overlap_vector[i].overlap);
 
     return multiple_alignment;
 }
@@ -92,7 +97,7 @@ void LongReadOverlap::retrieveMatches(const std::string& query,
         SequenceOverlap overlap;
 
 		// bandwidth not yet completely tested. < 200 are insufficient dunno why yet. 
-        size_t bandwidth = query.length()*0.15+100; //300;
+        size_t bandwidth = query.length()*0.15+100; // 200;
 
 		// banded global DP alignment, PB requires large mismatch penalty -8
         if(isRC)
@@ -115,7 +120,8 @@ void LongReadOverlap::retrieveMatches(const std::string& query,
 
         if(bPassedOverlap && bPassedIdentity)
         {
-			// std::cout << ">" << overlap.getPercentIdentity() / 100 << ":" << overlap.getOverlapLength() << "\n" << match_sequence << "\n";
+			// std::cout << ">" << overlap.getPercentIdentity() / 100 << ":" << overlap.getOverlapLength() << "\n" ;
+			// << match_sequence << "\n";
             SequenceOverlapPair op;
             //op.sequence[0] = query;
             op.sequence[1] = match_sequence;
@@ -155,11 +161,12 @@ void LongReadOverlap::retrieveStr(const std::string& query, size_t seedSize, siz
 		// std::cout << seedOffSet << "\t" << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
 		
 		// skip repeat and low-complexity seeds
-		// if(kmerFreq >= coverage*2 || kmerFreq >= 128) return;
+		if(kmerFreq >= coverage*2 || kmerFreq >= 128) return;
 		
 		// extend each SA index and collect kmers of smallKmerSize along the extension
 		for(int64_t fwdRootIndex = fwdInterval.lower; 
-			fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper && fwdRootIndex-fwdInterval.lower < coverage; 
+			fwdInterval.isValid() && fwdRootIndex <= fwdInterval.upper 
+			&& (fwdRootIndex-fwdInterval.lower < coverage); 
 			fwdRootIndex++)
 		{		
 			// extract the string of fwdIndex via LF mapping
@@ -188,7 +195,8 @@ void LongReadOverlap::retrieveStr(const std::string& query, size_t seedSize, siz
 		
 		// LF-mapping of each rvc index	
 		for(int64_t rvcRootIndex=rvcInterval.lower; 
-			rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid() && rvcRootIndex < rvcInterval.lower < coverage; 
+			rvcRootIndex <= rvcInterval.upper && rvcInterval.isValid() && 
+			(rvcRootIndex-rvcInterval.lower < coverage); 
 			rvcRootIndex++)
 		{
 			std::string currStr = reverseComplement(initKmer);
