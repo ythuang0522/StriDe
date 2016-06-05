@@ -980,18 +980,12 @@ void PacBioCorrectionPostProcess::process(const SequenceWorkItem& item, const Pa
 /*** Seed Feature Body *****/
 /***************************/
 SeedFeature::SeedFeature(size_t startPos, std::string str, bool repeat, size_t kmerSize, size_t repeatCutoff)
-:seedStartPos(startPos), seedStr(str), isRepeat(repeat), freqUpperBound(repeatCutoff), freqLowerBound(15), minKmerSize(13), isPBSeed(false)
+	:seedStartPos(startPos), seedStr(str), isRepeat(repeat), freqUpperBound(repeatCutoff), freqLowerBound(repeatCutoff/2), 
+	minKmerSize(17), isPBSeed(false), isNextRepeat(false), stepSize(1)
 {
 	seedEndPos = seedStartPos + seedStr.length() -1;
 	seedLength = seedStr.length();
-
-	if(repeat)
-	{
-		startBestKmerSize = endBestKmerSize = seedLength>31?31: seedLength;
-						
-	}
-	else
-		startBestKmerSize = endBestKmerSize = kmerSize;
+	startBestKmerSize = endBestKmerSize = kmerSize<=seedLength?kmerSize:seedLength;
 }
 
 // append current seed string with extendedStr
@@ -1032,9 +1026,9 @@ void SeedFeature::estimateBestKmerSize(const BWT* pBWT)
 //estimate kmer size
 void SeedFeature::increaseStartKmerSize(const BWT* pBWT)
 {
-	while(startKmerFreq > freqUpperBound && startBestKmerSize <= seedLength - 2)
+	while(startKmerFreq > freqUpperBound && startBestKmerSize <= seedLength - stepSize)
 	{
-		startBestKmerSize+=2;
+		startBestKmerSize+=stepSize;
 		std::string kmerStr = seedStr.substr(0, startBestKmerSize);
 		startKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
@@ -1042,7 +1036,7 @@ void SeedFeature::increaseStartKmerSize(const BWT* pBWT)
 	// over increase kmer size
 	if(startKmerFreq < freqLowerBound)
 	{
-		startBestKmerSize-=1;
+		startBestKmerSize-=stepSize;
 		std::string kmerStr = seedStr.substr(0, startBestKmerSize);
 		startKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
@@ -1052,7 +1046,7 @@ void SeedFeature::decreaseStartKmerSize(const BWT* pBWT)
 {
 	while(startKmerFreq < freqLowerBound && startBestKmerSize > minKmerSize)
 	{
-		startBestKmerSize-=2;
+		startBestKmerSize-=stepSize;
 		std::string kmerStr = seedStr.substr(0, startBestKmerSize);
 		startKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
@@ -1060,7 +1054,7 @@ void SeedFeature::decreaseStartKmerSize(const BWT* pBWT)
 	// over reduce kmer size
 	if(startKmerFreq>freqUpperBound)
 	{
-		startBestKmerSize+=2;
+		startBestKmerSize+=stepSize;
 		std::string kmerStr = seedStr.substr(0, startBestKmerSize);
 		startKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
@@ -1069,16 +1063,17 @@ void SeedFeature::decreaseStartKmerSize(const BWT* pBWT)
 //estimate kmer size
 void SeedFeature::increaseEndKmerSize(const BWT* pBWT)
 {
-	while(endKmerFreq > freqUpperBound && endBestKmerSize <= seedLength - 2)
+	while(endKmerFreq > freqUpperBound && endBestKmerSize <= seedLength - stepSize)
 	{
-		endBestKmerSize+=2;
+		endBestKmerSize+=stepSize;
+		assert(seedLength >= endBestKmerSize);
 		std::string kmerStr = seedStr.substr(seedLength - endBestKmerSize);
 		endKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
 	
 	if(endKmerFreq < freqLowerBound)
 	{
-		endBestKmerSize-=1;
+		endBestKmerSize-=stepSize;
 		std::string kmerStr = seedStr.substr(seedLength - endBestKmerSize);
 		endKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
@@ -1088,14 +1083,14 @@ void SeedFeature::decreaseEndKmerSize(const BWT* pBWT)
 {
 	while(endKmerFreq < freqLowerBound && endBestKmerSize > minKmerSize)
 	{
-		endBestKmerSize -= 2;
+		endBestKmerSize -= stepSize;
 		std::string kmerStr = seedStr.substr(seedLength - endBestKmerSize);
 		endKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}
 	
 	if(endKmerFreq > freqUpperBound)
 	{
-		endBestKmerSize += 2;
+		endBestKmerSize += stepSize;
 		std::string kmerStr = seedStr.substr(seedLength - endBestKmerSize);
 		endKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 	}

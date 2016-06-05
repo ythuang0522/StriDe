@@ -91,12 +91,11 @@ namespace opt
 
 }
 
-static const char* shortopts = "p:t:o:K:x:L:m:k:M:f:c:C:v:r";
+static const char* shortopts = "p:t:o:K:x:L:m:k:M:f:r:c:C:v";
 
 enum { OPT_HELP = 1, OPT_VERSION };
 
 static const struct option longopts[] = {
-	{ "verbose",       no_argument,       NULL, 'v' },
 	{ "threads",       required_argument, NULL, 't' },
 	{ "outfile",       required_argument, NULL, 'o' },
 	{ "prefix",        required_argument, NULL, 'p' },
@@ -105,12 +104,14 @@ static const struct option longopts[] = {
 	{ "max-leaves",    required_argument, NULL, 'L' },
 	{ "min-overlap",   required_argument, NULL, 'm' },
 	{ "min-seed-size", required_argument, NULL, 'k' },
-	{ "coverage",      required_argument, NULL, 'c' },
-	{ "PBcoverage",    required_argument, NULL, 'C' },
 	{ "PBprefix",      required_argument,  NULL, 'f' },
 	{ "readLen",       required_argument,  NULL, 'r' },
+	{ "coverage",      required_argument, NULL, 'c' },
+	{ "PBcoverage",    required_argument, NULL, 'C' },
+	{ "verbose",       no_argument,       NULL, 'v' },
 	{ "help",          no_argument,       NULL, OPT_HELP },
 	{ "version",       no_argument,       NULL, OPT_VERSION },
+
 	{ NULL, 0, NULL, 0 }
 };
 

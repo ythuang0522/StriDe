@@ -127,6 +127,11 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 				pacbioCorrectedStrs.back().append(gainStr);
 				pacbioCorrectedStrs.back().isRepeat = target.isRepeat;
 				pacbioCorrectedStrs.back().isPBSeed = target.isPBSeed;
+				pacbioCorrectedStrs.back().isPBSeed = target.isNextRepeat;
+				pacbioCorrectedStrs.back().startBestKmerSize = target.startBestKmerSize;
+				pacbioCorrectedStrs.back().endBestKmerSize = target.endBestKmerSize;
+				pacbioCorrectedStrs.back().seedEndPos = target.seedEndPos;
+				pacbioCorrectedStrs.back().seedStartPos = target.seedStartPos;
 
 				result.correctedLen += gainStr.length();
 			}
@@ -471,6 +476,10 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 	size_t maxKmerSize=m_params.kmerLength;
 	size_t minKmerSize=m_params.minKmerLength;
 	
+	// YTH
+	// int prevRepeatEnd = -10000;
+	// size_t prevRepeatFreq = 0;
+	
 	// prevention of short reads
 	if(readSeq.length()<=maxKmerSize)
 		return seedVec;
@@ -497,7 +506,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 	}
 	
 	// search for solid kmers as seeds
-	for(size_t pos=0 ; pos+minKmerSize<=readSeq.length() ; pos++)
+	for(size_t pos=0 ; pos+minKmerSize<readSeq.length() ; pos++)
 	{
 		string kmer=readSeq.substr(pos,minKmerSize);
 		BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_params.indices.pRBWT, reverse(kmer));
@@ -513,7 +522,10 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 			// seeds from PB index will be serached instead
 			int prevSeedEndPos=seedEndPosVec.empty()?0:seedEndPosVec.back()+1;
 			int distToPrevSeed=pos+1-prevSeedEndPos;
-			if(distToPrevSeed>=m_params.PBSearchDepth)
+
+			// skip repeat regions
+			// bool isWithinRepeat = pos - prevRepeatEnd < m_params.PBSearchDepth;
+			if(/*!isWithinRepeat &&*/ distToPrevSeed>=m_params.PBSearchDepth)
 			{
 				// if(seedingByPacBio(readSeq,seedVec,seedEndPosVec,prevSeedEndPos))
 				if(seedingByPacBio_v2(readSeq,seedVec,seedEndPosVec,prevSeedEndPos))
@@ -543,7 +555,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 			}
 			BWTAlgorithms::updateInterval(fwdInterval,b,m_params.indices.pRBWT);
 			BWTAlgorithms::updateInterval(rvcInterval,rcb,m_params.indices.pBWT);
-			kmerFreqs=fwdInterval.size()+rvcInterval.size();
+			kmerFreqs = fwdInterval.isValid()?fwdInterval.size():0 + rvcInterval.isValid()?rvcInterval.size():0;
 			
 			dynamicKmerSize++;			
 			assert(dynamicKmerSize<=kmerThreshold.size());
@@ -568,17 +580,34 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::seedingByDynamicKmer_v3(
 		size_t seedEndPos=pos-1;
 
 		// repeat seeds are less accurate at boundary and should be trimmed 
-		if(maxKmerFreq>m_params.coverage*4)
+		if(maxKmerFreq >= m_params.coverage*4)
+		{
 			trimRepeatSeed(readSeq,m_params.coverage,seedStartPos,seedEndPos);
 
+		}
+		
+		// bool isTooCloseToPrevSeed = seedEndPos - prevRepeatEnd <= prevRepeatFreq*0.02+100;
+		// if(isTooCloseToPrevSeed)
+			// continue;
+				
 		// super repeat seeds with frequency > 2000 are troublesome, often lead to -3 but no good solution so far, mark first
 		bool isSuperRepeat=maxKmerFreq>m_params.coverage*15?true:false;
-		SeedFeature newSeed(seedStartPos,readSeq.substr(seedStartPos,seedEndPos-seedStartPos+1),isSuperRepeat,dynamicKmerSize,dynamicKmerThreshold*4);
+		SeedFeature newSeed(seedStartPos, readSeq.substr(seedStartPos, seedEndPos-seedStartPos+1), isSuperRepeat, dynamicKmerSize, m_params.PBcoverage/2);
+		newSeed.estimateBestKmerSize(m_params.PBindices.pBWT);
+
+		// Some high-GC error seeds have unexpected large freq
+		size_t PBkmerFreq = BWTAlgorithms::countSequenceOccurrences(newSeed.seedStr, m_params.PBindices);
+		if(PBkmerFreq > m_params.PBcoverage/4)
+			continue;
 
 		// skip low-complexity sequencing errors of PacBio
-		// bool isShortAndHighFreq = i-seedStartPos <= 2 && maxKmerFreq > 80;
 		if(!isLowComplexity(newSeed.seedStr,0.9))
+		{
+			// std::cout << ">" << seedStartPos << ":" << maxKmerFreq << ":" << readSeq.substr(seedStartPos,seedEndPos-seedStartPos+1) << "\t" 
+			// << prevRepeatEnd << ":" << PBkmerFreq << "\n";
+
 			seedVec.push_back(newSeed);
+		}
 			
 		seedEndPosVec.push_back(seedEndPos);
 		// jump to the index after new seed
@@ -693,7 +722,7 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio_v2(const string& readSeq, st
 	}
 	
 	// search for solid kmers as seeds
-	for(size_t pos=prevEndPos ; pos+m_params.PBKmerLength<=readSeq.length() && pos-prevEndPos <= m_params.PBSearchDepth ; pos++)
+	for(size_t pos=prevEndPos ; pos+m_params.PBKmerLength<readSeq.length() && pos-prevEndPos <= m_params.PBSearchDepth ; pos++)
 	{
 		size_t dynamicKmerSize = m_params.PBKmerLength;
 
@@ -710,7 +739,7 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio_v2(const string& readSeq, st
 		size_t maxKmerFreq=kmerFreqs;
 		
 		// search for longest solid kmer as one seed if possible
-		for(pos=pos+dynamicKmerSize ; pos<readSeq.length() ; pos++)
+		for(pos=pos+dynamicKmerSize ; pos+dynamicKmerSize<readSeq.length() ; pos++)
 		{
 			char b=readSeq.at(pos);
 			char rcb;
@@ -723,10 +752,12 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio_v2(const string& readSeq, st
 			}
 			BWTAlgorithms::updateInterval(fwdInterval,b,m_params.PBindices.pRBWT);
 			BWTAlgorithms::updateInterval(rvcInterval,rcb,m_params.PBindices.pBWT);
-			kmerFreqs=fwdInterval.size()+rvcInterval.size();
+			kmerFreqs=fwdInterval.isValid()?fwdInterval.size():0 + rvcInterval.isValid()?rvcInterval.size():0;
 			
-			dynamicKmerSize++;			
-			assert(dynamicKmerSize<=kmerThreshold.size());
+			dynamicKmerSize++;
+			// assert(dynamicKmerSize<=kmerThreshold.size());
+			if(dynamicKmerSize>=kmerThreshold.size()) break;
+			
 			dynamicKmerThreshold=kmerThreshold.at(dynamicKmerSize);
 			
 			if(kmerFreqs>=dynamicKmerThreshold)
@@ -741,12 +772,9 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio_v2(const string& readSeq, st
 
 		//skip repeat seeds
 		if(maxKmerFreq >= m_params.PBcoverage*2)
-		// if(maxKmerFreq > 200)
 			continue;
 
 		// require sufficient seed length in repeats
-		// if(i-seedStartPos <= 4)
-		// if(dynamicKmerSize-m_params.PBKmerLength <= 4)
 		if(maxKmerFreq >= m_params.PBcoverage && dynamicKmerSize-m_params.PBKmerLength <= 4)
 			// std::cout << readSeq.substr(seedStartPos, i+dynamicKmerSize-2-seedStartPos+1) << "\n";
 			continue;
@@ -759,9 +787,8 @@ bool PacBioHybridCorrectionProcess::seedingByPacBio_v2(const string& readSeq, st
 
 		// super repeat seeds with frequency > 2000 are troublesome, often lead to -3 but no good solution so far, mark first
 		bool isSuperRepeat = maxKmerFreq >= m_params.PBcoverage?true:false;
-		// bool isSuperRepeat = maxKmerFreq > m_params.coverage*4?true:false;
-		// SeedFeature newSeed(seedStartPos, readSeq.substr(seedStartPos, seedEndPos-seedStartPos+1), isSuperRepeat, dynamicKmerSize, m_params.coverage*4);
-		SeedFeature newSeed(seedStartPos, readSeq.substr(seedStartPos, seedEndPos-seedStartPos+1), isSuperRepeat, dynamicKmerSize, m_params.PBcoverage);
+		SeedFeature newSeed(seedStartPos, readSeq.substr(seedStartPos, seedEndPos-seedStartPos+1), isSuperRepeat, dynamicKmerSize, m_params.PBcoverage/2);
+		newSeed.estimateBestKmerSize(m_params.PBindices.pBWT);
 
 		// skip low-complexity sequencing errors of PacBio
 		// bool isShortAndHighFreq = i-seedStartPos <= 2 && maxKmerFreq > 80;
@@ -840,11 +867,8 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature& source, SeedF
 		// std::cout << "\nfmwalk id: " << debugTargetSeed << ", dis_between_src_target length: " << dis_between_src_target << "\t"<< minOverlap << ".----\n";
 	// }
 	
-	// Give up long extensions > 2kb, by YTH, 20150419
-	// if(dis_between_src_target > 2000) return -4;
-
 	bool isSequencingGap = false;
-	bool isSeedfromPB = source.isPBSeed || target.isPBSeed;
+	bool isSeedfromPB = source.isPBSeed || target.isPBSeed || source.isNextRepeat;
 	
 	// Correction by FM-index extension from source to target with iterative minOverlap reduction
 	while( (FMWalkReturnType == -1 || FMWalkReturnType == -2) && 
@@ -913,21 +937,26 @@ int PacBioHybridCorrectionProcess::extendBetweenSeeds(SeedFeature& source, SeedF
 		if(source.isRepeat && minOverlap < m_params.kmerLength-1) break;
 	}
 
-	// std::cout << FMWalkReturnType << "\t" << target.seedStr << "\t" << source.isRepeat << target.isRepeat << source.isPBSeed << target.isPBSeed << "\n";
+	// std::cout << FMWalkReturnType << "\t" << target.seedStr << "\t" << source.isNextRepeat << target.isRepeat << source.isPBSeed << target.isPBSeed << "\n";
 	
 	// try correction by MSA using FM-index of low quality long reads for sequencing gaps
 	if( (FMWalkReturnType == -2 || FMWalkReturnType == -1) && !source.isRepeat && !target.isRepeat 
 		&& (isSequencingGap || isSeedfromPB) )
 	{
 		// mimic the overlap correction process
-		const std::string query = source.seedStr.substr(source.seedLength - m_params.PBKmerLength)+strBetweenSrcTarget.substr(10, dis_between_src_target)+target.seedStr;
-		
+		// const std::string query = source.seedStr.substr(source.seedLength - m_params.PBKmerLength)+strBetweenSrcTarget.substr(10, dis_between_src_target)+target.seedStr;
+
+		// switch to best kmer in PB index
+		const std::string query = source.seedStr.substr(source.seedLength - source.endBestKmerSize)+strBetweenSrcTarget.substr(10, dis_between_src_target)+target.seedStr;
+		size_t sourceKmerLength = source.endBestKmerSize;
+		size_t targetKmerLength = target.endBestKmerSize;
+
 		// std::cout << minOverlap << "\t" << query.length() << "\n" << query << "\n";
 		
 		// Self correction by aligning all reads having seeds with query
 		MultipleAlignment maquery = LongReadOverlap::buildMultipleAlignment(query,
-													m_params.PBKmerLength, 
-													m_params.PBKmerLength,
+													sourceKmerLength, //m_params.PBKmerLength, 
+													targetKmerLength, //m_params.PBKmerLength,
 													query.length()/10, 
 													0.73,	// alignment identity < 0.7 are often false positive repeats
 													m_params.PBcoverage,

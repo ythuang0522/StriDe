@@ -37,6 +37,7 @@ struct SeedFeature
 		std::string seedStr;
 		bool isRepeat;
 		bool isPBSeed;
+		bool isNextRepeat;
 		
 		// estimated by calling estimateBestKmerSize
 		size_t startBestKmerSize;
@@ -48,7 +49,7 @@ struct SeedFeature
 		size_t freqUpperBound;
 		size_t freqLowerBound;
 		size_t minKmerSize;
-		
+		size_t stepSize;
 		//estimate kmer size
 		void increaseStartKmerSize(const BWT* pBWT);
 		void decreaseStartKmerSize(const BWT* pBWT);
