@@ -54,6 +54,7 @@ struct MultipleAlignmentElement
     // or a gap character
     inline char getColumnSymbol(size_t column_idx) const
     {
+		if(column_idx >= getNumColumns()) std::cout << column_idx << "\n";
         assert(column_idx < getNumColumns());
         if(column_idx < leading_columns || column_idx >= leading_columns + padded_sequence.size()) {
             return '\0';
@@ -205,6 +206,8 @@ class MultipleAlignment
         // Leading/trailing bases are trimmed from the consensus sequence if there is less than
         // min_trim_coverage depth at the ends of the base sequence.
         std::string calculateBaseConsensus(int min_call_coverage, int min_trim_coverage);
+        std::string calculateBaseConsensus2(int min_call_coverage, int min_trim_coverage);
+
         std::string calculateBaseConsensus(KmerContext &kc, size_t KmerThreshold);
 
         // Calculate consensus sequence of the base element that maximizes the likelihood of the multiple alignment
@@ -314,6 +317,7 @@ class MultipleAlignment
 
         // Return a vector of counts for each base call for the given column
         std::vector<int> getColumnBaseCounts(size_t idx) const;
+		std::vector<int> getTwoColumnCounts(size_t idx) const;
 
         // Data
         std::vector<MultipleAlignmentElement> m_sequences;

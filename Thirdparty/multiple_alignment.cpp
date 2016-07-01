@@ -586,6 +586,79 @@ std::string MultipleAlignment::calculateBaseConsensus(int min_call_coverage, int
     return consensus_sequence;
 }
 
+// majority vote by two bases instead of only one
+std::string MultipleAlignment::calculateBaseConsensus2(int min_call_coverage, int min_trim_coverage)
+{
+    assert(!m_sequences.empty());
+    std::string consensus_sequence;
+    MultipleAlignmentElement& base_element = m_sequences.front();
+    size_t start_column = base_element.getStartColumn();
+    size_t end_column = base_element.getEndColumn();
+
+    // This index records the last base in the consensus that had coverage greater than
+    // min_trim_coverage. After the consensus calculation the read is trimmed back to this position
+    int last_good_base = -1;
+
+    for(size_t c = start_column; c <= end_column; ++c) {
+        std::vector<int> counts = getTwoColumnCounts(c);
+
+        char max_symbol = '\0';
+        int max_count = -1;
+        int total_depth = 0;
+
+#ifdef MA_DEBUG_CONSENSUS
+        printf("%zu\t", c);
+#endif
+        for(size_t a = 0; a < m_alphabet_size; ++a) {
+            char symbol = m_alphabet[a];
+            total_depth += counts[a];
+
+            if(symbol != 'N' && counts[a] > max_count) {
+                max_symbol = symbol;
+                max_count = counts[a];
+            }
+#ifdef MA_DEBUG_CONSENSUS
+            printf("%c:%d ", symbol, counts[a]);
+#endif
+        }
+
+        char base_symbol = base_element.getColumnSymbol(c);
+        int base_count = counts[symbol2index(base_symbol)];
+
+        // Choose a consensus base for this column. Only change a base
+        // if has been seen less than min_call_coverage times and the max
+        // base in the column has been seen more times than the base symbol
+        char consensus_symbol;
+        if(max_count >= base_count && base_count < min_call_coverage)
+            consensus_symbol = max_symbol;
+        else
+            consensus_symbol = base_symbol;
+
+        // Output a symbol to the consensus. Skip padding symbols and leading
+        // bases that are less than the minimum required depth to avoid trimming
+        if(consensus_symbol != '-' &&
+            (!consensus_sequence.empty() || total_depth >= min_trim_coverage))
+                consensus_sequence.push_back(consensus_symbol);
+
+        // Record the position of the last good base
+        if(total_depth >= min_trim_coverage) {
+            int consensus_index = consensus_sequence.size() - 1;
+            if(consensus_index > last_good_base)
+                last_good_base = consensus_index;
+        }
+#ifdef MA_DEBUG_CONSENSUS
+        printf("CALL: %c\n", consensus_symbol);
+#endif
+    }
+
+    if(last_good_base != -1)
+        consensus_sequence.erase(last_good_base + 1);
+    else
+        consensus_sequence.clear();
+
+    return consensus_sequence;
+}
+
 std::string MultipleAlignment::calculateBaseConsensus(KmerContext &kc, size_t KmerThreshold)
 {
     assert(!m_sequences.empty());
@@ -1220,6 +1293,39 @@ std::vector<int> MultipleAlignment::getColumnBaseCounts(size_t idx) const
             out[symbol2index(symbol)] += 1;
         }
     }
+    return out;
+}
+
+//
+std::vector<int> MultipleAlignment::getTwoColumnCounts(size_t idx) const
+{
+	int counts[m_alphabet_size][m_alphabet_size][m_alphabet_size]={0};
+	// cheat 1st base as duplicate
+	size_t prevIdx = (idx == 0)?0:idx-1;
+	size_t nextIdx = (idx >= getNumColumns()-1)?idx:idx+1;
+
+	// count frequency of two bases
+    for(size_t i = 0; i < m_sequences.size(); ++i) {
+        char symbol = m_sequences[i].getColumnSymbol(idx);
+        char prevSymbol = m_sequences[i].getColumnSymbol(prevIdx);
+		char nextSymbol = m_sequences[i].getColumnSymbol(nextIdx);
+
+        if(symbol != '\0' && prevSymbol != '\0' && nextSymbol != '\0') {
+            counts[symbol2index(symbol)][symbol2index(prevSymbol)][symbol2index(nextSymbol)] += 1;
+        }
+    }
+	
+	// search max count for each alphabet base
+	std::vector<int> out(m_alphabet_size, 0);
+	for(size_t i = 0; i < m_alphabet_size; ++i)
+	{
+		int maxCount = -1;
+		for(size_t j = 0; j < m_alphabet_size; ++j)
+			for(size_t k = 0; k < m_alphabet_size; ++k)
+				if(counts[i][j][k] > maxCount) maxCount = counts[i][j][k];
+		
+		out[i] = maxCount;
+	}
     return out;
 }
 

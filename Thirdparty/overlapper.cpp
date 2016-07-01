@@ -403,6 +403,20 @@ inline int _getBandedCellScore(const DPCells& cells, int i, int j, int band_widt
     return (band_row_index >= 0 && band_row_index < band_width) ? cells[i * band_width + band_row_index] : invalid_score;
 }
 
+inline int _getBandedCellIndex2(int i, int j, int band_width, int band_origin, int start)
+{
+    int band_start = band_origin + i;// i = leftMostPos
+    int band_row_index = j - band_start;
+    return (band_row_index >= 0 && band_row_index < band_width) ? (i-start+1) * band_width + band_row_index : -1;
+}
+
+// Returns the score for (i,j) in the band
+inline int _getBandedCellScore2(const DPCells& cells, int i, int j, int band_width, int band_origin, int start, int invalid_score)
+{
+    int band_start = band_origin + i;
+    int band_row_index = j - band_start;
+    return (band_row_index >= 0 && band_row_index < band_width) ? cells[(i-start+1) * band_width + band_row_index] : invalid_score;
+}
 
 SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string& s2, 
                                         int start_1, int start_2, int band_width,
@@ -495,10 +509,13 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
             assert(left_idx == _getBandedCellIndex(i - 1, j, band_width, band_origin));
             assert(curr_idx - 1 == _getBandedCellIndex(i, j - 1, band_width, band_origin));
 #endif
-
+			
             diagonal_score = cells[diagonal_idx] + (s1[i - 1] == s2[j - 1] ? MATCH_SCORE : MISMATCH_PENALTY);
             left_score = cells[left_idx] + GAP_PENALTY;
             up_score = cells[curr_idx - 1] + GAP_PENALTY;
+
+			// if(i == start_1 && j== start_2)
+				// diagonal_score = 100000;
 			
             cells[curr_idx] = max3(diagonal_score, left_score, up_score);
 
@@ -616,6 +633,8 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
 				i -= 1;
 				output.edit_distance += 1;
 			} else {
+				// if(i == start_1 && j == start_2) std::cout << "haha\n";
+
 				assert(curr == diagonal);
 				if(!is_match)
 					output.edit_distance += 1;
@@ -636,6 +655,7 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
 				j -= 1;
 				output.edit_distance += 1;
 			} else {
+				// if(i == start_1 && j == start_2) std::cout << "haha\n";
 				assert(curr == diagonal);
 				if(!is_match)
 					output.edit_distance += 1;
@@ -647,6 +667,7 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
 		else
 		{
 			if(curr == diagonal) {
+				// if(i == start_1 && j == start_2) std::cout << "haha\n";
 				if(!is_match)
 					output.edit_distance += 1;
 				cigar.push_back('M');
@@ -657,6 +678,7 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
 				i -= 1;
 				output.edit_distance += 1;
 			} else {
+				assert(curr == up);
 				cigar.push_back('I');
 				j -= 1;
 				output.edit_distance += 1;
@@ -675,6 +697,315 @@ SequenceOverlap Overlapper::extendMatch(const std::string& s1, const std::string
     std::reverse(cigar.begin(), cigar.end());
     assert(!cigar.empty());
     output.cigar = compactCigar(cigar);
+    return output;
+}
+
+
+SequenceOverlap Overlapper::bandedAlignment(const std::string& s1, const std::string& s2, 
+                                        int start_1, int start_2, int band_width,
+										const int MATCH_SCORE, const int GAP_PENALTY,const int MISMATCH_PENALTY)
+{
+    SequenceOverlap output;
+    int num_columns = s1.size() + 1;
+    int num_rows = s2.size() + 1;
+    
+    // Calculate the number of cells off the diagonal to compute
+    int half_width = band_width / 2;
+    band_width = half_width * 2 + 1; // the total number of cells per band
+
+    // Allocate bands with uninitialized scores
+    int INVALID_SCORE = std::numeric_limits<int>::min();
+
+    // Calculate the band center coordinates in the first
+    // column of the multiple alignment. These are calculated by
+    // projecting the match diagonal onto the first column. It is possible
+    // that these are negative.
+    int band_center = start_2 - start_1 + 1;
+    int band_origin = band_center - (half_width + 1);
+// #ifdef DEBUG_EXTEND
+    // printf("Match start: [%d %d]\n", start_1, start_2);
+    // printf("Band center, origin: [%d %d]\n", band_center, band_origin);
+    // printf("Num cells: %zu\n", cells.size());
+// #endif
+
+    // Fill in the bands column by column
+	int leftMostPos = start_1 - start_2 - 100;
+	if(leftMostPos < 1) leftMostPos = 1;
+	int rightMostPos = start_1 + s2.length() - start_2 + 100;
+	if(rightMostPos > num_columns) rightMostPos = num_columns;
+
+	// DPCells cells(rightMostPos*band_width, 0);
+	DPCells cells((rightMostPos-leftMostPos+2)*band_width, 0);
+
+	int bestScore = -1000, bestI=leftMostPos, bestJ;
+    for(int i = leftMostPos; i < rightMostPos; ++i) {
+
+		int j = band_origin + i; // start row of this band
+        int end_row = j + band_width;
+
+		// hueristic speedup by only keeping 200 candidates rows surrounding bestJ
+		// if(i - bestI > 1000) return output;
+		// if(bestScore >= 500) 
+		// {
+			// int oldJ = band_origin + i;
+			// j = bestJ-100;
+			// if(j < band_origin +i) j = band_origin + i;
+			// end_row = j + 200;
+			// if(end_row > oldJ + band_width) end_row = oldJ + band_width;
+		// }
+		// bestScore = -100000;
+
+        // Trim band coordinates to only compute valid positions
+        if(j < 1)
+            j = 1;
+        if(end_row > num_rows)
+            end_row = num_rows;
+
+        if(end_row <= 0 || j >= num_rows || j >= end_row)
+            continue; // nothing to do for this column
+
+        // Fill in this band. To avoid the need to perform many tests whether a particular cell
+        // is stored in a band, we do some of the calculations outside of the main loop below. 
+        // We first calculate the score for the first cell in the band. This calculation cannot
+        // involve the cell above the first row so we ignore it below. We then fill in the main
+        // part of the band, which can perform valid reads from all its neighboring cells. Finally
+        // we calculate the last row, which does not use the cell to its left.
+
+        // Set up initial indices and scores
+        int curr_idx = _getBandedCellIndex2(i, j, band_width, band_origin, leftMostPos);
+        int left_idx = _getBandedCellIndex2(i - 1, j, band_width, band_origin, leftMostPos);
+        int diagonal_idx = _getBandedCellIndex2(i - 1, j - 1, band_width, band_origin, leftMostPos);
+        int diagonal_score = cells[diagonal_idx] + (s1[i - 1] == s2[j - 1] ? MATCH_SCORE : MISMATCH_PENALTY);
+        int left_score = left_idx != -1 ? cells[left_idx] + GAP_PENALTY : INVALID_SCORE;
+        int up_score = 0;
+
+        // Set the first row score
+        cells[curr_idx] = std::max(left_score, diagonal_score);
+		// if(cells[curr_idx] > bestScore)
+		// {
+			// bestScore = cells[curr_idx];
+			// bestI = i;
+			// bestJ = j;
+		// }
+
+        // printf("Filled [%d %d] = %d\n", i , j, cells[curr_idx]);
+        // assert(_getBandedCellIndex(i,j, band_width, band_origin) != -1);
+        // assert(diagonal_idx != -1);
+
+        // Update indices
+        curr_idx += 1;
+        left_idx += 1;
+        diagonal_idx += 1;
+        j += 1;
+
+        // Fill in the main part of the band, stopping before the last row
+        while(j < end_row - 1) {
+
+#ifdef DEBUG_EXTEND
+            // assert(diagonal_idx == _getBandedCellIndex(i - 1, j - 1, band_width, band_origin));
+            // assert(left_idx == _getBandedCellIndex(i - 1, j, band_width, band_origin));
+            // assert(curr_idx - 1 == _getBandedCellIndex(i, j - 1, band_width, band_origin));
+#endif
+			
+            diagonal_score = cells[diagonal_idx] + (s1[i - 1] == s2[j - 1] ? MATCH_SCORE : MISMATCH_PENALTY);
+            left_score = cells[left_idx] + GAP_PENALTY;
+            up_score = cells[curr_idx - 1] + GAP_PENALTY;
+
+			// if(i == start_1 && j== start_2)
+				// diagonal_score = 100000;
+			
+            cells[curr_idx] = max3(diagonal_score, left_score, up_score);
+			// if(cells[curr_idx] > bestScore)
+			// {
+				// bestScore = cells[curr_idx];
+				// bestI = i;
+				// bestJ = j;
+			// }
+
+            // printf("Filled [%d %d] = %d\n", i , j, cells[curr_idx]);
+            // assert(_getBandedCellIndex(i,j, band_width, band_origin) != -1);
+            // Update indices
+            curr_idx += 1;
+            left_idx += 1;
+            diagonal_idx += 1;
+            j += 1;
+        }
+
+        // Fill in last row, here we ignore the left cell which is now out of band
+        // if(j != end_row) {
+		if(j < end_row) {
+            diagonal_score = cells[diagonal_idx] + (s1[i - 1] == s2[j - 1] ? MATCH_SCORE : MISMATCH_PENALTY);
+            up_score = cells[curr_idx - 1] + GAP_PENALTY;
+            cells[curr_idx] = std::max(diagonal_score, up_score);
+			// if(cells[curr_idx] > bestScore)
+			// {
+				// bestScore = cells[curr_idx];
+				// bestI = i;
+				// bestJ = j;
+			// }
+
+            // printf("Filled [%d %d] = %d\n", i , j, cells[curr_idx]);
+            // assert(_getBandedCellIndex(i,j, band_width, band_origin) != -1);
+        }
+    }
+	
+    // The location of the highest scoring match in the
+    // last row or last column is the maximum scoring overlap
+    // for the pair of strings. We start the backtracking from
+    // that cell
+    int max_row_value = std::numeric_limits<int>::min();
+    int max_column_value = std::numeric_limits<int>::min();
+    size_t max_row_index = 0;
+    size_t max_column_index = 0;
+
+    // Check every column of the last row
+    // The first column is skipped to avoid empty alignments
+    // for(int i = 1; i < num_columns; ++i) {
+	for(int i = leftMostPos; i < rightMostPos; ++i) {
+        int v = _getBandedCellScore2(cells, i, num_rows - 1, band_width, band_origin, leftMostPos, INVALID_SCORE); 
+        if(v > max_row_value) {
+            max_row_value = v;
+            max_row_index = i;
+        }
+    }
+
+	for(int j = 1; j < num_rows; ++j) {
+        int v = _getBandedCellScore2(cells, rightMostPos - 1, j, band_width, band_origin, leftMostPos, INVALID_SCORE); 
+        if(v > max_column_value) {
+            max_column_value = v;
+            max_column_index = j;
+        }
+    }
+	
+    // Compute the location at which to start the backtrack
+    size_t i;
+    size_t j;
+
+    if(max_column_value > max_row_value) {
+        // i = num_columns - 1;
+		i = rightMostPos - 1;
+        j = max_column_index;
+        output.score = max_column_value;
+    }
+    else {
+        i = max_row_index;
+        j = num_rows - 1;
+        output.score = max_row_value;
+    }    
+
+	// if(output.score < 100) return output;
+// #ifdef DEBUG_EXTEND
+    // printf("BEST:\t%zu %zu %zu %zu %d %d %d\n", i, j, start_1, start_2, j-i, start_2-start_1, output.score);
+	// printf("LocalBEST:\t%zu %zu %d\n", bestI, bestJ, bestScore);
+// #endif
+
+    // Backtrack to fill in the cigar string and alignment start position
+    // Set the alignment endpoints to be the index of the last aligned base
+    output.match[0].end = i - 1;
+    output.match[1].end = j - 1;
+    output.length[0] = s1.length();
+    output.length[1] = s2.length();
+#ifdef DEBUG_EXTEND
+    printf("Endpoints selected: (%d %d) with score %d\n", output.match[0].end, output.match[1].end, output.score);
+#endif
+
+    output.edit_distance = 0;
+    output.total_columns = 0;
+
+    std::string cigar;
+	cigar.reserve(s1.length());
+	while(i > leftMostPos -1 && j > 0){
+        // Compute the possible previous locations of the path
+        int idx_1 = i - 1;
+        int idx_2 = j - 1;
+
+        bool is_match = s1[idx_1] == s2[idx_2];
+        int diagonal = _getBandedCellScore2(cells, i - 1, j - 1, band_width, band_origin, leftMostPos, INVALID_SCORE) + (is_match ? MATCH_SCORE : MISMATCH_PENALTY);
+        int up = _getBandedCellScore2(cells, i, j - 1, band_width, band_origin, leftMostPos, INVALID_SCORE) + GAP_PENALTY;
+        int left =  _getBandedCellScore2(cells, i -1 , j, band_width, band_origin, leftMostPos, INVALID_SCORE) + GAP_PENALTY;
+        int curr = _getBandedCellScore2(cells, i, j, band_width, band_origin, leftMostPos, INVALID_SCORE);
+
+        // If there are multiple possible paths to this cell
+        // we break ties in order of insertion,deletion,match
+        // this helps left-justify matches for homopolymer runs
+        // of unequal lengths
+		// s2 homopolymer, prefer s2 extension
+		if(s2[idx_2] == s2[j])
+		{
+			if(curr == up) {
+				cigar.push_back('I');
+				j -= 1;
+				output.edit_distance += 1;
+			} else if(curr == left) {
+				cigar.push_back('D');
+				i -= 1;
+				output.edit_distance += 1;
+			} else {
+				// if(curr != diagonal) std::cout << i << ":" << j << ":" << diagonal << ":" << curr << ":"
+											// << up << ":" <<left << "\n";
+				assert(curr == diagonal);
+				if(!is_match)
+					output.edit_distance += 1;
+				cigar.push_back('M');
+				i -= 1;
+				j -= 1;
+			}
+		}
+		// s1 homopolymer, prefer s1 extension
+		else if(s1[idx_1] == s1[i])
+		{
+			if(curr == left) {
+				cigar.push_back('D');
+				i -= 1;
+				output.edit_distance += 1;
+			} else if(curr == up) {
+				cigar.push_back('I');
+				j -= 1;
+				output.edit_distance += 1;
+			} else {
+				// if(i == start_1 && j == start_2) std::cout << "haha\n";
+				assert(curr == diagonal);
+				if(!is_match)
+					output.edit_distance += 1;
+				cigar.push_back('M');
+				i -= 1;
+				j -= 1;
+			}
+		}
+		else
+		{
+			if(curr == diagonal) {
+				// if(i == start_1 && j == start_2) std::cout << "haha\n";
+				if(!is_match)
+					output.edit_distance += 1;
+				cigar.push_back('M');
+				i -= 1;
+				j -= 1;
+			} else if(curr == left) {
+				cigar.push_back('D');
+				i -= 1;
+				output.edit_distance += 1;
+			} else {
+				assert(curr == up);
+				cigar.push_back('I');
+				j -= 1;
+				output.edit_distance += 1;
+			}
+        }
+
+        output.total_columns += 1;
+    }
+
+    // Set the alignment startpoints
+    output.match[0].start = i;
+    output.match[1].start = j;
+
+    // Compact the expanded cigar string into the canonical run length encoding
+    // The backtracking produces a cigar string in reversed order, flip it
+    std::reverse(cigar.begin(), cigar.end());
+    assert(!cigar.empty());
+    output.cigar = compactCigar(cigar);
+	// std::cout << output.cigar << "\n"; 
     return output;
 }
 

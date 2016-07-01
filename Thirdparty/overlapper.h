@@ -155,6 +155,10 @@ SequenceOverlap computeOverlap(const std::string& s1, const std::string& s2, con
 SequenceOverlap extendMatch(const std::string& s1, const std::string& s2, int start_1, int start_2, 
 					int bandwidth, const int MATCH_SCORE = 2, const int GAP_PENALTY = -5,const int MISMATCH_PENALTY = -3);
 
+// seedup version of extendMatch which uses only time and space of the shorter S2 instead of longer S1
+SequenceOverlap bandedAlignment(const std::string& s1, const std::string& s2, int start_1, int start_2, 
+					int bandwidth, const int MATCH_SCORE = 2, const int GAP_PENALTY = -5,const int MISMATCH_PENALTY = -3);
+
 // Perform an alignment using affine gap penalties
 SequenceOverlap computeOverlapAffine(const std::string& s1, const std::string& s2, const OverlapperParams params = default_params);
 

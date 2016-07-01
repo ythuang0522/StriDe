@@ -69,7 +69,7 @@ else
 fi
 
 # Set compiler flags.
-AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Wno-unknown-pragmas -static")
+AC_SUBST(AM_CXXFLAGS, "-std=c++11 -Wall -Wextra -Wno-unknown-pragmas -static")
 #AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Wno-unknown-pragmas")
 AC_SUBST(CXXFLAGS, "-O3")
 AC_SUBST(CFLAGS, "-O3")
