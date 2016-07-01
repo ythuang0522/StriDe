@@ -24,6 +24,8 @@ struct SeedFeature
 {
 	public:
 		SeedFeature(size_t startPos, std::string str, bool repeat, size_t kmerSize, size_t repeatCutoff);
+
+		SeedFeature(){};
 		
 		// append current seed string with extendedStr
 		void append(std::string extendedStr);

@@ -22,6 +22,7 @@ struct SequenceOverlapPair
     SequenceOverlap overlap;
 
     static bool sortByOverlapLengthDesc(const SequenceOverlapPair& a, const SequenceOverlapPair& b) { return a.overlap.getOverlapLength() > b.overlap.getOverlapLength(); }
+    static bool sortByOverlapIdentityDesc(const SequenceOverlapPair& a, const SequenceOverlapPair& b) { return a.overlap.getPercentIdentity() > b.overlap.getPercentIdentity(); }
 
 };
 typedef std::vector<SequenceOverlapPair> SequenceOverlapPairVector;

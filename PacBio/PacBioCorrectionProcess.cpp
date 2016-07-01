@@ -1007,7 +1007,6 @@ void SeedFeature::estimateBestKmerSize(const BWT* pBWT)
 	std::string kmerStr = seedStr.substr(0, startBestKmerSize);
 	startKmerFreq = BWTAlgorithms::countSequenceOccurrences(kmerStr, pBWT);
 
-		
 	if(startKmerFreq > freqUpperBound)
 		increaseStartKmerSize(pBWT);
 	else if(startKmerFreq < freqLowerBound)

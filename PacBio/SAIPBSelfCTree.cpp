@@ -338,7 +338,9 @@ void SAIPBSelfCorrectTree::insertKmerToHash(std::string& insertedKmer, size_t se
 		else
 			newEntry = new KmerFeatures(expectedLength - currentLength + smallKmerSize, maxLength);
 			
-		kmerHash.insert(std::make_pair<std::string, KmerFeatures*>(insertedKmer, newEntry));
+		// kmerHash.insert(std::make_pair<std::string, KmerFeatures*>(insertedKmer, newEntry));
+		// C++ 11
+		kmerHash.insert(std::make_pair(insertedKmer, newEntry));
 	}
 	else
 	{
