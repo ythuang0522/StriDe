@@ -119,7 +119,8 @@ std::string StdAlnTools::expandCigar(const std::string& cigar)
     char code;
     while(parser >> length)
     {
-        bool success = parser >> code;
+        // bool success = parser >> code;
+		bool success = static_cast<bool>(parser >> code);
         expanded.append(length, code);
         assert(success);
         (void)success;
