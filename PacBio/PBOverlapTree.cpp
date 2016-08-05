@@ -259,81 +259,82 @@ bool PBOverlapTree::PrunedBySeedSupport()
 // Identify new seeds wrt currSeedIdx
 bool PBOverlapTree::isSupportedByNewSeed(SAIOverlapNode* currNode, size_t smallSeedIdx, size_t largeSeedIdx)
 {
-		// If there is mismatch/indel, jump to the next m_seedSize/m_seedDist, and 1 otherwise.
-		size_t seedIdxOffset = currNode->lastOverlapLen < m_currentLength-m_seedSize?
-								m_seedSize/m_seedDist:
-								//
-								m_currentLength - currNode->lastOverlapLen;
+	// If there is mismatch/indel, jump to the next m_seedSize/m_seedDist, and 1 otherwise.
+	size_t seedIdxOffset = currNode->lastOverlapLen < m_currentLength-m_seedSize?
+							m_seedSize/m_seedDist:
+							//
+							m_currentLength - currNode->lastOverlapLen;
 
-		// search for new seed starting from last matched seed or smallSeedIdx
-		size_t startSeedIdx = std::max(smallSeedIdx, currNode->lastSeedIdx+seedIdxOffset);
-		
-		bool isNewSeedFound = false;
-		BWTIntervalPair currIntervalPair = currNode->currIntervalPair;
-		
-		// sequenctial search for new seeds within maxIndelSize
-		/*
-		// for(size_t i = currNode->lastSeedIdx+seedIdxOffset; i<=largeSeedIdx; i++)
-		for(size_t i = startSeedIdx; i<=largeSeedIdx; i++)
+	// search for new seed starting from last matched seed or smallSeedIdx
+	size_t startSeedIdx = std::max(smallSeedIdx, currNode->lastSeedIdx+seedIdxOffset);
+	
+	bool isNewSeedFound = false;
+	BWTIntervalPair currIntervalPair = currNode->currIntervalPair;
+	
+	// sequenctial search for new seeds within maxIndelSize
+	/*
+	// for(size_t i = currNode->lastSeedIdx+seedIdxOffset; i<=largeSeedIdx; i++)
+	for(size_t i = startSeedIdx; i<=largeSeedIdx; i++)
+	{
+		// If seed is a substr of current extension, 
+		// the current SA interval is a sub-interval of the seed interval
+		isNewSeedFound = currIntervalPair.interval[0].lower >= m_TerminatedIntervals.at(i).lower
+					&& currIntervalPair.interval[0].upper <= m_TerminatedIntervals.at(i).upper;
+
+		// This extension is supported by one new seed after lastSeedIdx
+		// Return the seed greedily for the first one found, which is inaccurate in tandem repeats
+		if(isNewSeedFound)
 		{
-			// If seed is a substr of current extension, 
-			// the current SA interval is a sub-interval of the seed interval
-			isNewSeedFound = currIntervalPair.interval[0].lower >= m_TerminatedIntervals.at(i).lower
-						&& currIntervalPair.interval[0].upper <= m_TerminatedIntervals.at(i).upper;
-
-			// This extension is supported by one new seed after lastSeedIdx
-			// Return the seed greedily for the first one found, which is inaccurate in tandem repeats
-			if(isNewSeedFound)
-			{
-				std::cout << m_TerminatedIntervals.at(i).size() << "\n";
-				// update currNode members
-				currNode->lastSeedIdx = i;
-				
-				// lastOverlapLen records the overlap length of last hit
-				currNode->lastOverlapLen = m_currentLength;
-				
-				// currOverlapLen is always identical to m_currentLength
-				currNode->currOverlapLen = m_currentLength;	
-
-				// query overlap may shift due to indels
-				currNode->queryOverlapLen = i*m_seedDist+m_seedSize;
-				currNode->totalSeeds++;
-						
-				break;
-			}
-		}*/
-
-		// Binary search for new seeds using Query interval tree
-		std::vector<TreeInterval<size_t> > results;
-		BWTIntervalTree.findOverlapping(currIntervalPair.interval[0].lower, currIntervalPair.interval[0].upper, results);
-		int minIdxDiff = 10000;
-		size_t currSeedIdx = m_currentLength-m_seedSize;
-
-		for(size_t i=0; i< results.size(); i++)
-			if( results.at(i).value >= startSeedIdx && results.at(i).value <= largeSeedIdx)
-			{
-				// if(results.size() > 1) std::cout << results.size() << "\n";
-				// update currNode members
-				if(std::abs(results.at(i).value - currSeedIdx) < minIdxDiff)
-				{					
-					currNode->lastSeedIdx = results.at(i).value;
-					// query overlap may shift due to indels
-					currNode->queryOverlapLen = results.at(i).value+m_seedSize;
-					minIdxDiff = std::abs(results.at(i).value - currSeedIdx);
-				}
-
-				// lastOverlapLen records the overlap length of last hit
-				currNode->lastOverlapLen = m_currentLength;
-				
-				// currOverlapLen is always identical to m_currentLength
-				currNode->currOverlapLen = m_currentLength;	
-
-				currNode->totalSeeds++;
-				
-				isNewSeedFound = true;
-			}
+			std::cout << m_TerminatedIntervals.at(i).size() << "\n";
+			// update currNode members
+			currNode->lastSeedIdx = i;
 			
-		return isNewSeedFound;
+			// lastOverlapLen records the overlap length of last hit
+			currNode->lastOverlapLen = m_currentLength;
+			
+			// currOverlapLen is always identical to m_currentLength
+			currNode->currOverlapLen = m_currentLength;	
+
+			// query overlap may shift due to indels
+			currNode->queryOverlapLen = i*m_seedDist+m_seedSize;
+			currNode->totalSeeds++;
+					
+			break;
+		}
+	}*/
+
+	// Binary search for new seeds using Query interval tree
+	std::vector<TreeInterval<size_t> > results;
+	BWTIntervalTree.findOverlapping(currIntervalPair.interval[0].lower, currIntervalPair.interval[0].upper, results);
+	int minIdxDiff = 10000;
+	size_t currSeedIdx = m_currentLength-m_seedSize;
+
+	for(size_t i=0; i< results.size(); i++)
+		if( results.at(i).value >= startSeedIdx && results.at(i).value <= largeSeedIdx)
+		{
+			// if(results.size() > 1) std::cout << results.size() << "\n";
+			// update currNode members
+			if(std::abs(results.at(i).value - currSeedIdx) < minIdxDiff)
+			{					
+				currNode->lastSeedIdx = results.at(i).value;
+				// query overlap may shift due to indels
+				currNode->queryOverlapLen = results.at(i).value+m_seedSize;
+				minIdxDiff = std::abs(results.at(i).value - currSeedIdx);
+			}
+
+			// lastOverlapLen records the overlap length of last hit
+			currNode->lastOverlapLen = m_currentLength;
+			
+			// currOverlapLen is always identical to m_currentLength
+			currNode->currOverlapLen = m_currentLength;	
+
+			isNewSeedFound = true;
+		}
+	
+	if(isNewSeedFound)
+		currNode->totalSeeds++;
+	
+	return isNewSeedFound;
 }
 
 double PBOverlapTree::computeErrorRate(const SAIOverlapNode* currNode)

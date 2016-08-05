@@ -128,3 +128,24 @@ SAIOverlapNode* SAIOverlapNode::createChild(const std::string& label)
     
     return pAdded;
 }
+
+// Create a new child node with the given label. Returns a pointer to the new node.
+SAIOverlapNode2* SAIOverlapNode2::createChild(const std::string& label)
+{
+    SAIOverlapNode2* pAdded = new SAIOverlapNode2(m_pQuery, this);
+    pAdded->extend(label);
+	
+	// still lack of a copy constructor
+	pAdded->lastSeedIdx = this->lastSeedIdx;
+	pAdded->lastOverlapLen = this->lastOverlapLen;
+	pAdded->totalSeeds = this->totalSeeds;
+	pAdded->currOverlapLen = this->currOverlapLen;
+	pAdded->queryOverlapLen = this->queryOverlapLen;
+	pAdded->numOfErrors = this->numOfErrors;
+	pAdded->lastSeedIdxOffset = this->lastSeedIdxOffset;
+	pAdded->initSeedIdx = this->initSeedIdx;
+	
+	m_children.push_back(pAdded);
+    
+    return pAdded;
+}

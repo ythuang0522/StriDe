@@ -159,4 +159,48 @@ class SAIOverlapNode : public SAINode
 // leaves of SAIOverlapNode
 typedef std::list<SAIOverlapNode*> SONodePtrList;
 
+//
+// SAIOverlapNode2 for implementation of overlap computation using FM-index walk
+// It's used by ShortReadOverlapTree, v20160802 by Ya.
+//
+class SAIOverlapNode2 : public SAINode
+{
+    public:
+        //
+        // Functions
+        //
+        SAIOverlapNode2(const std::string* pQuery, SAIOverlapNode2* parent):SAINode(pQuery,parent)
+		{
+			lastSeedIdx=totalSeeds=lastOverlapLen=currOverlapLen=queryOverlapLen=numOfErrors=0;
+			lastSeedIdxOffset=0;
+		}
+        ~SAIOverlapNode2(){};
+
+		// Add a child node to this node with the given label
+        // Returns a pointer to the created node
+        SAIOverlapNode2* createChild(const std::string& label);
+
+        BWTInterval fwdInterval;
+        BWTInterval rvcInterval;
+		
+		// last matched seed index
+		size_t lastSeedIdx;
+		// last overlap length when matching last seed
+		size_t lastOverlapLen;
+		size_t totalSeeds;
+		// current overlap length on the subject increases wrt each FM-index extension
+		size_t currOverlapLen;
+		// number of SNPs or indels
+		size_t numOfErrors;
+		// index offset to the center
+		int lastSeedIdxOffset;
+		// index of the init seed
+		int initSeedIdx;
+		// current overlap length on the query
+		size_t queryOverlapLen;
+};
+
+// leaves of SAIOverlapNode2
+typedef std::list<SAIOverlapNode2*> SONode2PtrList;
+
 #endif
