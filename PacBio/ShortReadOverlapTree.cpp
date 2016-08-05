@@ -50,12 +50,10 @@ ShortReadOverlapTree::ShortReadOverlapTree(const std::string& sourceSeed,
 	m_pRootNode->fwdInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(beginningkmer));
 	m_pRootNode->rvcInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(beginningkmer));
 
-	m_pRootNode->lastOverlapLen = m_pRootNode->currOverlapLen 
-								= m_pRootNode->queryOverlapLen 
-								= m_minOverlap;
-	m_pRootNode->lastSeedIdx = m_pRootNode->initSeedIdx 
-							= m_minOverlap - m_seedSize;
+	m_pRootNode->lastOverlapLen	= m_pRootNode->currOverlapLen = m_pRootNode->queryOverlapLen = m_minOverlap;
+	m_pRootNode->lastSeedIdx = m_pRootNode->initSeedIdx	= m_minOverlap - m_seedSize;
 	m_pRootNode->totalSeeds = m_minOverlap - m_seedSize + 1;
+	
 	// push new node into roots and leaves vector
 	m_RootNodes.push_back(m_pRootNode);
 	m_leaves.push_back(m_pRootNode);
@@ -80,22 +78,19 @@ ShortReadOverlapTree::ShortReadOverlapTree(const std::string& sourceSeed,
 	
 	// put SA intervals into m_fwdIntervals and m_rvcIntervals cache
 	m_fwdIntervals.reserve(m_query.length()-m_seedSize+1);
-	for(int i = 0; i <= (int)m_query.length()-(int)m_seedSize ; i++)
-	{
-		std::string seedStr = m_query.substr(i, m_seedSize);
-		BWTInterval bi = BWTAlgorithms::findInterval( m_pRBWT, reverse(seedStr) );
-		if(bi.isValid())
-			m_fwdIntervals.push_back( TreeInterval<size_t>(bi.lower, bi.upper, i) );
-	}
-	fwdIntervalTree = IntervalTree<size_t>(m_fwdIntervals);
 	m_rvcIntervals.reserve(m_query.length()-m_seedSize+1);
 	for(int i = 0; i <= (int)m_query.length()-(int)m_seedSize ; i++)
 	{
 		std::string seedStr = m_query.substr(i, m_seedSize);
-		BWTInterval bi = BWTAlgorithms::findInterval( m_pBWT, reverseComplement(seedStr) );
+		BWTInterval bi;
+		bi = BWTAlgorithms::findInterval( m_pRBWT, reverse(seedStr) );
+		if(bi.isValid())
+			m_fwdIntervals.push_back( TreeInterval<size_t>(bi.lower, bi.upper, i) );
+		bi = BWTAlgorithms::findInterval( m_pBWT, reverseComplement(seedStr) );
 		if(bi.isValid())
 			m_rvcIntervals.push_back( TreeInterval<size_t>(bi.lower, bi.upper, i) );
 	}
+	fwdIntervalTree = IntervalTree<size_t>(m_fwdIntervals);
 	rvcIntervalTree = IntervalTree<size_t>(m_rvcIntervals);
 }
 
@@ -142,7 +137,7 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 			m_leaves.erase(iter1, iter2);
 		}
 	
-		//see if any interval reach left end $ with sufficient overlap
+		// see if terminating string is reached
 		if(m_currentLength >= m_minLength)
 			isTerminated(results);
 			
