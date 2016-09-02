@@ -172,6 +172,7 @@ class SAIOverlapNode2 : public SAINode
         SAIOverlapNode2(const std::string* pQuery, SAIOverlapNode2* parent):SAINode(pQuery,parent)
 		{
 			lastSeedIdx=totalSeeds=lastOverlapLen=currOverlapLen=queryOverlapLen=numOfErrors=0;
+			numRedeemSeed=0;
 			lastSeedIdxOffset=0;
 		}
         ~SAIOverlapNode2(){};
@@ -185,6 +186,10 @@ class SAIOverlapNode2 : public SAINode
 		
 		// last matched seed index
 		size_t lastSeedIdx;
+		// error seed begin idx
+		// size_t errorSeedBeginIdx;
+		// number of redeem seeds
+		double numRedeemSeed;
 		// last overlap length when matching last seed
 		size_t lastOverlapLen;
 		size_t totalSeeds;

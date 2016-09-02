@@ -144,6 +144,7 @@ SAIOverlapNode2* SAIOverlapNode2::createChild(const std::string& label)
 	pAdded->numOfErrors = this->numOfErrors;
 	pAdded->lastSeedIdxOffset = this->lastSeedIdxOffset;
 	pAdded->initSeedIdx = this->initSeedIdx;
+	pAdded->numRedeemSeed = this->numRedeemSeed;
 	
 	m_children.push_back(pAdded);
     

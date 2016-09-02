@@ -30,9 +30,9 @@ class ShortReadOverlapTree
 				const BWT* pRBWT,
 				size_t m_min_SA_threshold=3,
 				size_t maxIndelSize=9,
-				double errorRate=0.4,
+				double errorRate=0.44,
 				size_t maxLeaves=256,
-				size_t seedSize=7, 
+				size_t seedSize=11, 
 				size_t repeatFreq=256);
 		
         ~ShortReadOverlapTree();
@@ -64,7 +64,8 @@ class ShortReadOverlapTree
 		void attempToExtend(SONode2PtrList &newLeaves);
 		void refineSAInterval(size_t newKmer);
 		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
-
+		int findTheBestLocalPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
+		
         std::vector<std::pair<std::string, BWTIntervalPair> > getFMIndexExtensions(SAIOverlapNode2* pNode);
 
 		// prone the leaves without seeds in proximity
@@ -97,6 +98,7 @@ class ShortReadOverlapTree
 		size_t m_repeatFreq;
 
 		std::string m_query;
+		
         int m_maxLength;
 		int m_minLength;
         BWTInterval m_fwdTerminatedInterval;   //in rBWT

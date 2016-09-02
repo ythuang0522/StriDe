@@ -43,16 +43,18 @@ ShortReadOverlapTree::ShortReadOverlapTree(const std::string& sourceSeed,
 				m_repeatFreq(repeatFreq)
 {	
 	std::string beginningkmer = m_sourceSeed.substr(m_sourceSeed.length()-m_minOverlap);
+
 	// create one root node
 	m_pRootNode = new SAIOverlapNode2(&m_sourceSeed, NULL);
+	
 	// store initial str of root
 	m_pRootNode->computeInitial(m_sourceSeed);
 	m_pRootNode->fwdInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(beginningkmer));
 	m_pRootNode->rvcInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(beginningkmer));
-
-	m_pRootNode->lastOverlapLen	= m_pRootNode->currOverlapLen = m_pRootNode->queryOverlapLen = m_minOverlap;
-	m_pRootNode->lastSeedIdx = m_pRootNode->initSeedIdx	= m_minOverlap - m_seedSize;
+	m_pRootNode->lastOverlapLen = m_currentLength = m_pRootNode->currOverlapLen = m_pRootNode->queryOverlapLen = m_minOverlap;
+	m_pRootNode->lastSeedIdx = m_pRootNode->initSeedIdx = m_minOverlap - m_seedSize;
 	m_pRootNode->totalSeeds = m_minOverlap - m_seedSize + 1;
+	m_pRootNode->numRedeemSeed = 0;
 	
 	// push new node into roots and leaves vector
 	m_RootNodes.push_back(m_pRootNode);
@@ -61,20 +63,17 @@ ShortReadOverlapTree::ShortReadOverlapTree(const std::string& sourceSeed,
 	// initialize the ending SA intervals with kmer length = m_minOverlap
 	std::string endingkmer = m_targetSeed.substr(0, m_minOverlap);
 
+	// std::cout << "BE: " << beginningkmer << " " << endingkmer << "\n";
 	// PacBio reads are longer than real length due to insertions
 	m_maxLength = (1.1*(m_disBetweenSrcTarget+10))+2*m_minOverlap;
-	m_minLength = (0.9*(m_disBetweenSrcTarget-30))+2*m_minOverlap;
-	//std::cout << m_MaxLength << ":\t" << m_MinLength;
+	m_minLength = (0.8*(m_disBetweenSrcTarget-20))+2*m_minOverlap;
 
 	m_fwdTerminatedInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));
 	m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
 
-	m_currentLength = m_currentKmerSize
-					= m_minOverlap;
+	m_currentLength = m_currentKmerSize = m_minOverlap;
 
 	m_query = beginningkmer + m_strBetweenSrcTarget + endingkmer;
-	// std::cout << m_query << "\n";
-	// std::cout << m_query << "\n" << beginningkmer << "\n" << endingkmer << "\n\n";
 	
 	// put SA intervals into m_fwdIntervals and m_rvcIntervals cache
 	m_fwdIntervals.reserve(m_query.length()-m_seedSize+1);
@@ -101,8 +100,6 @@ ShortReadOverlapTree::~ShortReadOverlapTree()
 		delete *it;
 	
 	m_RootNodes.clear();
-    // Recursively destroy the tree
-    // delete m_pRootNode;
 }
 
 // comparison, not case sensitive.
@@ -121,13 +118,32 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
     {
 		// ACGT-extend the leaf nodes via updating existing SA interval
         extendLeaves();
-					
+		// std::cout << "====" << std::endl;
+		// std::cout << m_query << std::endl;
+		// std::cout << "AGAAGCAACAAGCAGTAAAAAAGAAAGAAACCGAAATCTCTTTTTTTTTTTCCCACCTATTCCCTCTTGCTAGAAGATACTTATTGAGTTTGGAAACAGCTGAAATTCCAGAAAAATTGCTTTTTCAGGTCTCTCTGCTGCCGGAAATGCTCTCTGTTCAAAAAGCTTTTACACTCTTGACCAGCGCACTCCGTCACCATACCATAGCACTCTTTGAGTTTCCTCTAATCAGGTTCCACCAAACAGATACCCCGGTGTTTCACGGAATGGTACGTTTGATATCGCTGATTTGAGAGGAGGTTACACTTGAAGAATCACAGTCTTGCGACCGGCTATTCAACAAGGCATTCCCCCAAGTTTGAATTCTTTGAAATAGATTGCTATTAGCTAGTAATCCACCAAATCCTTCGCTGCTCACCAATGGAATCGCAAGATGCCCACGATGAGACTGTTCAGGTTAAACGCAAAAGAAACACACTCTGGGAATTTCTTCCCAAATTGTATCTCTCAATACGCATCAACCCATGTCAATTAAACACGCTGTATAGAGACTAGGCAGATCTGACGATCACCTAGCGACTCTCTCCACCGTTTGACGAGGCCATTTACAAAAACATAACGAACGACAAGCCTACTCGAATTCGTTTCCAAACTCTTTT" << std::endl;
+		// std::cout << "AAGCAACAAGCAGTAAAAAAGAAAGAAACCGAAATCTCTTTTTTTTTTTCCCACCTATTCCCTCTTGCTAGAAGATACTTATTGAGTTTGGAAACAGCTGAAATTCCAGAAAAATTGCTTTTTCAGGTCTCTCTGCTGCCGGAAATGCTCTCTGTTCAAAAAGCTTTTACACTCTTGACCAGCGCACTCCGTCACCATACCATAGCACTCTTTGAGTTTCCTCTAATCAGGTTCCACCAAACAGATACCCCGGTGTTTCACGGAATGGTACGTTTGATATCGCTGATTTGAGAGGAGGTTACACTTGAAGAATCACAGTCTTGCGACCGGCTATTCAACAAGGCATTCCCCCAAGTTTGAATTCTTTGAAATAGATTGCTATTAGCTAGTAATCCACCAAATCCTTCGCTGCTCACCAATGGAATCGCAAGATGCCCACGATGAGACTGTTCAGGTTAAACGCAAAAGAAACACACTCTGGGAATTTCTTCCCAAATTGTATCTCTCAATACGCATCAACCCATGTCAATTAAACACGCTGTATAGAGACTAGGCAGATCTGACGATCACCTAGCGACTCTCTCCACCGTTTGACGAGGCCATTTACAAAAACATAACGAACGACAAGCCTACTCGAATTCGTTTCCAAACTCTTTT" << std::endl;
+		// std::cout << "----" << std::endl;
+		// for(SONode2PtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
+		// {
+			// std::cout << (*iter)->getSuffix(m_currentLength) << " ";
+			// std::cout << m_currentLength << " " << m_currentKmerSize << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << 
+			// " " << computeErrorRate(*iter) << " " << (*iter)->totalSeeds << " " << (*iter)->numOfErrors << " " <<
+			// (*iter)->queryOverlapLen << " " << (*iter)->currOverlapLen << "\n";
+		// }
+		// std::cout << "----" << std::endl;
 		// Remove leaves without seed support within m_maxIndelSize
 		PrunedBySeedSupport();
-		
+		// for(SONode2PtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
+		// {
+			// std::cout << (*iter)->getSuffix(m_currentLength) << " ";
+			// std::cout << m_currentLength << " " << m_currentKmerSize << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << 
+			// " " << computeErrorRate(*iter) << " " << (*iter)->totalSeeds << " " << (*iter)->numOfErrors << " " <<
+			// (*iter)->queryOverlapLen << " " << (*iter)->currOverlapLen << "\n";
+			// break;
+		// }
 		// speedup by retaining the top bestN candidates after sufficient overlap length
 		// This is the 3rd filter less reliable than previous ones
-		const size_t bestN = 50;
+		const size_t bestN = 100;
 		if(m_leaves.size()>= bestN)
 		{
 			m_leaves.sort(SeedComparator);
@@ -140,7 +156,6 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 		// see if terminating string is reached
 		if(m_currentLength >= m_minLength)
 			isTerminated(results);
-			
 	}
 
 	// reach the terminal kmer
@@ -151,19 +166,21 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 	}
 	
 	// Did not reach the terminal kmer
-    if(m_leaves.empty())
-        return -1;	//high error
-    else if(m_currentLength > m_maxLength)
-        return -2;	//exceed search depth
-    else if(m_leaves.size() > m_maxLeaves)
-        return -3;	//too much repeats
+    if(m_leaves.empty())	//high error
+        return -1;
+    else if(m_currentLength > m_maxLength)	//exceed search depth
+	{
+		// return findTheBestLocalPath(results, FMWResult);
+        return -2;
+	}
+    else if(m_leaves.size() > m_maxLeaves)	//too much repeats
+        return -3;
 	else
 		return -4;
 }
 
 int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
-	double maxKmerCoverage = 0;
 	int maxAlgScore = -100;
 	
 	for (size_t i = 0 ; i < results.size() ;i++)
@@ -205,6 +222,55 @@ int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FM
 	if(FMWResult.mergedSeq.length() != 0)
 		return 1;
 	return -4;
+}
+
+int ShortReadOverlapTree::findTheBestLocalPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
+{
+	m_leaves.sort(SeedComparator);
+	
+	const int numMaxDP = 10;
+	int maxAlgScore = -100, countNumDP = 0;
+	for(SONode2PtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end() && countNumDP < numMaxDP; ++iter, countNumDP++)
+	{
+		std::string candidateSeq;
+		
+		candidateSeq = (*iter)->getSuffix(m_currentLength);
+		
+		// find the path with maximum alignment score
+		AlnAln *aln_local;
+		
+		aln_local = aln_stdaln(m_query.c_str(), candidateSeq.c_str(), &aln_param_pacbio, 0, 1);
+
+		// std::cout << aln_local->score << ", " <<
+		// aln_local->start2 << ", " << aln_local->end2 << ".\n";
+			
+		bool isAlgScoreBetter = maxAlgScore < aln_local->score;
+		// bool isSameEnd11bp = candidateSeq.substr(candidateSeq.length()-11) == m_targetSeed.substr(m_minOverlap-11, 11);
+		
+		// std::cout << "====\n" << 
+		// m_query << "\n" << 
+		// candidateSeq << "\n" <<
+		// candidateSeq.substr(0, aln_local->end2) << "\n" << aln_local->end2 << "----\n";
+		// candidateSeq.substr(candidateSeq.length()-11) << "\n" <<
+		// m_targetSeed.substr(m_minOverlap-11, 11) << "\n";
+		
+		// if(isAlgScoreBetter)// && isSameEnd11bp)
+		// {
+			// maxAlgScore = aln_local->score;
+			// FMWResult.alnScore = maxAlgScore;
+			// bug fix: m_targetSeed may be shorter than m_minOverlap
+			// if(m_targetSeed.length() > m_minOverlap)
+				// FMWResult.mergedSeq = candidateSeq.substr(0, aln_local->end2) + m_targetSeed.substr(m_minOverlap);
+			// else
+				// FMWResult.mergedSeq = candidateSeq.substr(0, aln_local->end2);
+		// }
+		
+		aln_free_AlnAln(aln_local);
+	}
+	
+	if(FMWResult.mergedSeq.length() != 0)
+		return 1;
+	return -2;
 }
 
 // Print the string represented by every node
@@ -294,13 +360,16 @@ void ShortReadOverlapTree::attempToExtend(SONode2PtrList &newLeaves)
             (*iter)->extend(extensions.front().first);
             (*iter)->fwdInterval=extensions.front().second.interval[0];
             (*iter)->rvcInterval=extensions.front().second.interval[1];
-			if((*iter)->fwdInterval.isValid()) (*iter)->addKmerCount( (*iter)->fwdInterval.size());
-			if((*iter)->rvcInterval.isValid()) (*iter)->addKmerCount( (*iter)->rvcInterval.size());
+			if((*iter)->fwdInterval.isValid())
+				(*iter)->addKmerCount( (*iter)->fwdInterval.size());
+			if((*iter)->rvcInterval.isValid())
+				(*iter)->addKmerCount( (*iter)->rvcInterval.size());
 			
 			// currOverlapLen/queryOverlapLen always increase wrt each extension
 			// in order to know the approximate real-time matched length for terminal/containment processing
-            (*iter)->currOverlapLen++;
+			(*iter)->currOverlapLen++;
 			(*iter)->queryOverlapLen++;
+			
 			newLeaves.push_back(*iter);
         }
         else if(extensions.size() > 1)
@@ -311,11 +380,13 @@ void ShortReadOverlapTree::attempToExtend(SONode2PtrList &newLeaves)
                 SAIOverlapNode2* pChildNode = (*iter)->createChild(extensions[i].first);
                 pChildNode->fwdInterval=extensions[i].second.interval[0];
                 pChildNode->rvcInterval=extensions[i].second.interval[1];
+				
 				//inherit accumulated kmerCount from parent
 				pChildNode->addKmerCount( (*iter)->getKmerCount() );
-				if(pChildNode->fwdInterval.isValid()) pChildNode->addKmerCount( pChildNode->fwdInterval.size());
-				if(pChildNode->rvcInterval.isValid()) pChildNode->addKmerCount( pChildNode->rvcInterval.size());
-
+				if(pChildNode->fwdInterval.isValid())
+					pChildNode->addKmerCount( pChildNode->fwdInterval.size());
+				if(pChildNode->rvcInterval.isValid())
+					pChildNode->addKmerCount( pChildNode->rvcInterval.size());
 				pChildNode->currOverlapLen++;
 				pChildNode->queryOverlapLen++;
                 
@@ -350,17 +421,7 @@ bool ShortReadOverlapTree::PrunedBySeedSupport()
 	SONode2PtrList::iterator iter = m_leaves.begin(); 
     while(iter != m_leaves.end())
     {
-		double currErrorRate = computeErrorRate(*iter);
-
-		// speedup by skipping dissimilar reads
-		// This is the 2nd filter less reliable than the 1st one 
-		if(currErrorRate > m_errorRate+0.04)
-		{
-			iter = m_leaves.erase(iter);
-			continue;
-		}
-
-		if( m_currentLength - (*iter)->lastOverlapLen >= m_seedSize ||
+		if( m_currentLength - (*iter)->lastOverlapLen > m_seedSize ||
 			m_currentLength - (*iter)->lastOverlapLen <= 1)
 		{
 			// search for matched new seeds
@@ -374,7 +435,21 @@ bool ShortReadOverlapTree::PrunedBySeedSupport()
 			// increment the error number in order to distinguish two separate seeds
 			// and one larger consecutive seed during error rate computation
 			if(!isNewSeedFound && currSeedIdx+(*iter)->lastSeedIdxOffset == (*iter)->lastSeedIdx+1)
-				(*iter)->numOfErrors++;
+				(*iter)->numOfErrors ++;
+			else if(!isNewSeedFound && currSeedIdx+(*iter)->lastSeedIdxOffset - (*iter)->lastSeedIdx > m_seedSize+1)
+				(*iter)->numRedeemSeed += 0.5;
+		}
+		else
+			(*iter)->numRedeemSeed ++;
+		
+		double currErrorRate = computeErrorRate(*iter);
+
+		// speedup by skipping dissimilar reads
+		// This is the 2nd filter less reliable than the 1st one 
+		if(m_currentLength <= 200 && currErrorRate > m_errorRate)
+		{
+			iter = m_leaves.erase(iter);
+			continue;
 		}
 		
 		iter++;
@@ -414,7 +489,7 @@ bool ShortReadOverlapTree::isSupportedByNewSeed(SAIOverlapNode2* currNode, size_
 		{
 			// update currNode members
 			if(std::abs(resultsFwd.at(i).value - currSeedIdx) < minIdxDiff)
-			{					
+			{
 				currNode->lastSeedIdx = resultsFwd.at(i).value;
 				// query overlap may shift due to indels
 				currNode->queryOverlapLen = resultsFwd.at(i).value+m_seedSize;
@@ -456,23 +531,32 @@ bool ShortReadOverlapTree::isSupportedByNewSeed(SAIOverlapNode2* currNode, size_
 double ShortReadOverlapTree::computeErrorRate(const SAIOverlapNode2* currNode)
 {	
 	// Compute accuracy via matched length in both query and subject
-	int matchedLen = (int)currNode->totalSeeds*2;
+	// double matchedLen = (double)currNode->totalSeeds*2;
+	double matchedLen = (double)currNode->totalSeeds;
 	
 	// SNP and indel over-estimate the unmatched lengths across error, ---*---
 	// Restore the unmatched region via numOfErrors, which is still over-estimated
-	matchedLen += (int)(currNode->numOfErrors*(m_seedSize-1)*2) ;
+	// matchedLen += (int)(currNode->numOfErrors*(m_seedSize-1)*2) ;
+	matchedLen += currNode->numRedeemSeed;
 	
-	int totalLen = (int)currNode->queryOverlapLen + currNode->currOverlapLen- (m_seedSize*2) +2;
+	// double totalLen = (double)currNode->queryOverlapLen + currNode->currOverlapLen- (m_seedSize*2) +2;
+	double totalLen = (double)currNode->currOverlapLen - m_seedSize +1;
+	
+	double unmatchedLen = totalLen - matchedLen;
 
-	int unmatchedLen = totalLen - matchedLen;
-
-	 //std::cout << currNode->queryOverlapLen  << "\t" << currNode->currOverlapLen
+	// std::cout << unmatchedLen/totalLen << "\t" << 
+	// matchedLen << "\t" << 
+	// unmatchedLen << "\t" << 
+	// totalLen << "\t"<< 
+	// currNode->numOfErrors <<"\n";
+	
+	//std::cout << currNode->queryOverlapLen  << "\t" << currNode->currOverlapLen
 	//	  << "\t" << currNode->totalSeeds << "\n";
 
-	 // std::cout << (double)unmatchedLen/totalLen << "\t" << matchedLen << "\t" << unmatchedLen 
+	// std::cout << (double)unmatchedLen/totalLen << "\t" << matchedLen << "\t" << unmatchedLen 
 	//		 << "\t" << totalLen << "\t"<< currNode->numOfErrors <<"\n";
 	
-	return unmatchedLen/(double)totalLen;
+	return unmatchedLen/totalLen;
 }
 			
 //update SA intervals of each leaf, which corresponds to one-base extension
