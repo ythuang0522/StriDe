@@ -13,34 +13,21 @@
 
 //
 // Class: SAIOverlapTree
-ShortReadOverlapTree::ShortReadOverlapTree(const std::string& sourceSeed,
-				const std::string& strBetweenSrcTarget,
-				const std::string& targetSeed,				
-				int disBetweenSrcTarget,
-				size_t minOverlap,
-				size_t maxOverlap,
-				const BWT* pBWT, 
-				const BWT* pRBWT, 
-				size_t min_SA_threshold, 				
-				size_t maxIndelSize,
-				double errorRate,
-				size_t maxLeaves,
-				size_t seedSize, 
-				size_t repeatFreq):
-				m_sourceSeed(sourceSeed), 
-				m_strBetweenSrcTarget(strBetweenSrcTarget),
-				m_targetSeed(targetSeed),				
-				m_disBetweenSrcTarget(disBetweenSrcTarget),
-				m_minOverlap(minOverlap), 
-				m_maxOverlap(maxOverlap), 
-				m_maxIndelSize(maxIndelSize), 
-				m_pBWT(pBWT), 
-				m_pRBWT(pRBWT),
-				m_min_SA_threshold(min_SA_threshold),
-				m_errorRate(errorRate),
-				m_maxLeaves(maxLeaves), 
-				m_seedSize(seedSize), 
-				m_repeatFreq(repeatFreq)
+ShortReadOverlapTree::ShortReadOverlapTree(FMWalkParameters& parameters):
+	m_sourceSeed(parameters.sourceSeed), 
+	m_strBetweenSrcTarget(parameters.strBetweenSrcTarget),
+	m_targetSeed(parameters.targetSeed),				
+	m_disBetweenSrcTarget(parameters.disBetweenSrcTarget),
+	m_minOverlap(parameters.minOverlap), 
+	m_maxOverlap(parameters.maxOverlap), 
+	m_maxIndelSize(parameters.maxIndelSize), 
+	m_pBWT(parameters.indices.pBWT), 
+	m_pRBWT(parameters.indices.pRBWT),
+	m_min_SA_threshold(parameters.SAThreshold),
+	m_errorRate(parameters.errorRate),
+	m_maxLeaves(parameters.maxLeaves), 
+	m_seedSize(parameters.seedSize), 
+	m_repeatFreq(parameters.repeatFreq)
 {	
 	std::string beginningkmer = m_sourceSeed.substr(m_sourceSeed.length()-m_minOverlap);
 
@@ -63,7 +50,6 @@ ShortReadOverlapTree::ShortReadOverlapTree(const std::string& sourceSeed,
 	// initialize the ending SA intervals with kmer length = m_minOverlap
 	std::string endingkmer = m_targetSeed.substr(0, m_minOverlap);
 
-	// std::cout << "BE: " << beginningkmer << " " << endingkmer << "\n";
 	// PacBio reads are longer than real length due to insertions
 	m_maxLength = (1.1*(m_disBetweenSrcTarget+10))+2*m_minOverlap;
 	m_minLength = (0.8*(m_disBetweenSrcTarget-20))+2*m_minOverlap;
@@ -108,20 +94,18 @@ static bool SeedComparator(const SAIOverlapNode2* first, const SAIOverlapNode2* 
   return ( 	first->totalSeeds > second->totalSeeds );
 }
 
-//On success return the length of merged string
+// on success return the length of merged string
 int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 {
 	SAIntervalNodeResultVector results;
 	
-	//Overlap extension via FM-index walk
+	// overlap extension via FM-index walk
     while(!m_leaves.empty() && m_leaves.size() <= m_maxLeaves && m_currentLength <= m_maxLength)
     {
 		// ACGT-extend the leaf nodes via updating existing SA interval
         extendLeaves();
 		// std::cout << "====" << std::endl;
 		// std::cout << m_query << std::endl;
-		// std::cout << "AGAAGCAACAAGCAGTAAAAAAGAAAGAAACCGAAATCTCTTTTTTTTTTTCCCACCTATTCCCTCTTGCTAGAAGATACTTATTGAGTTTGGAAACAGCTGAAATTCCAGAAAAATTGCTTTTTCAGGTCTCTCTGCTGCCGGAAATGCTCTCTGTTCAAAAAGCTTTTACACTCTTGACCAGCGCACTCCGTCACCATACCATAGCACTCTTTGAGTTTCCTCTAATCAGGTTCCACCAAACAGATACCCCGGTGTTTCACGGAATGGTACGTTTGATATCGCTGATTTGAGAGGAGGTTACACTTGAAGAATCACAGTCTTGCGACCGGCTATTCAACAAGGCATTCCCCCAAGTTTGAATTCTTTGAAATAGATTGCTATTAGCTAGTAATCCACCAAATCCTTCGCTGCTCACCAATGGAATCGCAAGATGCCCACGATGAGACTGTTCAGGTTAAACGCAAAAGAAACACACTCTGGGAATTTCTTCCCAAATTGTATCTCTCAATACGCATCAACCCATGTCAATTAAACACGCTGTATAGAGACTAGGCAGATCTGACGATCACCTAGCGACTCTCTCCACCGTTTGACGAGGCCATTTACAAAAACATAACGAACGACAAGCCTACTCGAATTCGTTTCCAAACTCTTTT" << std::endl;
-		// std::cout << "AAGCAACAAGCAGTAAAAAAGAAAGAAACCGAAATCTCTTTTTTTTTTTCCCACCTATTCCCTCTTGCTAGAAGATACTTATTGAGTTTGGAAACAGCTGAAATTCCAGAAAAATTGCTTTTTCAGGTCTCTCTGCTGCCGGAAATGCTCTCTGTTCAAAAAGCTTTTACACTCTTGACCAGCGCACTCCGTCACCATACCATAGCACTCTTTGAGTTTCCTCTAATCAGGTTCCACCAAACAGATACCCCGGTGTTTCACGGAATGGTACGTTTGATATCGCTGATTTGAGAGGAGGTTACACTTGAAGAATCACAGTCTTGCGACCGGCTATTCAACAAGGCATTCCCCCAAGTTTGAATTCTTTGAAATAGATTGCTATTAGCTAGTAATCCACCAAATCCTTCGCTGCTCACCAATGGAATCGCAAGATGCCCACGATGAGACTGTTCAGGTTAAACGCAAAAGAAACACACTCTGGGAATTTCTTCCCAAATTGTATCTCTCAATACGCATCAACCCATGTCAATTAAACACGCTGTATAGAGACTAGGCAGATCTGACGATCACCTAGCGACTCTCTCCACCGTTTGACGAGGCCATTTACAAAAACATAACGAACGACAAGCCTACTCGAATTCGTTTCCAAACTCTTTT" << std::endl;
 		// std::cout << "----" << std::endl;
 		// for(SONode2PtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 		// {
@@ -131,8 +115,10 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 			// (*iter)->queryOverlapLen << " " << (*iter)->currOverlapLen << "\n";
 		// }
 		// std::cout << "----" << std::endl;
+		
 		// Remove leaves without seed support within m_maxIndelSize
 		PrunedBySeedSupport();
+		
 		// for(SONode2PtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 		// {
 			// std::cout << (*iter)->getSuffix(m_currentLength) << " ";
@@ -141,6 +127,7 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 			// (*iter)->queryOverlapLen << " " << (*iter)->currOverlapLen << "\n";
 			// break;
 		// }
+		
 		// speedup by retaining the top bestN candidates after sufficient overlap length
 		// This is the 3rd filter less reliable than previous ones
 		const size_t bestN = 100;
@@ -179,6 +166,7 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 		return -4;
 }
 
+// dead code
 int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
 	int maxAlgScore = -100;
@@ -278,7 +266,6 @@ void ShortReadOverlapTree::printAll()
 {
 	for (std::list<SAIOverlapNode2*>::iterator it = m_RootNodes.begin(); it != m_RootNodes.end(); ++it)
 		(*it)->printAllStrings("");
-
 }
 
 void ShortReadOverlapTree::extendLeaves()
@@ -287,25 +274,23 @@ void ShortReadOverlapTree::extendLeaves()
 	
 	//attempt to extend one base for each leave
     attempToExtend(newLeaves);
-/*	if(m_kmerMode) 
-		refineSAInterval(m_minOverlap);
-	else if(m_lowCoverageHighErrorMode && m_currentKmerSize >= m_maxOverlap) 
-		refineSAInterval(m_minOverlap);
-	else */
+	// if(m_kmerMode) 
+		// refineSAInterval(m_minOverlap);
+	// else if(m_lowCoverageHighErrorMode && m_currentKmerSize >= m_maxOverlap) 
+		// refineSAInterval(m_minOverlap);
+	// else
 	if(m_currentKmerSize >= m_maxOverlap)
 	{
-		/*
-		if(m_minOverlap > 51)
-			refineSAInterval(m_minOverlap);
-		else if(m_beginningIntervalSize >= 80 && m_terminatedIntervalSize >= 80)
-			refineSAInterval(81);
-		else if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
-			refineSAInterval(51);
-		else
-			refineSAInterval(m_minOverlap);
-		*/
+		// if(m_minOverlap > 51)
+			// refineSAInterval(m_minOverlap);
+		// else if(m_beginningIntervalSize >= 80 && m_terminatedIntervalSize >= 80)
+			// refineSAInterval(81);
+		// else if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
+			// refineSAInterval(51);
+		// else
+			// refineSAInterval(m_minOverlap);
 		// if(m_beginningIntervalSize >= m_coverage*0.8 || m_terminatedIntervalSize >= m_coverage*0.8) // 256: 16, extension may exceed max leaves soon after
-		//if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
+		// if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
 			// refineSAInterval(81);
 		// else
 			refineSAInterval(m_minOverlap);
@@ -327,7 +312,6 @@ void ShortReadOverlapTree::extendLeaves()
 
     m_leaves.clear();
     m_leaves = newLeaves;
-
 }
 
 // Refine SA intervals of each leave with a new kmer
@@ -436,6 +420,7 @@ bool ShortReadOverlapTree::PrunedBySeedSupport()
 			// and one larger consecutive seed during error rate computation
 			if(!isNewSeedFound && currSeedIdx+(*iter)->lastSeedIdxOffset == (*iter)->lastSeedIdx+1)
 				(*iter)->numOfErrors ++;
+			// redeem number of seed, 0.5 is a rough value.
 			else if(!isNewSeedFound && currSeedIdx+(*iter)->lastSeedIdxOffset - (*iter)->lastSeedIdx > m_seedSize+1)
 				(*iter)->numRedeemSeed += 0.5;
 		}
@@ -478,6 +463,7 @@ bool ShortReadOverlapTree::isSupportedByNewSeed(SAIOverlapNode2* currNode, size_
 		fwdIntervalTree.findOverlapping(currFwdInterval.lower, currFwdInterval.upper, resultsFwd);
 	if(currRvcInterval.isValid())
 		rvcIntervalTree.findOverlapping(currRvcInterval.lower, currRvcInterval.upper, resultsRvc);
+	
 	int minIdxDiff = 10000;
 	size_t currSeedIdx = m_currentLength-m_seedSize;
 	for(size_t i=0 ; i<resultsFwd.size() || i<resultsRvc.size() ; i++)

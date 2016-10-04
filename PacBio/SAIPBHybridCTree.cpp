@@ -12,7 +12,7 @@ using namespace std;
 
 //
 // Class: SAIntervalTree
-SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters parameters):
+SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_pSourceSeed(&parameters.sourceSeed), 
 	m_strBetweenSrcTarget(parameters.strBetweenSrcTarget),
 	m_targetSeed(parameters.targetSeed),
@@ -47,7 +47,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters parameters):
 
 	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
-	m_MinLength = (0.9*(m_disBetweenSrcTarget-30))+endingkmer.length()+m_currentLength;
+	m_MinLength = (0.8*(m_disBetweenSrcTarget-20))+endingkmer.length()+m_currentLength;
 	//std::cout << m_MaxLength << ":\t" << m_MinLength;
 
 	m_fwdTerminatedInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));

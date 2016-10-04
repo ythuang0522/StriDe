@@ -107,15 +107,20 @@ public:
 
 private:
 
-	std::vector<SeedFeature> seedingByDynamicKmer(const std::string& readSeq);
-	std::vector<SeedFeature> seedingByDynamicKmer_v2(const std::string& readSeq);
-	std::vector<SeedFeature> seedingByDynamicKmer_v3(const std::string& readSeq);
-	int calculateKmerFreqsEachPBPos(const std::string& readSeq, std::vector<std::vector<size_t> >& PBKmerFreqsVec);
-	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, int dis_between_src_target, FMWalkResult* FMWResult, int debugTargetSeed);
+	// identify seeds
+	std::vector<SeedFeature> dynamicSeedingFromSR(const std::string& readSeq);
+	bool dynamicSeedingFromPB(const std::string& readSeq, std::vector<SeedFeature>& seedVec, std::vector<int>& seedEndPosVec, size_t prevEndPos);
+	
+	// replace raw sequence by correct sequence
+	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, int dis_between_src_target, FMWalkResult& FMWResult);
+	int unlimitedFMIndexExtension(FMWalkParameters& FMWParams, SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, FMWalkResult& FMWResult, int minOverlap, bool& isSequencingGap, bool sourceIsRepeat);
+	int limitedFMIndexExtension(FMWalkParameters& FMWParams, SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, FMWalkResult& FMWResult, int minOverlap, bool& isSequencingGap, bool sourceIsRepeat);
+	int MSACorrection(FMWalkParameters& FMWParams, SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, FMWalkResult& FMWResult, int minOverlap, bool& isSequencingGap, bool sourceIsRepeat);
+	
+	// subfunction
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
-	bool seedingByPacBio(const std::string& readSeq, std::vector<SeedFeature>& seedVec, 	std::vector<int>& seedEndPosVec, size_t prevEndPos);
-	bool seedingByPacBio_v2(const std::string& readSeq, std::vector<SeedFeature>& seedVec, 	std::vector<int>& seedEndPosVec, size_t prevEndPos);
 	bool isLowComplexity(std::string& seq ,const float& ratioThreshold);
+	
 	PacBioHybridCorrectionParameters m_params;
 };
 

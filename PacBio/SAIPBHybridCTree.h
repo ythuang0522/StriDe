@@ -22,10 +22,14 @@ struct FMWalkParameters
 	std::string strBetweenSrcTarget;
 	std::string targetSeed;
     int disBetweenSrcTarget;
-	int maxLeaves;
+	size_t maxLeaves=256;
 	int minOverlap;
 	int maxOverlap;
     int SAThreshold = 3;
+	size_t maxIndelSize=9;
+	double errorRate=0.44;
+	size_t seedSize=11;
+	size_t repeatFreq=256;
 	bool kmerMode = false;
 	bool lowCoverageHighErrorMode = false;
 	bool debugMode = false;
@@ -43,7 +47,7 @@ struct FMWalkResult
 class SAIntervalPBHybridCTree
 {
     public:
-        SAIntervalPBHybridCTree(FMWalkParameters parameters);
+        SAIntervalPBHybridCTree(FMWalkParameters& parameters);
 
         ~SAIntervalPBHybridCTree();
 

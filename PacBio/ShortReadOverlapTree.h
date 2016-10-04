@@ -20,20 +20,7 @@
 class ShortReadOverlapTree
 {
     public:
-         ShortReadOverlapTree(const std::string& sourceSeed,
-				const std::string& strBetweenSrcTarget,
-				const std::string& targetSeed,
-				int m_disBetweenSrcTarget,
-				size_t minOverlap,
-				size_t maxOverlap,
-				const BWT* pBWT,
-				const BWT* pRBWT,
-				size_t m_min_SA_threshold=3,
-				size_t maxIndelSize=9,
-				double errorRate=0.44,
-				size_t maxLeaves=256,
-				size_t seedSize=11, 
-				size_t repeatFreq=256);
+         ShortReadOverlapTree(FMWalkParameters& parameters);
 		
         ~ShortReadOverlapTree();
 
