@@ -120,6 +120,7 @@ private:
 	// subfunction
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
 	bool isLowComplexity(std::string& seq ,const float& ratioThreshold);
+	float GCAndTandemRatio(std::string& seq);
 	
 	PacBioHybridCorrectionParameters m_params;
 };
