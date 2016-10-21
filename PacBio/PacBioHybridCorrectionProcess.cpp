@@ -260,7 +260,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 			// In large sequencing gaps (>7kb), no seeds can be found in Illumina index
 			// If no seed is found within PBSearchDepth, 
 			// seeds from PB index will be serached instead
-			int prevSeedEndPos=seedEndPosVec.empty()?0:seedEndPosVec.back()+1;
+			int prevSeedEndPos=seedEndPosVec.empty()?0:(seedEndPosVec.back()+1);
 			int distToPrevSeed=pos+1-prevSeedEndPos;
 
 			// skip repeat regions
@@ -328,7 +328,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 			// continue;
 				
 		// super repeat seeds with frequency > 2000 are troublesome, often lead to -3 but no good solution so far, mark first
-		bool isSuperRepeat=maxKmerFreq>m_params.coverage*15?true:false;
+		bool isSuperRepeat = maxKmerFreq>(m_params.coverage*15)?true:false;
 		SeedFeature newSeed(seedStartPos, readSeq.substr(seedStartPos, seedEndPos-seedStartPos+1), isSuperRepeat, dynamicKmerSize, m_params.PBcoverage/2);
 		newSeed.estimateBestKmerSize(m_params.PBindices.pBWT);
 
@@ -453,7 +453,7 @@ bool PacBioHybridCorrectionProcess::dynamicSeedingFromPB(const string& readSeq, 
 		newSeed.estimateBestKmerSize(m_params.PBindices.pBWT);
 
 		// skip low-complexity sequencing errors of PacBio
-		// bool isShortAndHighFreq = i-seedStartPos <= 2 && maxKmerFreq > 80;
+		// skip GC and tandem ratio >= 0.9 seeds
 		if(!isLowComplexity(newSeed.seedStr,0.8) && GCAndTandemRatio(newSeed.seedStr)<0.9)
 		{
 			// std::cout << "PB> " << newSeed.seedStartPos << ": " 
