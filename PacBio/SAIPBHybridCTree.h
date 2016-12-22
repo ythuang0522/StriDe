@@ -34,6 +34,7 @@ struct FMWalkParameters
 	bool lowCoverageHighErrorMode = false;
 	bool debugMode = false;
 	size_t coverage;
+	size_t targetSeedStartPos=0;
 };
 
 // Result Object for the FM-index Walk of PacBio Hybrid Correction
@@ -41,7 +42,7 @@ struct FMWalkResult
 {
 	std::string mergedSeq;
 	int alnScore;
-	double kmerFreq;
+	size_t kmerFreq;
 };
 
 class SAIntervalPBHybridCTree
@@ -66,6 +67,7 @@ class SAIntervalPBHybridCTree
         // Functions
         //
         void extendLeaves();
+		void extendLeaves_v2();
         void attempToExtend(STNodePtrList &newLeaves);
         void refineSAInterval(size_t newKmer);
         std::vector<std::pair<std::string, BWTIntervalPair> > getFMIndexExtensions(SAIntervalNode* pNode);
@@ -92,9 +94,11 @@ class SAIntervalPBHybridCTree
         size_t m_MaxLeaves;
         const BWT* m_pBWT;
         const BWT* m_pRBWT;
-        size_t m_min_SA_threshold;
+        size_t m_minSAThreshold;
+		size_t m_iniMinSAThreshold;
 		int m_disBetweenSrcTarget;
 		int m_expectedLength;
+		size_t m_targetSeedStartPos;
 
         SAIntervalNode* m_pRootNode;
         STNodePtrList m_leaves;

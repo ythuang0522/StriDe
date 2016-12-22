@@ -104,6 +104,7 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
     {
 		// ACGT-extend the leaf nodes via updating existing SA interval
         extendLeaves();
+		// extendLeaves_v2();
 		// std::cout << "====" << std::endl;
 		// std::cout << m_query << std::endl;
 		// std::cout << "----" << std::endl;
@@ -166,7 +167,6 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 		return -4;
 }
 
-// dead code
 int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
 	int maxAlgScore = -100;
@@ -212,6 +212,7 @@ int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FM
 	return -4;
 }
 
+// dead code
 int ShortReadOverlapTree::findTheBestLocalPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
 	m_leaves.sort(SeedComparator);
@@ -266,6 +267,32 @@ void ShortReadOverlapTree::printAll()
 {
 	for (std::list<SAIOverlapNode2*>::iterator it = m_RootNodes.begin(); it != m_RootNodes.end(); ++it)
 		(*it)->printAllStrings("");
+}
+
+void ShortReadOverlapTree::extendLeaves_v2()
+{
+	SONode2PtrList newLeaves;
+	
+	// attempt to extend one base for each leave
+	attempToExtend(newLeaves);
+	
+	// reduce current k-mer size until leaves appear
+	while(newLeaves.empty() && m_currentKmerSize > m_minOverlap)
+	{
+		m_currentKmerSize--;
+		refineSAInterval(m_currentKmerSize);
+		attempToExtend(newLeaves);
+	}
+
+	// extension succeed
+	if(!newLeaves.empty())
+	{
+		m_currentLength++;  
+		m_currentKmerSize++;
+	}
+
+	m_leaves.clear();
+	m_leaves = newLeaves;
 }
 
 void ShortReadOverlapTree::extendLeaves()
@@ -474,7 +501,7 @@ bool ShortReadOverlapTree::isSupportedByNewSeed(SAIOverlapNode2* currNode, size_
 			resultsFwd.at(i).value <= largeSeedIdx )
 		{
 			// update currNode members
-			if(std::abs(resultsFwd.at(i).value - currSeedIdx) < minIdxDiff)
+			if(std::abs((int)resultsFwd.at(i).value - (int)currSeedIdx) < minIdxDiff)
 			{
 				currNode->lastSeedIdx = resultsFwd.at(i).value;
 				// query overlap may shift due to indels
@@ -493,7 +520,7 @@ bool ShortReadOverlapTree::isSupportedByNewSeed(SAIOverlapNode2* currNode, size_
 			resultsRvc.at(i).value <= largeSeedIdx )
 		{
 			// update currNode members
-			if(std::abs(resultsRvc.at(i).value - currSeedIdx) < minIdxDiff)
+			if(std::abs((int)resultsRvc.at(i).value - (int)currSeedIdx) < minIdxDiff)
 			{					
 				currNode->lastSeedIdx = resultsRvc.at(i).value;
 				// query overlap may shift due to indels

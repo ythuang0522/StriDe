@@ -22,11 +22,12 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_MaxLeaves(parameters.maxLeaves), 
 	m_pBWT(parameters.indices.pBWT), 
 	m_pRBWT(parameters.indices.pRBWT), 
-	m_min_SA_threshold(parameters.SAThreshold),
+	m_minSAThreshold(parameters.SAThreshold),
 	m_kmerMode(parameters.kmerMode),
 	m_lowCoverageHighErrorMode(parameters.lowCoverageHighErrorMode),
 	m_debugMode(parameters.debugMode),
-	m_coverage(parameters.coverage)
+	m_coverage(parameters.coverage),
+	m_targetSeedStartPos(parameters.targetSeedStartPos)
 {
 	// Create the root node containing the seed string
 	m_pRootNode = new SAIntervalNode(m_pSourceSeed, NULL);
@@ -43,7 +44,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_pRootNode->rvcInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(beginningkmer));
 
     // initialize the ending SA intervals with kmer length = m_minOverlap
-	std::string endingkmer = m_targetSeed.substr(0, m_minOverlap);
+	std::string endingkmer = m_targetSeed.substr(m_targetSeedStartPos, m_minOverlap);
 
 	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
@@ -55,24 +56,23 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 
 	//m_expectedLength = m_pSourceSeed->length() + m_disBetweenSrcTarget + m_targetSeed.length();
 	
-	m_beginningIntervalSize = m_pRootNode->fwdInterval.size()+m_pRootNode->rvcInterval.size();
-	m_terminatedIntervalSize = m_fwdTerminatedInterval.size()+m_rvcTerminatedInterval.size();
+	m_beginningIntervalSize = 
+		(m_pRootNode->fwdInterval.isValid()?m_pRootNode->fwdInterval.size():0)+
+		(m_pRootNode->rvcInterval.isValid()?m_pRootNode->rvcInterval.size():0);
+	m_terminatedIntervalSize = 
+		(m_fwdTerminatedInterval.isValid()?m_fwdTerminatedInterval.size():0)+
+		(m_rvcTerminatedInterval.isValid()?m_rvcTerminatedInterval.size():0);
+	
+	m_iniMinSAThreshold = parameters.SAThreshold;
 	
 	if(m_debugMode)
 	{
-		int fwdKmerFreqs, rvcKmerFreqs, kmerFreqs;
-		fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(beginningkmer, parameters.indices);
-		rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(beginningkmer), parameters.indices);
-		kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
-		std::cout << beginningkmer << " " << kmerFreqs << "\n";
-		fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(endingkmer, parameters.indices);
-		rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(endingkmer), parameters.indices);
-		kmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
-		std::cout << endingkmer << " " << kmerFreqs << "\n";
+		std::cout << beginningkmer << " " << m_beginningIntervalSize << "\n";
+		std::cout << endingkmer << " " << m_terminatedIntervalSize << "\n";
 	}
 	
 	if(m_lowCoverageHighErrorMode == true)
-		m_min_SA_threshold *= 3;
+		m_minSAThreshold *= 3;
 }
 
 //
@@ -95,7 +95,8 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
     while(!m_leaves.empty() && m_leaves.size() <= m_MaxLeaves && m_currentLength <= m_MaxLength)
     {
 		// ACGT-extend the leaf nodes via updating existing SA interval
-        	extendLeaves();
+        	// extendLeaves();
+			extendLeaves_v2();
 		
 		// see if terminating string is reached
 		if(m_currentLength >= m_MinLength)
@@ -103,12 +104,14 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		
 		if(m_debugMode)
 		{	
-			//std::cout << results.size() << "\n";
+			std::cout << "----m_currentKmerSize: " << m_currentKmerSize
+			<< ", m_leaves.size(): " << m_leaves.size()
+			<< ", result: " << results.size() << "----\n";
+			std::cout << "TATCAGCATATAAGTAAGCAGAGGATATGTCCAGCTGTGTGATATAATAGTCGTTGTCTAATGCGATTGACAGTGACGTCATCAGTGCATAGTGATGTACGGTATTGGATTGCATATCAGAATCATATGTATCGGGGTGTTGAATGTCGCCTCTTGCAACAAATCTAGCTTTGTGTGTACCATCACGTTTCTTGTTAAATATAAACATTGAGTTTATTACTTTTTTAGGATCTATGTCATTTCTATCATAATATTTGTTTGTATCCCAAGTGTTCATTTTCAATAGTTGGCTAATTTCTTTATGATAAGCTTCAACATATCTGTCTTTTTCTTTGTTGTCTTTATTATATGTAATTGCTTCATCATATCTTAAGGTCGTTCGAACTGGTTTGATCGATTTCACTCCTTTTATTGCTGCAATTAAATTTATGCGTTTCTTCGATCTTGGTGGTTCCAGACTTCTCATATTCTTATTATTCCATGTGTCTCGGGATACCTCAATTTCAGTTTCATTATCTTCTAATGATCTTTTCTTACTTTTGGTAGTAGTCAGAACATTAGAATCATCCATACCACCCAAACTGGAATTAGTCTGACGAGAGTGTATGTGTGGAATATCTTTTGAAACATCAGAAGTG" << endl;
 			for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 			{
-				std::cout << "ATCAGGTAGTCGATACCGTACAGCGCAACGCGACGGTAGTCACCGATGATACGGCCACGGCCATATGCATCTGGCAGACCGGTCAGAACACCAGATTTACGGCAACGCAGGATGTCCGGAGTGTAAACGTCGAACACGCCCTGGTTGTGAGTTTTACGGTATTCAGTGAAGATTTTTTTGATCATCGGATCCAGTTCGCGGTTGTACGCTTTGCAGGAACCTTCGATCATTTTGATACCACCGAACGGGATAAG" << endl;
 				std::cout << (*iter)->getSuffix(m_currentLength-m_pSourceSeed->length()) << " ";
-				std::cout << m_currentLength << " " << m_currentKmerSize << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << "\n";
+				std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << "\n";
 			}
 		}
 		
@@ -125,6 +128,8 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 */
 		// std::cout << m_currentKmerSize << ":" << m_currentLength << ":" << m_leaves.size() << "\n";	
     }
+	// if(m_debugMode)
+		// std::cout << results.size() << "\n";
 	
 	// reach the terminal kmer
 	if(results.size() > 0)
@@ -176,39 +181,41 @@ void SAIntervalPBHybridCTree::pruneLeavesByAlignment()
 
 int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
-	double maxKmerCoverage = 0;
 	int maxAlgScore = -100;
+	// size_t maxKmerCoverage = 0;
 	
 	for (size_t i = 0 ; i < results.size() ;i++)
 	{
 		std::string candidateSeq;
 		
 		// bug fix: m_targetSeed may be shorter than m_minOverlap
-		if(m_targetSeed.length() > m_minOverlap)
-			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap);
+		if(m_targetSeed.length()-m_targetSeedStartPos > m_minOverlap)
+			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap+m_targetSeedStartPos);
 		else
-			candidateSeq = results[i].thread;		
+			candidateSeq = results[i].thread;
 		
 		// find the path with maximum alignment score
-		std::string pathBetweenSrcTarget = candidateSeq.substr(m_pSourceSeed->length()-10, candidateSeq.length()-m_pSourceSeed->length()-m_targetSeed.length()+20);
+		std::string pathBetweenSrcTarget = candidateSeq.substr(m_pSourceSeed->length()-10, candidateSeq.length()-m_pSourceSeed->length()-m_targetSeed.length()+m_targetSeedStartPos+20);
 		AlnAln *aln_global;
 		aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), pathBetweenSrcTarget.c_str(), &aln_param_pacbio, 1, 1);
 		
-		/*
 		if(m_debugMode)
 		{
 			std::cout << ">pathBetweenSrcTarget:" << i+1 << ",len:" << pathBetweenSrcTarget.length() 
-				<<  ",identity:" << matchPercent 
-				<< ",aln score:" << aln_global->score << "\n";
+				// <<  ",identity:" << matchPercent 
+				<< ",alnScore:" << aln_global->score << ",kmerFreq:" << results.at(i).SAICoverage <<"\n";
 			std::cout << pathBetweenSrcTarget << "\n";
-			printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
-		}*/
+			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
+		}
 
 		bool isAlgScoreBetter = maxAlgScore < aln_global->score;
+		// bool isAlgScoreBetter = maxKmerCoverage < results.at(i).SAICoverage;
 		if(isAlgScoreBetter)
 		{
 			maxAlgScore = aln_global->score;
+			// maxKmerCoverage = results.at(i).SAICoverage;
 			FMWResult.alnScore = maxAlgScore;
+			// FMWResult.kmerFreq = maxKmerCoverage;
 			FMWResult.mergedSeq = candidateSeq;
 		}
 		
@@ -216,7 +223,18 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 	}
 
 	if(FMWResult.mergedSeq.length() != 0)
+	{	
+		// if(m_debugMode)
+		// {
+			// std::cout << ">resultStr:YO,len:" << FMWResult.mergedSeq.length() 
+				// <<  ",identity:" << matchPercent 
+				// << ",alnScore:" << FMWResult.alnScore << "\n";
+				// << ",kmerFreq:" << FMWResult.kmerFreq << "\n";
+			// std::cout << FMWResult.mergedSeq << "\n";
+			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
+		// }
 		return 1;
+	}
 	return -4;
 }
 
@@ -245,8 +263,10 @@ void SAIntervalPBHybridCTree::attempToExtend(STNodePtrList &newLeaves)
             (*iter)->extend(extensions.front().first);
             (*iter)->fwdInterval=extensions.front().second.interval[0];
             (*iter)->rvcInterval=extensions.front().second.interval[1];
-			if((*iter)->fwdInterval.isValid()) (*iter)->addKmerCount( (*iter)->fwdInterval.size());
-			if((*iter)->rvcInterval.isValid()) (*iter)->addKmerCount( (*iter)->rvcInterval.size());
+			if((*iter)->fwdInterval.isValid())
+				(*iter)->addKmerCount( (*iter)->fwdInterval.size());
+			if((*iter)->rvcInterval.isValid())
+				(*iter)->addKmerCount( (*iter)->rvcInterval.size());
 			
             newLeaves.push_back(*iter);
         }
@@ -260,13 +280,54 @@ void SAIntervalPBHybridCTree::attempToExtend(STNodePtrList &newLeaves)
                 pChildNode->rvcInterval=extensions[i].second.interval[1];
 				//inherit accumulated kmerCount from parent
 				pChildNode->addKmerCount( (*iter)->getKmerCount() );
-				if(pChildNode->fwdInterval.isValid()) pChildNode->addKmerCount( pChildNode->fwdInterval.size());
-				if(pChildNode->rvcInterval.isValid()) pChildNode->addKmerCount( pChildNode->rvcInterval.size());
+				if(pChildNode->fwdInterval.isValid())
+					pChildNode->addKmerCount( pChildNode->fwdInterval.size());
+				if(pChildNode->rvcInterval.isValid())
+					pChildNode->addKmerCount( pChildNode->rvcInterval.size());
 
                 newLeaves.push_back(pChildNode);
             }
         }
     }
+}
+
+void SAIntervalPBHybridCTree::extendLeaves_v2()
+{
+	STNodePtrList newLeaves;
+	
+	// don't be too greedy.
+	if(m_currentKmerSize > m_maxOverlap && m_leaves.size() < m_MaxLeaves*2/7)
+	{
+		refineSAInterval(m_maxOverlap);
+		m_currentKmerSize=m_maxOverlap;
+	}
+
+	// the size of leaves is close to maxLeaves, so increase the FMW Threshold.
+	if(m_leaves.size() > m_MaxLeaves/2)
+		m_minSAThreshold = m_iniMinSAThreshold*3;
+	else
+		m_minSAThreshold = m_iniMinSAThreshold;
+	
+	// attempt to extend one base for each leave
+	attempToExtend(newLeaves);
+	
+	// reduce current k-mer size until leaves appear
+	while(newLeaves.empty() && m_currentKmerSize > m_minOverlap)
+	{
+		m_currentKmerSize--;
+		refineSAInterval(m_currentKmerSize);
+		attempToExtend(newLeaves);
+	}
+
+	// extension succeed
+	if(!newLeaves.empty())
+	{
+		m_currentLength++;		
+		m_currentKmerSize++;
+	}
+
+	m_leaves.clear();
+	m_leaves = newLeaves;
 }
 
 void SAIntervalPBHybridCTree::extendLeaves()
@@ -314,7 +375,6 @@ void SAIntervalPBHybridCTree::extendLeaves()
 
     m_leaves.clear();
     m_leaves = newLeaves;
-
 }
 
 // Check for leaves whose extension has terminated. If the leaf has
@@ -357,7 +417,7 @@ bool SAIntervalPBHybridCTree::isTerminated(SAIntervalNodeResultVector& results)
 std::vector<std::pair<std::string, BWTIntervalPair> > SAIntervalPBHybridCTree::getFMIndexExtensions(SAIntervalNode* pNode)
 {
     std::vector<std::pair<std::string, BWTIntervalPair> > out;
-    size_t IntervalSizeCutoff=m_min_SA_threshold;    //min freq at fwd and rvc bwt, >=3 is equal to >=2 kmer freq
+    size_t IntervalSizeCutoff=m_minSAThreshold;    //min freq at fwd and rvc bwt, >=3 is equal to >=2 kmer freq
 
     for(int i = 1; i < BWT_ALPHABET::size; ++i) //i=A,C,G,T
     {

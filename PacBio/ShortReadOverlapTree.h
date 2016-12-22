@@ -48,6 +48,7 @@ class ShortReadOverlapTree
         // Functions
         //
         void extendLeaves();
+		void extendLeaves_v2();
 		void attempToExtend(SONode2PtrList &newLeaves);
 		void refineSAInterval(size_t newKmer);
 		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);

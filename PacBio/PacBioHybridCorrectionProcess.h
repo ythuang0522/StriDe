@@ -110,6 +110,7 @@ private:
 	// identify seeds
 	std::vector<SeedFeature> dynamicSeedingFromSR(const std::string& readSeq);
 	bool dynamicSeedingFromPB(const std::string& readSeq, std::vector<SeedFeature>& seedVec, std::vector<int>& seedEndPosVec, size_t prevEndPos);
+	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec);
 	
 	// replace raw sequence by correct sequence
 	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, int dis_between_src_target, FMWalkResult& FMWResult);

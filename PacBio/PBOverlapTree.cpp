@@ -314,7 +314,7 @@ bool PBOverlapTree::isSupportedByNewSeed(SAIOverlapNode* currNode, size_t smallS
 		{
 			// if(results.size() > 1) std::cout << results.size() << "\n";
 			// update currNode members
-			if(std::abs(results.at(i).value - currSeedIdx) < minIdxDiff)
+			if(std::abs((int)results.at(i).value - (int)currSeedIdx) < minIdxDiff)
 			{					
 				currNode->lastSeedIdx = results.at(i).value;
 				// query overlap may shift due to indels
