@@ -306,8 +306,14 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 		//if( (pos-1-minKmerSize-seedStartPos) < 2 && !seedVec.empty() && pos-1-minKmerSize-seedVec.back().seedEndPos <= 30)
 		//if(!seedVec.empty() && pos-1-minKmerSize-seedVec.back().seedEndPos <= 30)
 		//	continue;
-
+	
 		size_t seedEndPos=pos-1;
+		
+		// if seed frequency in PB great tha in SR, 
+		// we skipped it.
+		if(dynamicKmerSize==minKmerSize && 
+		BWTAlgorithms::countSequenceOccurrences(readSeq.substr(seedStartPos, seedEndPos-seedStartPos+1), m_params.PBindices)>maxKmerFreq)
+			continue;
 
 		// repeat seeds are less accurate at boundary and should be trimmed 
 		if(maxKmerFreq >= m_params.coverage*4)
