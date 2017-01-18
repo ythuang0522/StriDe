@@ -15,7 +15,7 @@
 // Class: SAIOverlapTree
 ShortReadOverlapTree::ShortReadOverlapTree(FMWalkParameters& parameters):
 	m_sourceSeed(parameters.sourceSeed), 
-	m_strBetweenSrcTarget(parameters.strBetweenSrcTarget),
+	m_rawPBStrBetweenSrcTargetWith2Minoverlap(parameters.rawPBStrBetweenSrcTargetWith2Minoverlap),
 	m_targetSeed(parameters.targetSeed),				
 	m_disBetweenSrcTarget(parameters.disBetweenSrcTarget),
 	m_minOverlap(parameters.minOverlap), 
@@ -58,15 +58,13 @@ ShortReadOverlapTree::ShortReadOverlapTree(FMWalkParameters& parameters):
 	m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
 
 	m_currentLength = m_currentKmerSize = m_minOverlap;
-
-	m_query = beginningkmer + m_strBetweenSrcTarget + endingkmer;
 	
 	// put SA intervals into m_fwdIntervals and m_rvcIntervals cache
-	m_fwdIntervals.reserve(m_query.length()-m_seedSize+1);
-	m_rvcIntervals.reserve(m_query.length()-m_seedSize+1);
-	for(int i = 0; i <= (int)m_query.length()-(int)m_seedSize ; i++)
+	m_fwdIntervals.reserve(m_rawPBStrBetweenSrcTargetWith2Minoverlap.length()-m_seedSize+1);
+	m_rvcIntervals.reserve(m_rawPBStrBetweenSrcTargetWith2Minoverlap.length()-m_seedSize+1);
+	for(int i = 0; i <= (int)m_rawPBStrBetweenSrcTargetWith2Minoverlap.length()-(int)m_seedSize ; i++)
 	{
-		std::string seedStr = m_query.substr(i, m_seedSize);
+		std::string seedStr = m_rawPBStrBetweenSrcTargetWith2Minoverlap.substr(i, m_seedSize);
 		BWTInterval bi;
 		bi = BWTAlgorithms::findInterval( m_pRBWT, reverse(seedStr) );
 		if(bi.isValid())
@@ -170,6 +168,7 @@ int ShortReadOverlapTree::extendOverlap(FMWalkResult &FMWResult)
 int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
 {
 	int maxAlgScore = -100;
+	// size_t maxKmerCoverage = 0;
 	
 	for (size_t i = 0 ; i < results.size() ;i++)
 	{
@@ -179,11 +178,13 @@ int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FM
 		if(m_targetSeed.length() > m_minOverlap)
 			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap);
 		else
-			candidateSeq = results[i].thread;		
+			candidateSeq = results[i].thread;
 		
 		// find the path with maximum alignment score
+		std::string pathBetweenSrcTargetWith2Minoverlap = 
+			results[i].thread.substr(m_sourceSeed.length()-m_minOverlap);
 		AlnAln *aln_global;
-		aln_global = aln_stdaln(m_query.c_str(), candidateSeq.c_str(), &aln_param_pacbio, 1, 1);
+		aln_global = aln_stdaln(m_rawPBStrBetweenSrcTargetWith2Minoverlap.c_str(), pathBetweenSrcTargetWith2Minoverlap.c_str(), &aln_param_pacbio, 1, 1);
 		
 		/*
 		if(m_debugMode)
@@ -210,56 +211,6 @@ int ShortReadOverlapTree::findTheBestPath(SAIntervalNodeResultVector results, FM
 	if(FMWResult.mergedSeq.length() != 0)
 		return 1;
 	return -4;
-}
-
-// dead code
-int ShortReadOverlapTree::findTheBestLocalPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
-{
-	m_leaves.sort(SeedComparator);
-	
-	const int numMaxDP = 10;
-	int maxAlgScore = -100, countNumDP = 0;
-	for(SONode2PtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end() && countNumDP < numMaxDP; ++iter, countNumDP++)
-	{
-		std::string candidateSeq;
-		
-		candidateSeq = (*iter)->getSuffix(m_currentLength);
-		
-		// find the path with maximum alignment score
-		AlnAln *aln_local;
-		
-		aln_local = aln_stdaln(m_query.c_str(), candidateSeq.c_str(), &aln_param_pacbio, 0, 1);
-
-		// std::cout << aln_local->score << ", " <<
-		// aln_local->start2 << ", " << aln_local->end2 << ".\n";
-			
-		bool isAlgScoreBetter = maxAlgScore < aln_local->score;
-		// bool isSameEnd11bp = candidateSeq.substr(candidateSeq.length()-11) == m_targetSeed.substr(m_minOverlap-11, 11);
-		
-		// std::cout << "====\n" << 
-		// m_query << "\n" << 
-		// candidateSeq << "\n" <<
-		// candidateSeq.substr(0, aln_local->end2) << "\n" << aln_local->end2 << "----\n";
-		// candidateSeq.substr(candidateSeq.length()-11) << "\n" <<
-		// m_targetSeed.substr(m_minOverlap-11, 11) << "\n";
-		
-		// if(isAlgScoreBetter)// && isSameEnd11bp)
-		// {
-			// maxAlgScore = aln_local->score;
-			// FMWResult.alnScore = maxAlgScore;
-			// bug fix: m_targetSeed may be shorter than m_minOverlap
-			// if(m_targetSeed.length() > m_minOverlap)
-				// FMWResult.mergedSeq = candidateSeq.substr(0, aln_local->end2) + m_targetSeed.substr(m_minOverlap);
-			// else
-				// FMWResult.mergedSeq = candidateSeq.substr(0, aln_local->end2);
-		// }
-		
-		aln_free_AlnAln(aln_local);
-	}
-	
-	if(FMWResult.mergedSeq.length() != 0)
-		return 1;
-	return -2;
 }
 
 // Print the string represented by every node
@@ -425,8 +376,8 @@ bool ShortReadOverlapTree::PrunedBySeedSupport()
 			
 	// Compute the range of small and large indices for tolerating m_maxIndelSize
 	size_t smallSeedIdx = currSeedIdx <= indelOffset ? 0 : currSeedIdx - indelOffset;
-	size_t largeSeedIdx = (currSeedIdx+indelOffset) >= (m_query.length()-m_seedSize)?
-						  (m_query.length()-m_seedSize):currSeedIdx+indelOffset;
+	size_t largeSeedIdx = (currSeedIdx+indelOffset) >= (m_rawPBStrBetweenSrcTargetWith2Minoverlap.length()-m_seedSize)?
+						  (m_rawPBStrBetweenSrcTargetWith2Minoverlap.length()-m_seedSize):currSeedIdx+indelOffset;
 
 	// check range of last seed and find new seeds for each interval
 	SONode2PtrList::iterator iter = m_leaves.begin(); 

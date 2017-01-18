@@ -113,10 +113,10 @@ private:
 	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec);
 	
 	// replace raw sequence by correct sequence
-	int extendBetweenSeeds(SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, int dis_between_src_target, FMWalkResult& FMWResult);
-	int unlimitedFMIndexExtension(FMWalkParameters& FMWParams, SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, FMWalkResult& FMWResult, int minOverlap, bool& isSequencingGap, bool sourceIsRepeat);
-	int limitedFMIndexExtension(FMWalkParameters& FMWParams, SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, FMWalkResult& FMWResult, int minOverlap, bool& isSequencingGap, bool sourceIsRepeat);
-	int MSACorrection(FMWalkParameters& FMWParams, SeedFeature& source, SeedFeature& target, std::string& strBetweenSrcTarget, FMWalkResult& FMWResult, int minOverlap, bool& isSequencingGap, bool sourceIsRepeat);
+	int extendBetweenSeeds(std::string& readSeq, SeedFeature& source, SeedFeature& target, FMWalkResult& FMWResult);
+	int unlimitedFMIndexExtension(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);
+	int limitedFMIndexExtension(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);
+	int MSACorrection(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);
 	
 	// subfunction
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);

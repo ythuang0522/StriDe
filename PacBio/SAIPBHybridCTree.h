@@ -19,7 +19,7 @@ struct FMWalkParameters
 {
 	BWTIndexSet indices;
 	std::string sourceSeed;
-	std::string strBetweenSrcTarget;
+	std::string rawPBStrBetweenSrcTargetWith2Minoverlap;
 	std::string targetSeed;
     int disBetweenSrcTarget;
 	size_t maxLeaves=256;
@@ -34,7 +34,6 @@ struct FMWalkParameters
 	bool lowCoverageHighErrorMode = false;
 	bool debugMode = false;
 	size_t coverage;
-	size_t targetSeedStartPos=0;
 };
 
 // Result Object for the FM-index Walk of PacBio Hybrid Correction
@@ -85,7 +84,7 @@ class SAIntervalPBHybridCTree
         // Data
         //
         const std::string* m_pSourceSeed;
-		std::string m_strBetweenSrcTarget;
+		std::string m_rawPBStrBetweenSrcTargetWith2Minoverlap;
         std::string m_targetSeed;
         size_t m_minOverlap;
 		size_t m_maxOverlap;
@@ -98,7 +97,6 @@ class SAIntervalPBHybridCTree
 		size_t m_iniMinSAThreshold;
 		int m_disBetweenSrcTarget;
 		int m_expectedLength;
-		size_t m_targetSeedStartPos;
 
         SAIntervalNode* m_pRootNode;
         STNodePtrList m_leaves;

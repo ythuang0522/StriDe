@@ -14,11 +14,11 @@ using namespace std;
 // Class: SAIntervalTree
 SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_pSourceSeed(&parameters.sourceSeed), 
-	m_strBetweenSrcTarget(parameters.strBetweenSrcTarget),
+	m_disBetweenSrcTarget(parameters.disBetweenSrcTarget), 
+	m_rawPBStrBetweenSrcTargetWith2Minoverlap(parameters.rawPBStrBetweenSrcTargetWith2Minoverlap),
 	m_targetSeed(parameters.targetSeed),
 	m_minOverlap(parameters.minOverlap), 
 	m_maxOverlap(parameters.maxOverlap), 
-	m_disBetweenSrcTarget(parameters.disBetweenSrcTarget),
 	m_MaxLeaves(parameters.maxLeaves), 
 	m_pBWT(parameters.indices.pBWT), 
 	m_pRBWT(parameters.indices.pRBWT), 
@@ -26,8 +26,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_kmerMode(parameters.kmerMode),
 	m_lowCoverageHighErrorMode(parameters.lowCoverageHighErrorMode),
 	m_debugMode(parameters.debugMode),
-	m_coverage(parameters.coverage),
-	m_targetSeedStartPos(parameters.targetSeedStartPos)
+	m_coverage(parameters.coverage)
 {
 	// Create the root node containing the seed string
 	m_pRootNode = new SAIntervalNode(m_pSourceSeed, NULL);
@@ -44,7 +43,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_pRootNode->rvcInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(beginningkmer));
 
     // initialize the ending SA intervals with kmer length = m_minOverlap
-	std::string endingkmer = m_targetSeed.substr(m_targetSeedStartPos, m_minOverlap);
+	std::string endingkmer = m_targetSeed.substr(0, m_minOverlap);
 
 	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
@@ -67,8 +66,8 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	
 	if(m_debugMode)
 	{
-		std::cout << beginningkmer << " " << m_beginningIntervalSize << "\n";
-		std::cout << endingkmer << " " << m_terminatedIntervalSize << "\n";
+		std::cout << beginningkmer << " " << m_beginningIntervalSize << "--\n";
+		std::cout << endingkmer << " " << m_terminatedIntervalSize << "--\n";
 	}
 	
 	if(m_lowCoverageHighErrorMode == true)
@@ -162,7 +161,7 @@ void SAIntervalPBHybridCTree::pruneLeavesByAlignment()
 	int maxAlnScore = -100;
 	STNodePtrList newLeaves;
 
-	std::string rawStr = m_strBetweenSrcTarget.substr(0, m_currentLength-m_pSourceSeed->length());
+	std::string rawStr = m_rawPBStrBetweenSrcTargetWith2Minoverlap.substr(0, m_currentLength-m_pSourceSeed->length());
 	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 	{
 		std::string currStr = (*iter)->getSuffix(rawStr.length());
@@ -184,27 +183,28 @@ int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results,
 	int maxAlgScore = -100;
 	// size_t maxKmerCoverage = 0;
 	
-	for (size_t i = 0 ; i < results.size() ;i++)
+	for (size_t i = 0 ; i < results.size() ; i++)
 	{
 		std::string candidateSeq;
 		
 		// bug fix: m_targetSeed may be shorter than m_minOverlap
-		if(m_targetSeed.length()-m_targetSeedStartPos > m_minOverlap)
-			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap+m_targetSeedStartPos);
+		if(m_targetSeed.length() > m_minOverlap)
+			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap);
 		else
 			candidateSeq = results[i].thread;
 		
 		// find the path with maximum alignment score
-		std::string pathBetweenSrcTarget = candidateSeq.substr(m_pSourceSeed->length()-10, candidateSeq.length()-m_pSourceSeed->length()-m_targetSeed.length()+m_targetSeedStartPos+20);
+		std::string pathBetweenSrcTargetWith2Minoverlap = 
+			results[i].thread.substr(m_pSourceSeed->length()-m_minOverlap);
 		AlnAln *aln_global;
-		aln_global = aln_stdaln(m_strBetweenSrcTarget.c_str(), pathBetweenSrcTarget.c_str(), &aln_param_pacbio, 1, 1);
+		aln_global = aln_stdaln(m_rawPBStrBetweenSrcTargetWith2Minoverlap.c_str(), pathBetweenSrcTargetWith2Minoverlap.c_str(), &aln_param_pacbio, 1, 1);
 		
 		if(m_debugMode)
 		{
-			std::cout << ">pathBetweenSrcTarget:" << i+1 << ",len:" << pathBetweenSrcTarget.length() 
+			std::cout << ">pathBetweenSrcTargetWith2Minoverlap:" << i+1 << ",len:" << pathBetweenSrcTargetWith2Minoverlap.length() 
 				// <<  ",identity:" << matchPercent 
 				<< ",alnScore:" << aln_global->score << ",kmerFreq:" << results.at(i).SAICoverage <<"\n";
-			std::cout << pathBetweenSrcTarget << "\n";
+			std::cout << pathBetweenSrcTargetWith2Minoverlap << "\n";
 			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
 		}
 

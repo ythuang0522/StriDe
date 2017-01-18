@@ -52,7 +52,6 @@ class ShortReadOverlapTree
 		void attempToExtend(SONode2PtrList &newLeaves);
 		void refineSAInterval(size_t newKmer);
 		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
-		int findTheBestLocalPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
 		
         std::vector<std::pair<std::string, BWTIntervalPair> > getFMIndexExtensions(SAIOverlapNode2* pNode);
 
@@ -69,7 +68,7 @@ class ShortReadOverlapTree
         // Data
         //
 		const std::string m_sourceSeed;
-		const std::string m_strBetweenSrcTarget;
+		const std::string m_rawPBStrBetweenSrcTargetWith2Minoverlap;
 		const std::string m_targetSeed;		
 		int m_disBetweenSrcTarget;
         size_t m_minOverlap;
@@ -84,8 +83,6 @@ class ShortReadOverlapTree
         size_t m_maxLeaves;
 		size_t m_seedSize;
 		size_t m_repeatFreq;
-
-		std::string m_query;
 		
         int m_maxLength;
 		int m_minLength;

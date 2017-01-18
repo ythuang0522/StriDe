@@ -993,8 +993,6 @@ void SeedFeature::append(std::string extendedStr)
 {
 	seedStr += extendedStr;
 	seedLength += extendedStr.length();
-	seedStartPos += extendedStr.length();
-	seedEndPos += extendedStr.length();
 }
 
 void SeedFeature::setBestKmerSize(size_t kmerSize)
