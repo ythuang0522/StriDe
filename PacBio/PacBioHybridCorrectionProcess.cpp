@@ -69,7 +69,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		// we try to use the next seed as a new target.
 		for(int newTargetSeed = targetSeed + tryNext; 
 		// tryNext <= N, N means the maximum try times.
-		tryNext <= 0 && FMWalkReturnType <= 0 && newTargetSeed < seedVec.size(); 
+		tryNext <= 3 && FMWalkReturnType <= 0 && newTargetSeed < seedVec.size(); 
 		tryNext++, newTargetSeed = targetSeed + tryNext)
 		{
 			target = seedVec.at(newTargetSeed);

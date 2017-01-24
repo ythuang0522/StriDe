@@ -102,6 +102,7 @@ static const struct option longopts[] = {
 	{ "max-seed-size", required_argument, NULL, 'K' },
 	{ "kmer-threshold",required_argument, NULL, 'x' },
 	{ "max-leaves",    required_argument, NULL, 'L' },
+	{ "max-overlap",   required_argument, NULL, 'M' },
 	{ "min-overlap",   required_argument, NULL, 'm' },
 	{ "min-seed-size", required_argument, NULL, 'k' },
 	{ "PBprefix",      required_argument,  NULL, 'f' },
