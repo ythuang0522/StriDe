@@ -126,7 +126,7 @@ size_t processWorkParallelPthread(Generator& generator,
     InputBufferVector inputBuffers(numThreads);
     OutputBufferVector outputBuffers(numThreads);
     SemaphorePtrVector semVec(numThreads);
-
+	
     // Create the threads
     for(int i = 0; i < numThreads; ++i)
     {
@@ -163,15 +163,27 @@ size_t processWorkParallelPthread(Generator& generator,
         bool valid = generator.generate(workItem);
         if(valid)
         {
+			/*** Sequencial buffer insertion ***/
+            // inputBuffers[next_thread]->push_back(workItem);
+            // numWorkItemsRead += 1;
+
+            // // Change buffers if this one is full
+            // if(inputBuffers[next_thread]->size() == BUFFER_SIZE)
+            // {
+                // ++num_buffers_full;
+                // ++next_thread;
+            // }
+
+			/*** Uniform-circular buffer insertion ***/
             inputBuffers[next_thread]->push_back(workItem);
             numWorkItemsRead += 1;
 
             // Change buffers if this one is full
-            if(inputBuffers[next_thread]->size() == BUFFER_SIZE)
-            {
+			if(inputBuffers[next_thread]->size() == BUFFER_SIZE)
                 ++num_buffers_full;
-                ++next_thread;
-            }
+			
+			// move to next circular buffer vector
+			next_thread = (next_thread+1)% numThreads;
         }
 
         done = !valid || generator.getNumConsumed() == n;
@@ -205,6 +217,7 @@ size_t processWorkParallelPthread(Generator& generator,
 
                     inputBuffers[i]->clear();
                     outputBuffers[i]->clear();
+					
                 }
 
                 double proc_time_secs = timer.getElapsedWallTime();

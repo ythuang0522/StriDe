@@ -29,9 +29,13 @@ MultipleAlignment LongReadOverlap::buildMultipleAlignment(const std::string& que
     SequenceOverlapPairVector overlap_vector;
 	retrieveMatches(query, srcKmerLength, min_overlap, min_identity, coverage, indices, false, overlap_vector);
 	size_t srcSize = overlap_vector.size();
-	
+
+	if(srcSize == 0) return multiple_alignment;
+
 	// reverse overlap from target seed
 	retrieveMatches(query, tarKmerLength, min_overlap, min_identity, coverage, indices, true, overlap_vector);
+
+	if(srcSize == overlap_vector.size()) return multiple_alignment;
 	
 	// push into multiple alignment matrix
     for(size_t i = 0; i < srcSize; ++i)
