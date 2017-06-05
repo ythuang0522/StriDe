@@ -13,10 +13,9 @@ using namespace std;
 //
 // Class: SAIntervalTree
 SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
-	m_pSourceSeed(&parameters.sourceSeed), 
+	m_pStrSourceSeed(&parameters.strSourceSeed),
+	m_strTargetSeed(parameters.strTargetSeed),
 	m_disBetweenSrcTarget(parameters.disBetweenSrcTarget), 
-	m_rawPBStrBetweenSrcTargetWith2Minoverlap(parameters.rawPBStrBetweenSrcTargetWith2Minoverlap),
-	m_targetSeed(parameters.targetSeed),
 	m_minOverlap(parameters.minOverlap), 
 	m_maxOverlap(parameters.maxOverlap), 
 	m_MaxLeaves(parameters.maxLeaves), 
@@ -25,25 +24,24 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_minSAThreshold(parameters.SAThreshold),
 	m_kmerMode(parameters.kmerMode),
 	m_lowCoverageHighErrorMode(parameters.lowCoverageHighErrorMode),
-	m_debugMode(parameters.debugMode),
-	m_coverage(parameters.coverage)
+	m_debugMode(parameters.debugMode)
 {
 	// Create the root node containing the seed string
-	m_pRootNode = new SAIntervalNode(m_pSourceSeed, NULL);
+	m_pRootNode = new SAIntervalNode(m_pStrSourceSeed, NULL);
 	// store initial str of root
-	m_pRootNode->computeInitial(*m_pSourceSeed);
+	m_pRootNode->computeInitial(*m_pStrSourceSeed);
 	m_leaves.push_back(m_pRootNode);
 
-	m_currentLength = m_pSourceSeed->length();
+	m_currentLength = m_pStrSourceSeed->length();
 	m_currentKmerSize = m_minOverlap;
 	
 	// initialize the beginning SA intervals with kmer length = m_minOverlap
-	std::string beginningkmer = m_pSourceSeed->substr(m_currentLength-m_minOverlap);
+	std::string beginningkmer = m_pStrSourceSeed->substr(m_currentLength-m_minOverlap);
 	m_pRootNode->fwdInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(beginningkmer));
 	m_pRootNode->rvcInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(beginningkmer));
 
     // initialize the ending SA intervals with kmer length = m_minOverlap
-	std::string endingkmer = m_targetSeed.substr(0, m_minOverlap);
+	std::string endingkmer = m_strTargetSeed.substr(0, m_minOverlap);
 
 	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
@@ -54,14 +52,6 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
 
 	//m_expectedLength = m_pSourceSeed->length() + m_disBetweenSrcTarget + m_targetSeed.length();
-	
-	m_beginningIntervalSize = 
-		(m_pRootNode->fwdInterval.isValid()?m_pRootNode->fwdInterval.size():0)+
-		(m_pRootNode->rvcInterval.isValid()?m_pRootNode->rvcInterval.size():0);
-	m_terminatedIntervalSize = 
-		(m_fwdTerminatedInterval.isValid()?m_fwdTerminatedInterval.size():0)+
-		(m_rvcTerminatedInterval.isValid()?m_rvcTerminatedInterval.size():0);
-	
 	m_iniMinSAThreshold = parameters.SAThreshold;
 	
 	if(m_debugMode)
@@ -82,14 +72,13 @@ SAIntervalPBHybridCTree::~SAIntervalPBHybridCTree()
 }
 
 // On success return the length of merged string
-int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
+void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 {
     SAIntervalNodeResultVector results;
 	
 	//if(m_debugMode)
 	//	std::cout << m_disBetweenSrcTarget << " " << m_MinLength << "----\n";	
 	
-    size_t alignCount = 0;
     // BFS search from 1st to 2nd read via FM-index walk
     while(!m_leaves.empty() && m_leaves.size() <= m_MaxLeaves && m_currentLength <= m_MaxLength)
     {
@@ -98,8 +87,8 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 			extendLeaves_v2();
 		
 		// see if terminating string is reached
-		if(m_currentLength >= m_MinLength)
-			isTerminated(results);
+		if(m_currentLength >= m_MinLength && isTerminated(results))
+			break;
 		
 		// if(m_debugMode)
 		// {	
@@ -117,14 +106,6 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		if(m_leaves.size() > m_maxUsedLeaves)
 			m_maxUsedLeaves = m_leaves.size();
 
-/*		// prune leaaves via alignment to raw read
-		if(m_leaves.size()>m_MaxLeaves/2 && m_strBetweenSrcTarget.length()>10 && alignCount < 2){
-			//std::cout << m_leaves.size() << ":";
-			pruneLeavesByAlignment();
-			alignCount++;
-			//std::cout << m_leaves.size() << "\n";
-		}
-*/
 		// std::cout << m_currentKmerSize << ":" << m_currentLength << ":" << m_leaves.size() << "\n";	
     }
 	// if(m_debugMode)
@@ -133,109 +114,30 @@ int SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 	// reach the terminal kmer
 	if(results.size() > 0)
 	{
+		FMWResult.typeFMWalkResult = 1;
+		// bug fix: m_targetSeed may be shorter than m_minOverlap
+		if(m_strTargetSeed.length() > m_minOverlap)
+			FMWResult.mergedSeq = results.at(0).thread + m_strTargetSeed.substr(m_minOverlap);
+		else
+			FMWResult.mergedSeq = results.at(0).thread;
+		return;
+		
 		// find the path with maximum match percent or kmer coverage
-		return findTheBestPath(results, FMWResult);
+		// return findTheBestPath(results, FMWResult);
 	}
 	
 	// std::cout << m_currentLength << ":" << m_MaxLength << "\n";
-/*
-	if(m_disBetweenSrcTarget == 236) {
-	//	std::cout << "CCCGAACCAATATCCCTTCAAAAGACGAAAAGTCACTTTTTCCAAAACTACAGTGTCCCTACAGTACCCCGATTATATCCCCCACTAACCTGAAACCATCATCTCTTCCACAAAACGAAAACTATTTTTTCCATTACTACAGTAATCCTACAGTACTCCTGCAGTACTCCTACAGTACTACAGCATCCCCTTCAGTACTCCTACTGTACCCCCCCCCCCCCCCCCGGCACTACTACAGTACCCCGACCACATCCCTCACTAACCTCAAACCAATATTTCTTTTAAAATACGAAAACCAATTTTTCCCAAACTACAGTACCCCTACAGTACTCCTACAGTATCCCTACAGTACTCCTACAGTACCCCAAACATATCCCCCTACTAACCCGAACCAATAT\n";
-		std::cout << m_currentLength << ":" << m_MaxLength << "haha\n";
-		printAll();
-	}
-*/
+	
     // Did not reach the terminal kmer
     if(m_leaves.empty())
-        return -1;	//high error
+        FMWResult.typeFMWalkResult = -1;	//high error
     else if(m_currentLength > m_MaxLength)
-        return -2;	//exceed search depth
+        FMWResult.typeFMWalkResult = -2;	//exceed search depth
     else if(m_leaves.size() > m_MaxLeaves)
-        return -3;	//too much repeats
+        FMWResult.typeFMWalkResult = -3;	//too much repeats
 	else
-		return -4;
-}
-
-void SAIntervalPBHybridCTree::pruneLeavesByAlignment()
-{
-	int maxAlnScore = -100;
-	STNodePtrList newLeaves;
-
-	std::string rawStr = m_rawPBStrBetweenSrcTargetWith2Minoverlap.substr(0, m_currentLength-m_pSourceSeed->length());
-	for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
-	{
-		std::string currStr = (*iter)->getSuffix(rawStr.length());
-		AlnAln *aln_global = aln_stdaln(rawStr.c_str(), currStr.c_str(), &aln_param_pacbio, 1, 1);
-		if( maxAlnScore <= aln_global->score )
-		{
-			maxAlnScore = aln_global->score;
-			newLeaves.push_back(*iter);
-		}	
-		aln_free_AlnAln(aln_global);
-	}
-
-	m_leaves.clear();
-	m_leaves = newLeaves;
-}
-
-int SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
-{
-	int maxAlgScore = -100;
-	// size_t maxKmerCoverage = 0;
-	
-	for (size_t i = 0 ; i < results.size() ; i++)
-	{
-		std::string candidateSeq;
-		
-		// bug fix: m_targetSeed may be shorter than m_minOverlap
-		if(m_targetSeed.length() > m_minOverlap)
-			candidateSeq = results[i].thread + m_targetSeed.substr(m_minOverlap);
-		else
-			candidateSeq = results[i].thread;
-		
-		// find the path with maximum alignment score
-		std::string pathBetweenSrcTargetWith2Minoverlap = 
-			results[i].thread.substr(m_pSourceSeed->length()-m_minOverlap);
-		AlnAln *aln_global;
-		aln_global = aln_stdaln(m_rawPBStrBetweenSrcTargetWith2Minoverlap.c_str(), pathBetweenSrcTargetWith2Minoverlap.c_str(), &aln_param_pacbio, 1, 1);
-		
-		if(m_debugMode)
-		{
-			std::cout << ">pathBetweenSrcTargetWith2Minoverlap:" << i+1 << ",len:" << pathBetweenSrcTargetWith2Minoverlap.length() 
-				// <<  ",identity:" << matchPercent 
-				<< ",alnScore:" << aln_global->score << ",kmerFreq:" << results.at(i).SAICoverage <<"\n";
-			std::cout << pathBetweenSrcTargetWith2Minoverlap << "\n";
-			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
-		}
-
-		bool isAlgScoreBetter = maxAlgScore < aln_global->score;
-		// bool isAlgScoreBetter = maxKmerCoverage < results.at(i).SAICoverage;
-		if(isAlgScoreBetter)
-		{
-			maxAlgScore = aln_global->score;
-			// maxKmerCoverage = results.at(i).SAICoverage;
-			FMWResult.alnScore = maxAlgScore;
-			// FMWResult.kmerFreq = maxKmerCoverage;
-			FMWResult.mergedSeq = candidateSeq;
-		}
-		
-		aln_free_AlnAln(aln_global);
-	}
-
-	if(FMWResult.mergedSeq.length() != 0)
-	{	
-		// if(m_debugMode)
-		// {
-			// std::cout << ">resultStr:YO,len:" << FMWResult.mergedSeq.length() 
-				// <<  ",identity:" << matchPercent 
-				// << ",alnScore:" << FMWResult.alnScore << "\n";
-				// << ",kmerFreq:" << FMWResult.kmerFreq << "\n";
-			// std::cout << FMWResult.mergedSeq << "\n";
-			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
-		// }
-		return 1;
-	}
-	return -4;
+		FMWResult.typeFMWalkResult = -4;
+	return;
 }
 
 // Print the string represented by every node
@@ -328,53 +230,6 @@ void SAIntervalPBHybridCTree::extendLeaves_v2()
 
 	m_leaves.clear();
 	m_leaves = newLeaves;
-}
-
-void SAIntervalPBHybridCTree::extendLeaves()
-{
-    STNodePtrList newLeaves;
-	
-	//attempt to extend one base for each leave
-    attempToExtend(newLeaves);
-/*	if(m_kmerMode) 
-		refineSAInterval(m_minOverlap);
-	else if(m_lowCoverageHighErrorMode && m_currentKmerSize >= m_maxOverlap) 
-		refineSAInterval(m_minOverlap);
-	else */
-	if(m_currentKmerSize >= m_maxOverlap)
-	{
-		/*
-		if(m_minOverlap > 51)
-			refineSAInterval(m_minOverlap);
-		else if(m_beginningIntervalSize >= 80 && m_terminatedIntervalSize >= 80)
-			refineSAInterval(81);
-		else if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
-			refineSAInterval(51);
-		else
-			refineSAInterval(m_minOverlap);
-		*/
-		if(m_beginningIntervalSize >= m_coverage*0.8 || m_terminatedIntervalSize >= m_coverage*0.8) // 256: 16, extension may exceed max leaves soon after
-		//if(m_beginningIntervalSize >= 80 || m_terminatedIntervalSize >= 80)
-			refineSAInterval(81);
-		else
-			refineSAInterval(m_minOverlap);
-	}
-	
-    //shrink the SAIntervals in case overlap is larger than read length
-    if(!m_kmerMode  &&  newLeaves.empty() )
-    {
-		refineSAInterval(m_minOverlap);
-        attempToExtend(newLeaves);
-    }
-
-	//extension succeed
-    if(!newLeaves.empty()){
-        m_currentLength++;  
-		m_currentKmerSize++;
-	}
-
-    m_leaves.clear();
-    m_leaves = newLeaves;
 }
 
 // Check for leaves whose extension has terminated. If the leaf has

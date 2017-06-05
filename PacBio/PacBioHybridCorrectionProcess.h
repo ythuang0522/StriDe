@@ -19,8 +19,8 @@
 #include "SampledSuffixArray.h"
 #include "BWTAlgorithms.h"
 #include "KmerDistribution.h"
-#include "PacBioCorrectionProcess.h"
 #include "SAIPBHybridCTree.h"
+#include "SeedFeature.h"
 
 // Parameter object for the error corrector
 struct PacBioHybridCorrectionParameters
@@ -113,7 +113,7 @@ private:
 	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec);
 	
 	// replace raw sequence by correct sequence
-	int extendBetweenSeeds(std::string& readSeq, SeedFeature& source, SeedFeature& target, FMWalkResult& FMWResult);
+	void extendBetweenSeeds(std::string& readSeq, SeedFeature& source, SeedFeature& target, FMWalkResult& FMWResult);
 	int unlimitedFMIndexExtension(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);
 	int limitedFMIndexExtension(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);
 	int MSACorrection(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);

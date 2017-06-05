@@ -18,27 +18,22 @@
 struct FMWalkParameters
 {
 	BWTIndexSet indices;
-	std::string sourceSeed;
-	std::string rawPBStrBetweenSrcTargetWith2Minoverlap;
-	std::string targetSeed;
+	std::string strSourceSeed;
+	std::string strTargetSeed;
     int disBetweenSrcTarget;
 	size_t maxLeaves=256;
 	int minOverlap;
 	int maxOverlap;
     int SAThreshold = 3;
-	size_t maxIndelSize=9;
-	double errorRate=0.44;
-	size_t seedSize=11;
-	size_t repeatFreq=256;
 	bool kmerMode = false;
 	bool lowCoverageHighErrorMode = false;
 	bool debugMode = false;
-	size_t coverage;
 };
 
 // Result Object for the FM-index Walk of PacBio Hybrid Correction
 struct FMWalkResult
 {
+	int typeFMWalkResult=-2;
 	std::string mergedSeq;
 	int alnScore;
 	size_t kmerFreq;
@@ -53,7 +48,7 @@ class SAIntervalPBHybridCTree
 
         //return the merged string
         //bool mergeTwoReads(StringVector & mergeReads);
-        int mergeTwoSeeds(FMWalkResult &FMWResult);
+        void mergeTwoSeeds(FMWalkResult &FMWResult);
 		size_t getKmerCoverage(){return m_maxKmerCoverage;};
 		size_t getMaxUsedLeaves(){return m_maxUsedLeaves;};
 
@@ -83,9 +78,9 @@ class SAIntervalPBHybridCTree
         //
         // Data
         //
-        const std::string* m_pSourceSeed;
-		std::string m_rawPBStrBetweenSrcTargetWith2Minoverlap;
-        std::string m_targetSeed;
+        const std::string* m_pStrSourceSeed;
+		std::string m_strTargetSeed;
+		int m_disBetweenSrcTarget;
         size_t m_minOverlap;
 		size_t m_maxOverlap;
         int m_MaxLength;
@@ -95,7 +90,6 @@ class SAIntervalPBHybridCTree
         const BWT* m_pRBWT;
         size_t m_minSAThreshold;
 		size_t m_iniMinSAThreshold;
-		int m_disBetweenSrcTarget;
 		int m_expectedLength;
 
         SAIntervalNode* m_pRootNode;
@@ -111,12 +105,10 @@ class SAIntervalPBHybridCTree
 		size_t m_beginningIntervalSize;
 		size_t m_terminatedIntervalSize;
 		
-        bool m_kmerMode;
-		bool m_lowCoverageHighErrorMode;
+        bool m_kmerMode=false;
+		bool m_lowCoverageHighErrorMode=false;
 		bool m_repeatMode=false;
-		bool m_debugMode;
-
-	size_t m_coverage;
+		bool m_debugMode=false;
 };
 
 #endif

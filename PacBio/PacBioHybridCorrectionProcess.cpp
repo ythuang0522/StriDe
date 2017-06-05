@@ -28,7 +28,7 @@ PacBioHybridCorrectionProcess::~PacBioHybridCorrectionProcess()
 {
 }
 
-// PacBio Hybrid Correction by Ya, v20160216.
+// PacBio Hybrid Correction by Ya, v20170602.
 PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(const SequenceWorkItem& workItem)
 {
 	PacBioHybridCorrectionResult result;
@@ -52,72 +52,52 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		return result;
 	}
 	
-	// debug:
-	// int success=0, noWalk=0, errorSeed=0, exLeaves=0;
-	
 	// FMWalk for each pair of seeds
-	for(size_t targetSeed = 1 ; targetSeed < seedVec.size() ; targetSeed++)
+	for(size_t numFMWalk = 1 ; numFMWalk < seedVec.size() ; numFMWalk++)
 	{
-		int tryNext = 0;
-		int FMWalkReturnType = 0;
-		SeedFeature source = pacbioCorrectedStrs.back(), 
-					target;
 		FMWalkResult FMWResult;
-		
-		// This for loop is a unfinished function, 
-		// in order to escape the error seed target potentially, 
-		// we try to use the next seed as a new target.
-		for(int newTargetSeed = targetSeed + tryNext; 
-		// tryNext <= N, N means the maximum try times.
-		tryNext <= 3 && FMWalkReturnType <= 0 && newTargetSeed < seedVec.size(); 
-		tryNext++, newTargetSeed = targetSeed + tryNext)
-		{
-			target = seedVec.at(newTargetSeed);
-			FMWalkReturnType = extendBetweenSeeds(readSeq, source, target, FMWResult);
-			// cout<< FMWalkReturnType <<"\n";
-		}
-		if(FMWalkReturnType > 0)
-			targetSeed += (tryNext - 1);
-		target = seedVec.at(targetSeed);
+		SeedFeature seedSource = pacbioCorrectedStrs.back(),
+			seedTarget = seedVec.at(numFMWalk);
+		extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
 		
 		// debug:
-		// string seed = seedVec.at(targetSeed-tryNext).seedStr;
-		string seed = seedVec.at(targetSeed).seedStr;
-		int fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.indices);
-		int rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.indices);
-		int SRSF = fwdSF+rvcSF;
-		fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.PBindices);
-		rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.PBindices);
-		int PBSF = fwdSF+rvcSF;
-		// // std::cout << ">" << targetSeed-tryNext
-		// std::cout << ">" << targetSeed
-		// // << ", pos:" << seedVec.at(targetSeed-tryNext).seedStartPos
-		// << ", pos:" << seedVec.at(targetSeed).seedStartPos
-		// // << ", len:" << seedVec.at(targetSeed-tryNext).seedLength
-		// << ", len:" << seedVec.at(targetSeed).seedLength
-		// // << ", isPB:" << (seedVec.at(targetSeed-tryNext).isPBSeed?"yes":"no")
-		// << ", isPB:" << (seedVec.at(targetSeed).isPBSeed?"yes":"no")
+		// string seed = seedVec.at(numFMWalk-1).seedStr;
+		// string seed = seedVec.at(numFMWalk).seedStr;
+		// int fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.indices);
+		// int rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.indices);
+		// int SRSF = fwdSF+rvcSF;
+		// fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.PBindices);
+		// rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.PBindices);
+		// int PBSF = fwdSF+rvcSF;
+		// std::cout << ">" << targetSeed-1
+		// std::cout << ">" << numFMWalk-1
+		// << ", pos:" << seedVec.at(targetSeed-1).seedStartPos
+		// << ", pos:" << seedVec.at(numFMWalk-1).seedStartPos
+		// << ", len:" << seedVec.at(targetSeed-1).seedLength
+		// << ", len:" << seedVec.at(numFMWalk-1).seedLength
+		// << ", isPB:" << (seedVec.at(targetSeed-1).isPBSeed?"yes":"no")
+		// << ", isPB:" << (seedVec.at(numFMWalk-1).isPBSeed?"yes":"no")
 		// << ", SRSF:" << SRSF
 		// << ", PBSF:" << PBSF
 		// << ", GC&tandem%:" << (int)(GCAndTandemRatio(seed)*100) << "%"
-		// << ", FMWRT:" << FMWalkReturnType << ".\n"
+		// << ", FMWRT:" << FMWResult.typeFMWalkResult << ".\n"
 		// << seed << endl;
 		
 		// record corrected pacbio reads string--
-		result.seedDis += target.seedStartPos-source.seedEndPos-1;
+		// result.seedDis += target.seedStartPos-source.seedEndPos-1;
 		// A. FMWalk success:
-		if(FMWalkReturnType == 1)
+		if(FMWResult.typeFMWalkResult == 1)
 		{
-			assert(FMWResult.mergedSeq.length() > source.seedLength);
-			string extendedStr = FMWResult.mergedSeq.substr(source.seedLength);
+			assert(FMWResult.mergedSeq.length() > seedSource.seedLength);
+			string extendedStr = FMWResult.mergedSeq.substr(seedSource.seedLength);
 			pacbioCorrectedStrs.back().append(extendedStr);
-			pacbioCorrectedStrs.back().seedStartPos = target.seedStartPos;
-			pacbioCorrectedStrs.back().seedEndPos = target.seedEndPos;
-			pacbioCorrectedStrs.back().isRepeat = target.isRepeat;
-			pacbioCorrectedStrs.back().isPBSeed = target.isPBSeed;
-			pacbioCorrectedStrs.back().isNextRepeat = target.isNextRepeat;
-			pacbioCorrectedStrs.back().startBestKmerSize = target.startBestKmerSize;
-			pacbioCorrectedStrs.back().endBestKmerSize = target.endBestKmerSize;
+			pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
 			result.correctedLen += extendedStr.length();
 		}
 		// B. FMWalk failure: 
@@ -126,13 +106,23 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		// 3. exceed depth
 		else
 		{
-			pacbioCorrectedStrs.push_back(target);
-			result.correctedLen += target.seedLength;
+			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
+			pacbioCorrectedStrs.back().append(extendedStr);
+			pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
+			result.correctedLen += extendedStr.length();
+			// pacbioCorrectedStrs.push_back(seedTarget);
+			// result.correctedLen += seedTarget.seedLength;
 		}
 		
 		// output information
 		result.totalWalkNum++;
-		if(FMWalkReturnType == 1)
+		if(FMWResult.typeFMWalkResult == 1)
 			result.correctedNum++;
 		// else if(FMWalkReturnType == -1)
 			// result.highErrorNum++;
@@ -205,28 +195,28 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 			// << BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices) << ":" 
 			// << BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices) << "\n";
 			
-		if(kmerFreqs<dynamicKmerThreshold)
-		{
+		// if(kmerFreqs<dynamicKmerThreshold)
+		// {
 			// In large sequencing gaps (>7kb), no seeds can be found in Illumina index
 			// If no seed is found within PBSearchDepth, 
 			// seeds from PB index will be serached instead
-			int prevSeedEndPos=seedEndPosVec.empty()?0:(seedEndPosVec.back()+1);
-			int distToPrevSeed=pos+1-prevSeedEndPos;
+			// int prevSeedEndPos=seedEndPosVec.empty()?0:(seedEndPosVec.back()+1);
+			// int distToPrevSeed=pos+1-prevSeedEndPos;
 
 			// skip repeat regions
 			// bool isWithinRepeat = pos - prevRepeatEnd < m_params.PBSearchDepth;
-			if(/*!isWithinRepeat &&*/ distToPrevSeed>=m_params.PBSearchDepth)
-			{
+			// if(/*!isWithinRepeat &&*/ distToPrevSeed>=m_params.PBSearchDepth)
+			// {
 				// if(seedingByPacBio(readSeq,seedVec,seedEndPosVec,prevSeedEndPos))
-				if(dynamicSeedingFromPB(readSeq,seedVec,seedEndPosVec,prevSeedEndPos))
-					;//cout << seedVec.back().seedStr << " " << seedVec.back().seedStartPos << " " << BWTAlgorithms::countSequenceOccurrencesSingleStrand(seedVec.back().seedStr, m_params.PBindices)+BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seedVec.back().seedStr), m_params.PBindices) << endl;
-				else
-					seedEndPosVec.push_back(pos);
+				// if(dynamicSeedingFromPB(readSeq,seedVec,seedEndPosVec,prevSeedEndPos))
+					// ;//cout << seedVec.back().seedStr << " " << seedVec.back().seedStartPos << " " << BWTAlgorithms::countSequenceOccurrencesSingleStrand(seedVec.back().seedStr, m_params.PBindices)+BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seedVec.back().seedStr), m_params.PBindices) << endl;
+				// else
+					// seedEndPosVec.push_back(pos);
 				//cout << seedEndPosVec.size() << endl;
-				pos=seedEndPosVec.back();
-			}
-			continue;
-		}
+				// pos=seedEndPosVec.back();
+			// }
+			// continue;
+		// }
 		
 		size_t seedStartPos=pos;
 		size_t maxKmerFreq=kmerFreqs;
@@ -308,11 +298,8 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 		}
 			seedEndPosVec.push_back(seedEndPos);
 			
-			// jump to the index after new seed
-			pos=seedEndPos;
-		// }
-		// else
-			// pos=seedStartPos;
+		// jump to the index after new seed
+		pos=seedEndPos;
 	}
 	
 	return seedVec;
@@ -561,287 +548,70 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::filterErrorSRSeeds(std::
 	return newSeedVec;
 }
 
-int PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, SeedFeature& source, SeedFeature& target, FMWalkResult& FMWResult)
+void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, SeedFeature& seedSource, SeedFeature& seedTarget, FMWalkResult& FMWResult)
 {
-	// compute initMinOverlap from min of seedLength and maxOverlap
-	int initMinOverlap = std::min(source.seedLength, target.seedLength);
-		initMinOverlap = std::min(initMinOverlap, m_params.maxOverlap);
-		initMinOverlap = std::min(initMinOverlap, (int)source.seedEndPos);
-
+	// FMWalk params initialized
 	FMWalkParameters FMWParams;
 	FMWParams.indices = m_params.indices;
-	FMWParams.minOverlap = initMinOverlap;
 	FMWParams.maxOverlap = m_params.maxOverlap;
 	FMWParams.SAThreshold = m_params.FMWKmerThreshold;
 	FMWParams.maxLeaves = m_params.maxLeaves;
-	FMWParams.coverage = m_params.coverage;
-
-	bool isSequencingGap = false;
-	bool isSeedfromPB = source.isPBSeed || target.isPBSeed || source.isNextRepeat;
-
-	int FMWalkReturnType = -2;
 	
-	// seeds from PB may success in FMWalk of short-reads seeds
-	string kmer = target.seedStr;
-	int fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
-	int rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
-	int targetKmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
-	kmer = target.seedStr;
-	fwdKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices);
-	rvcKmerFreqs = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices);
-	int srcKmerFreqs = fwdKmerFreqs+rvcKmerFreqs;
+	// compute minOverlap from min of seedLength and maxOverlap
+	FMWParams.minOverlap = std::min(seedSource.seedLength, seedTarget.seedLength);
+	FMWParams.minOverlap = std::min(FMWParams.minOverlap, m_params.maxOverlap);
+
+	FMWParams.strSourceSeed = seedSource.seedStr;
+	FMWParams.strTargetSeed = seedTarget.seedStr;
+	FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
 	
-	// if(!isSeedfromPB||(target.isPBSeed && kmerFreqs>m_params.coverage))
-	/* Some PB seeds are not due to GC gaps */
-	if(targetKmerFreqs > 3 && srcKmerFreqs > 3)
+	// FMWalk: Correction by FM-index extension from source to target
+	SAIntervalPBHybridCTree SAITree(FMWParams);
+	SAITree.mergeTwoSeeds(FMWResult);
+	
+	if(FMWResult.typeFMWalkResult==1)
+		return;
+	
+	FMWParams.strSourceSeed = reverseComplement(seedTarget.seedStr);
+	FMWParams.strTargetSeed = reverseComplement(seedSource.seedStr);
+	FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
+	
+	// FMWalk: Correction by FM-index extension from source to target
+	SAIntervalPBHybridCTree SAITree2(FMWParams);
+	SAITree2.mergeTwoSeeds(FMWResult);
+	
+	if(FMWResult.typeFMWalkResult==1)
 	{
-		// 1st correction:
-		// correction by FM-index extension from source to target with iterative minOverlap reduction
-		FMWalkReturnType = unlimitedFMIndexExtension(FMWParams, readSeq, source, target, isSequencingGap, FMWResult);
-		if(FMWalkReturnType < 0)
-			// 2nd correction:
-			// correction by FM-index extension from source to target with iterative minOverlap reduction
-			// number of extension path is limited by identity and number of matched seed between extended sequence and the raw pacbio read
-			FMWalkReturnType = limitedFMIndexExtension(FMWParams, readSeq, source, target, isSequencingGap, FMWResult);
+		FMWResult.mergedSeq=reverseComplement(FMWResult.mergedSeq);
+		return;
 	}
 
-	// 3rd correction:
-	// try correction by MSA using FM-index of low quality long reads for sequencing gaps
-	if( (FMWalkReturnType == -1 || FMWalkReturnType == -2 ) && !source.isRepeat && !target.isRepeat 
-		&& (isSequencingGap || isSeedfromPB) )
-		if(MSACorrection(FMWParams, readSeq, source, target, isSequencingGap, FMWResult))
-			FMWalkReturnType = 1;
-		// else
-			// FMWalkReturnType = -4;
+	// MSACorrection
+	const std::string query = 
+		readSeq.substr(seedSource.seedEndPos-m_params.PBKmerLength+1,
+			seedTarget.seedStartPos-seedSource.seedEndPos-1+
+			2*m_params.PBKmerLength);
+	size_t sourceKmerLength = m_params.PBKmerLength;
+	size_t targetKmerLength = m_params.PBKmerLength;
+
+	// Self correction by aligning all reads having seeds with query
+	MultipleAlignment maquery = LongReadOverlap::buildMultipleAlignment(query,
+												sourceKmerLength, //m_params.PBKmerLength, 
+												targetKmerLength, //m_params.PBKmerLength,
+												query.length()/10, 
+												0.73,	// alignment identity < 0.7 are often false positive repeats
+												m_params.PBcoverage,
+												m_params.PBindices);
+
+	// skip insufficient number of overlapping reads for correction
+	if(maquery.getNumRows() <= 3)
+		return;
 	
-	return FMWalkReturnType;
-}
-
-// 1st correction:
-// correction by FM-index extension from source to target with iterative minOverlap reduction
-int PacBioHybridCorrectionProcess::unlimitedFMIndexExtension(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult)
-{
-	int FMWalkReturnType = -2, 
-		PrevFMWalkReturnType = 0,
-		initMinOverlap = FMWParams.minOverlap,
-		minTargetLength = target.isPBSeed?
-			m_params.PBKmerLength:m_params.minKmerLength;
-
-	// debug: 
-	// if(source.seedStartPos==9743)
-		// FMWParams.debugMode=true;
-		
-	while( (FMWalkReturnType == -1 || FMWalkReturnType == -2) && 
-		(FMWParams.minOverlap >= minTargetLength) )
-	{
-		// FMWalk params initialized
-		FMWParams.sourceSeed = source.seedStr;
-		FMWParams.targetSeed = target.seedStr;
-		FMWParams.disBetweenSrcTarget = target.seedStartPos-source.seedEndPos-1;
-		// we need raw pacbio string between source and target seed and 10 bp around
-		// to do global alignmet with fmwalk result.
-		try
-		{
-			FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
-				readSeq.substr(source.seedEndPos-FMWParams.minOverlap+1, 
-					FMWParams.disBetweenSrcTarget+2*FMWParams.minOverlap);
-		}
-		catch(...)
-		{
-			cout << readSeq << endl
-				<< source.seedEndPos << endl 
-				<< FMWParams.minOverlap << endl
-				<< FMWParams.disBetweenSrcTarget+2*FMWParams.minOverlap << endl;
-			assert(false);
-		}
-		
-		// FMWalk1st: Correction by FM-index extension from source to target
-		SAIntervalPBHybridCTree SAITree(FMWParams);
-		FMWalkReturnType = SAITree.mergeTwoSeeds(FMWResult);
-		
-		// if FMWalk1st success, we double check the FMWalk result using FMWalk2nd.
-		// FMWalk2nd: Correction by FM-index extension from target to source
-		if(FMWalkReturnType > 0)
-		{
-			FMWParams.sourceSeed = reverseComplement(target.seedStr);
-			FMWParams.targetSeed = reverseComplement(source.seedStr);
-			FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
-				reverseComplement(FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap);
-			
-			FMWalkResult FMWResult2;
-			SAIntervalPBHybridCTree SAITree2(FMWParams);
-			FMWalkReturnType = SAITree2.mergeTwoSeeds(FMWResult2);
-			
-			if(FMWResult.mergedSeq.length() == FMWResult2.mergedSeq.length())
-			{
-				// select the extended seq with higher alignment score
-				if(FMWResult.alnScore < FMWResult2.alnScore)
-				{
-					FMWResult2.mergedSeq = reverseComplement(FMWResult2.mergedSeq);
-					FMWResult = FMWResult2;
-				}
-				break;
-			}
-			
-			// Give up the extension if 2nd extension does not match the 1st one.
-			if(FMWalkReturnType > 0)
-				FMWalkReturnType = -4;
-		}
-		
-		// if the target sequence is not reached, 
-		// change target sequence in order to avoid error sequence.
-		if(FMWalkReturnType == -2 && FMWParams.minOverlap!=initMinOverlap)
-		{
-			FMWParams.sourceSeed = source.seedStr;
-			FMWParams.targetSeed = target.seedStr.substr(target.seedLength-FMWParams.minOverlap);
-			FMWParams.disBetweenSrcTarget += (initMinOverlap-FMWParams.minOverlap);
-			FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
-				readSeq.substr(source.seedEndPos-FMWParams.minOverlap+1, 
-					FMWParams.disBetweenSrcTarget+2*FMWParams.minOverlap);
-			
-			// FMWalk1st: Correction by FM-index extension from source to target
-			SAIntervalPBHybridCTree SAITree(FMWParams);
-			FMWalkReturnType = SAITree.mergeTwoSeeds(FMWResult);
-			
-			// if FMWalk1st success, we double check the FMWalk result using FMWalk2nd.
-			// FMWalk2nd: Correction by FM-index extension from target to source
-			if(FMWalkReturnType > 0)
-			{
-				FMWalkResult FMWResult2;
-				FMWParams.sourceSeed = reverseComplement(FMWParams.targetSeed);
-				FMWParams.targetSeed = reverseComplement(source.seedStr);
-				FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
-					reverseComplement(FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap);
-				
-				SAIntervalPBHybridCTree SAITree2(FMWParams);
-				FMWalkReturnType = SAITree2.mergeTwoSeeds(FMWResult2);
-				
-				if(FMWResult.mergedSeq.length() == FMWResult2.mergedSeq.length())
-				{
-					// select the extended seq with higher alignment score
-					if(FMWResult.alnScore < FMWResult2.alnScore)
-					{
-						FMWResult2.mergedSeq = reverseComplement(FMWResult2.mergedSeq);
-						FMWResult = FMWResult2;
-					}
-					break;
-				}
-				
-				// Give up the extension if 2nd extension does not match the 1st one.
-				if(FMWalkReturnType > 0)
-					FMWalkReturnType = -4;
-			}
-		}
-		
-		// Extension Failed:
-		// 1) try smaller minOverlap
-		// 2) try correction by MSA for sequencing gap
-		
-		// Sequencing gaps in short reads often lead to -1 or -2
-		// But over-reduced minOverlap size also lead to -2 due to error seeds
-		if( (FMWalkReturnType == -2 && FMWParams.minOverlap >= m_params.kmerLength) || 
-			(FMWalkReturnType == -1 && FMWParams.minOverlap == initMinOverlap) )
-			isSequencingGap = true;
-		
-		// The FMWalkReturnType may switch from -1 to -3 due to over-reduced minOverlap
-		// We have to skip further reduction and reset the FMWalkReturnType
-		if(FMWalkReturnType == -3 && PrevFMWalkReturnType == -1)
-		{
-			// the current -3 state is incorrect, reset to prev status
-			FMWalkReturnType = PrevFMWalkReturnType;
-			break;
-		}
-		
-		PrevFMWalkReturnType = FMWalkReturnType;
-		FMWParams.minOverlap--;	
-		
-		// FMWalkReturnType -2 leads to misassembly in C elegans
-		// FMWalkReturnType < 0 generates better assembly in E coli
-		// if(sourceIsRepeat && minOverlap < m_params.kmerLength-1)
-			// break;
-	}
+	std::string consensus = maquery.calculateBaseConsensus(100000, -1);
+	FMWResult.mergedSeq = seedSource.seedStr + consensus.substr(m_params.PBKmerLength+1);
+	FMWResult.typeFMWalkResult = 1;
 	
-	return FMWalkReturnType;
-}
-
-// 2nd correction:
-// correction by FM-index extension from source to target with iterative minOverlap reduction
-// number of extension path is limited by identity and number of matched seed between extended sequence and the raw pacbio read
-int PacBioHybridCorrectionProcess::limitedFMIndexExtension(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult)
-{
-	int FMWalkReturnType = -2, 
-		PrevFMWalkReturnType = 0,
-		initMinOverlap = FMWParams.minOverlap;
-	
-	while( (FMWalkReturnType < 0) && 
-		(FMWParams.minOverlap >= m_params.minKmerLength) )
-	{
-		// FMWalk params initialized
-		FMWParams.sourceSeed = source.seedStr;
-		FMWParams.targetSeed = target.seedStr;
-		FMWParams.disBetweenSrcTarget = target.seedStartPos-source.seedEndPos-1;
-		FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
-			readSeq.substr(source.seedEndPos-FMWParams.minOverlap+1, 
-				FMWParams.disBetweenSrcTarget+2*FMWParams.minOverlap);
-		
-		// FMWalk1st: Correction by FM-index extension from source to target
-		ShortReadOverlapTree SAITree(FMWParams);
-		FMWalkReturnType = SAITree.extendOverlap(FMWResult);
-
-		// if FMWalk1st success, we double check the FMWalk result using FMWalk2nd.
-		// FMWalk2nd: Correction by FM-index extension from target to source
-		if(FMWalkReturnType > 0)
-		{
-			FMWParams.sourceSeed = reverseComplement(target.seedStr);
-			FMWParams.targetSeed = reverseComplement(source.seedStr);
-			FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
-				reverseComplement(FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap);
-			
-			FMWalkResult FMWResult2;
-			ShortReadOverlapTree SAITree2(FMWParams);
-			FMWalkReturnType = SAITree2.extendOverlap(FMWResult2);
-			
-			if(FMWalkReturnType > 0)
-			{
-				// select the extended seq with higher alignment score
-				if(FMWResult.alnScore < FMWResult2.alnScore)
-				{
-					FMWResult2.mergedSeq = reverseComplement(FMWResult2.mergedSeq);
-					FMWResult = FMWResult2;
-				}
-				break;
-			}
-		}
-		
-		// Extension Failed:
-		// 1) try smaller minOverlap
-		// 2) try correction by MSA for sequencing gap
-		
-		// Sequencing gaps in short reads often lead to -1 or -2
-		// But over-reduced minOverlap size also lead to -2 due to error seeds
-		if( (FMWalkReturnType == -2 && FMWParams.minOverlap >= m_params.kmerLength) || 
-			(FMWalkReturnType == -1 && FMWParams.minOverlap == initMinOverlap) )
-			isSequencingGap = true;
-		
-		// The FMWalkReturnType may switch from -1 to -3 due to over-reduced minOverlap
-		// We have to skip further reduction and reset the FMWalkReturnType
-		if(FMWalkReturnType == -3 && PrevFMWalkReturnType == -1)
-		{
-			// the current -3 state is incorrect, reset to prev status
-			FMWalkReturnType = PrevFMWalkReturnType;
-			break;
-		}
-		
-		PrevFMWalkReturnType = FMWalkReturnType;
-		FMWParams.minOverlap--;	
-		
-		// FMWalkReturnType -2 leads to misassembly in C elegans
-		// FMWalkReturnType < 0 generates bette r assembly in E coli
-		if(source.isRepeat && FMWParams.minOverlap < m_params.kmerLength-1)
-			break;
-	}
-
-	return FMWalkReturnType;
+	return;
 }
 
 // 3rd correction:
