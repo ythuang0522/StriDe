@@ -58,7 +58,24 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		FMWalkResult FMWResult;
 		SeedFeature seedSource = pacbioCorrectedStrs.back(),
 			seedTarget = seedVec.at(numFMWalk);
-		extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
+
+		// in order to escape the error seed target potentially, 
+		// we try to use the next seed as a new target.
+		int tryNext = 0;
+		for(int nextFMWalk = numFMWalk + tryNext; 
+		// tryNext <= N, N means the maximum try times.
+		tryNext <= 3 && 
+		(FMWResult.typeFMWalkResult==-1||FMWResult.typeFMWalkResult==-2) && 
+		nextFMWalk < seedVec.size(); 
+		tryNext++, nextFMWalk = numFMWalk + tryNext)
+		{
+			seedTarget = seedVec.at(nextFMWalk);
+			extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
+			// cout<< FMWalkReturnType <<"\n";
+		}
+		if(FMWResult.typeFMWalkResult > 0)
+			numFMWalk += (tryNext - 1);
+		seedTarget = seedVec.at(numFMWalk);
 		
 		// debug:
 		// string seed = seedVec.at(numFMWalk).seedStr;
@@ -207,7 +224,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 					// ;//cout << seedVec.back().seedStr << " " << seedVec.back().seedStartPos << " " << BWTAlgorithms::countSequenceOccurrencesSingleStrand(seedVec.back().seedStr, m_params.PBindices)+BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seedVec.back().seedStr), m_params.PBindices) << endl;
 				// else
 					// seedEndPosVec.push_back(pos);
-				//cout << seedEndPosVec.size() << endl;
+				// cout << seedEndPosVec.size() << endl;
 				// pos=seedEndPosVec.back();
 			// }
 			// continue;
@@ -583,16 +600,21 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	if(FMWResult.typeFMWalkResult==1)
 		return;
 	
-	// FMWalk 2nd: Correction by FM-index extension from target to source
-	FMWParams.strSourceSeed = reverseComplement(seedTarget.seedStr);
-	FMWParams.strTargetSeed = reverseComplement(seedSource.seedStr);
-	FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
-	SAIntervalPBHybridCTree SAITree2(FMWParams);
-	SAITree2.mergeTwoSeeds(FMWResult);
-	if(FMWResult.typeFMWalkResult==1)
+	int iniTypeFMWalkResult = FMWResult.typeFMWalkResult;
+	
+	if(FMWResult.typeFMWalkResult==-1||FMWResult.typeFMWalkResult==-2)
 	{
-		FMWResult.mergedSeq=reverseComplement(FMWResult.mergedSeq);
-		return;
+		// FMWalk 2nd: Correction by FM-index extension from target to source
+		FMWParams.strSourceSeed = reverseComplement(seedTarget.seedStr);
+		FMWParams.strTargetSeed = reverseComplement(seedSource.seedStr);
+		FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
+		SAIntervalPBHybridCTree SAITree2(FMWParams);
+		SAITree2.mergeTwoSeeds(FMWResult);
+		if(FMWResult.typeFMWalkResult==1)
+		{
+			FMWResult.mergedSeq=reverseComplement(FMWResult.mergedSeq);
+			return;
+		}
 	}
 
 	// FMWalk 3rd: MSA Correction
@@ -611,7 +633,10 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	
 	// skip insufficient number of overlapping reads for correction
 	if(maquery.getNumRows() <= 3)
+	{
+		FMWResult.typeFMWalkResult = iniTypeFMWalkResult;
 		return;
+	}
 	
 	std::string consensus = maquery.calculateBaseConsensus(100000, -1);
 	FMWResult.mergedSeq = seedSource.seedStr + consensus.substr(m_params.PBKmerLength);
