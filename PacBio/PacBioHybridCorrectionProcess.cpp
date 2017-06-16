@@ -602,9 +602,9 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	
 	int iniTypeFMWalkResult = FMWResult.typeFMWalkResult;
 	
+	// FMWalk 2nd: Correction by FM-index extension from target to source
 	if(FMWResult.typeFMWalkResult==-1||FMWResult.typeFMWalkResult==-2)
 	{
-		// FMWalk 2nd: Correction by FM-index extension from target to source
 		FMWParams.strSourceSeed = reverseComplement(seedTarget.seedStr);
 		FMWParams.strTargetSeed = reverseComplement(seedSource.seedStr);
 		FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
