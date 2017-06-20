@@ -150,3 +150,37 @@ SAIOverlapNode2* SAIOverlapNode2::createChild(const std::string& label)
     
     return pAdded;
 }
+
+SAIOverlapNode3::~SAIOverlapNode3()
+{
+    // Delete children
+    for(SONode3PtrList::iterator iter = m_children3.begin(); iter != m_children3.end(); ++iter)
+        delete *iter;
+
+}
+
+
+SAIOverlapNode3* SAIOverlapNode3::createChild(const std::string& label)
+{
+    SAIOverlapNode3* pAdded = new SAIOverlapNode3(m_pQuery, this);
+    pAdded->extend(label);
+	
+	// still lack of a copy constructor
+	pAdded->lastSeedIdx = this->lastSeedIdx;
+	pAdded->lastOverlapLen = this->lastOverlapLen;
+	pAdded->totalSeeds = this->totalSeeds;
+	pAdded->currOverlapLen = this->currOverlapLen;
+	pAdded->queryOverlapLen = this->queryOverlapLen;
+	pAdded->numOfErrors = this->numOfErrors;
+	pAdded->lastSeedIdxOffset = this->lastSeedIdxOffset;
+	pAdded->initSeedIdx = this->initSeedIdx;
+	pAdded->numRedeemSeed = this->numRedeemSeed;
+	pAdded->LocalErrorRateRecord = this->LocalErrorRateRecord;
+    pAdded->GlobalErrorRateRecord = this->GlobalErrorRateRecord;
+    pAdded->resultindex = this->resultindex;
+    
+    // pAdded->currkmersize = this->currkmersize;
+	m_children3.push_back(pAdded);
+    
+    return pAdded;
+}

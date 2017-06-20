@@ -16,7 +16,10 @@ libpacbio_a_SOURCES = \
 	SAIPBHybridCTree.h SAIPBHybridCTree.cpp \
 	PacBioCorrectionProcess.h PacBioCorrectionProcess.cpp \
 	PacBioHybridCorrectionProcess.h PacBioHybridCorrectionProcess.cpp \
+	PacBioSelfCorrectionProcess.h PacBioSelfCorrectionProcess.cpp \
+	LongReadCorrectByOverlap.h LongReadCorrectByOverlap.cpp \
         LongReadOverlap.h LongReadOverlap.cpp \
 	PBOverlapTree.h PBOverlapTree.cpp \
 	SeedFeature.h SeedFeature.cpp \
+	HashtableSearch.h HashtableSearch.cpp \
         IntervalTree.h

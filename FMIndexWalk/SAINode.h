@@ -108,6 +108,7 @@ struct SAIntervalNodeResult
     std::string thread;
 	size_t SAICoverage;
 	int SAIntervalSize;
+	double errorRate;
 };
 typedef std::vector<SAIntervalNodeResult> SAIntervalNodeResultVector;
 
@@ -207,5 +208,72 @@ class SAIOverlapNode2 : public SAINode
 
 // leaves of SAIOverlapNode2
 typedef std::list<SAIOverlapNode2*> SONode2PtrList;
+
+class SAIOverlapNode3;
+// leaves of SAIOverlapNode3
+typedef std::list<SAIOverlapNode3*> SONode3PtrList;
+
+
+//
+// SAIOverlapNode3 for implementation of overlap computation using FM-index walk
+// It's used by ChengWei.
+//
+class SAIOverlapNode3 : public SAINode
+{
+    public:
+        //
+        // Functions
+        //
+        SAIOverlapNode3(const std::string* pQuery, SAIOverlapNode3* parent):SAINode(pQuery,parent)
+		{
+			lastSeedIdx=totalSeeds=lastOverlapLen=currOverlapLen=queryOverlapLen=numOfErrors=0;
+			numRedeemSeed=0;
+			lastSeedIdxOffset=0;
+		}
+        ~SAIOverlapNode3();
+
+		// Add a child node to this node with the given label
+        // Returns a pointer to the created node
+        SAIOverlapNode3* createChild(const std::string& label);
+
+
+        BWTInterval fwdInterval;
+        BWTInterval rvcInterval;
+		
+		// last matched seed index
+		size_t lastSeedIdx;
+		// error seed begin idx
+		// size_t errorSeedBeginIdx;
+		// number of redeem seeds
+		double numRedeemSeed;
+		// last overlap length when matching last seed
+		size_t lastOverlapLen;
+		size_t totalSeeds;
+		// current overlap length on the subject increases wrt each FM-index extension
+		size_t currOverlapLen;
+		// number of SNPs or indels
+		size_t numOfErrors;
+		// index offset to the center
+		int lastSeedIdxOffset;
+		// index of the init seed
+		int initSeedIdx;
+		// current overlap length on the query
+		size_t queryOverlapLen;
+        // index of the result and index of the matchpoint
+        std::pair <int,int> resultindex = std::make_pair(-1,-1);
+        // size_t currkmersize;
+        
+        
+        std::vector<double> LocalErrorRateRecord;
+        std::vector<double> GlobalErrorRateRecord;
+        SONode3PtrList m_children3;
+  
+        
+        
+        
+};
+
+// leaves of SAIOverlapNode3
+typedef std::list<SAIOverlapNode3*> SONode3PtrList;
 
 #endif

@@ -17,6 +17,7 @@
 #include "multiple_alignment.h"
 #include "LongReadOverlap.h"
 #include "ShortReadOverlapTree.h"
+#include "PacBioSelfCorrectionProcess.h"
 
 using namespace std;
 
@@ -33,6 +34,32 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 {
 	PacBioHybridCorrectionResult result;
 	
+	// 以下是給政威debug用
+	
+	PacBioSelfCorrectionParameters ecParams;
+	ecParams.indices = m_params.PBindices;
+	ecParams.kmerLength = 17;
+	ecParams.maxLeaves = 32;
+	ecParams.minKmerLength = 13;
+    ecParams.idmerLength = 9;
+    ecParams.ErrorRate = 0.15;
+	ecParams.FMWKmerThreshold = 3;
+	ecParams.numOfNextTarget = 1;
+	ecParams.collectedSeeds = 5;
+    ecParams.PBcoverage = m_params.PBcoverage;
+	ecParams.isSplit = false;
+	ecParams.isFirst = false;
+    ecParams.DebugExtend = false;
+    ecParams.DebugSeed = false;
+	ecParams.maxSeedInterval = 500;
+	PacBioSelfCorrectionProcess yo(ecParams);
+	PacBioSelfCorrectionResult tmp=yo.PBSelfCorrectionUsedByPBHybridCorrection(workItem);
+	result.merge=tmp.merge;
+	result.correctedPacbioStrs=tmp.correctedPacbioStrs;
+	return result;
+	
+	// 以上是給政威debug用
+	
 	// std::cout << workItem.read.id << endl;
 	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
 	std::string readSeq = workItem.read.seq.toString();
@@ -48,6 +75,27 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 	}
 	else
 	{
+			PacBioSelfCorrectionParameters ecParams;
+	ecParams.indices = m_params.PBindices;
+	ecParams.kmerLength = 17;
+	ecParams.maxLeaves = 32;
+	ecParams.minKmerLength = 13;
+    ecParams.idmerLength = 9;
+    ecParams.ErrorRate = 0.15;
+	ecParams.FMWKmerThreshold = 3;
+	ecParams.numOfNextTarget = 1;
+	ecParams.collectedSeeds = 5;
+    ecParams.PBcoverage = m_params.PBcoverage;
+	ecParams.isSplit = false;
+	ecParams.isFirst = false;
+    ecParams.DebugExtend = false;
+    ecParams.DebugSeed = false;
+	ecParams.maxSeedInterval = 500;
+	PacBioSelfCorrectionProcess yo(ecParams);
+	PacBioSelfCorrectionResult tmp=yo.PBSelfCorrectionUsedByPBHybridCorrection(workItem);
+	result.merge=tmp.merge;
+	result.correctedPacbioStrs=tmp.correctedPacbioStrs;
+	return result;
 		result.merge = false;
 		return result;
 	}
@@ -130,6 +178,29 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 			result.correctedLen += extendedStr.length();
 			// pacbioCorrectedStrs.push_back(seedTarget);
 			// result.correctedLen += seedTarget.seedLength;
+			
+			// cout << pacbioCorrectedStrs[0].seedStr << "\n";
+	PacBioSelfCorrectionParameters ecParams;
+	ecParams.indices = m_params.PBindices;
+	ecParams.kmerLength = 17;
+	ecParams.maxLeaves = 32;
+	ecParams.minKmerLength = 13;
+    ecParams.idmerLength = 9;
+    ecParams.ErrorRate = 0.15;
+	ecParams.FMWKmerThreshold = 3;
+	ecParams.numOfNextTarget = 1;
+	ecParams.collectedSeeds = 5;
+    ecParams.PBcoverage = m_params.PBcoverage;
+	ecParams.isSplit = false;
+	ecParams.isFirst = false;
+    ecParams.DebugExtend = false;
+    ecParams.DebugSeed = false;
+	ecParams.maxSeedInterval = 500;
+	PacBioSelfCorrectionProcess yo(ecParams);
+	PacBioSelfCorrectionResult tmp=yo.PBSelfCorrectionUsedByPBHybridCorrection(workItem);
+	result.merge=tmp.merge;
+	result.correctedPacbioStrs=tmp.correctedPacbioStrs;
+	return result;
 		}
 		
 		// output information
@@ -149,7 +220,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 	result.merge = true;
 	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
 		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
-	
+		
 	return result;
 }
 

@@ -26,10 +26,12 @@ struct SeedFeature
 		size_t seedStartPos;
 		size_t seedEndPos;
 		size_t seedLength;
+		size_t maxFixedMerFreqs;
 		std::string seedStr;
 		bool isRepeat;
 		bool isPBSeed;
 		bool isNextRepeat;
+		bool isLargeVar = false;
 		
 		// estimated by calling estimateBestKmerSize
 		size_t startBestKmerSize;
