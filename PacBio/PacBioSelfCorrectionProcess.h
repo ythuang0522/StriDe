@@ -108,8 +108,7 @@ public:
 
 	// PacBio correction by Ya, v20150305.
 	PacBioSelfCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
-	PacBioSelfCorrectionResult PBSelfCorrectionUsedByPBHybridCorrection(const SequenceWorkItem& workItem);
-	
+
 	PacBioSelfCorrectionResult process(const SequenceWorkItem& workItem)
 	{
 		return PBSelfCorrection(workItem);

@@ -34,32 +34,6 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 {
 	PacBioHybridCorrectionResult result;
 	
-	// 以下是給政威debug用
-	
-	PacBioSelfCorrectionParameters ecParams;
-	ecParams.indices = m_params.PBindices;
-	ecParams.kmerLength = 17;
-	ecParams.maxLeaves = 32;
-	ecParams.minKmerLength = 13;
-    ecParams.idmerLength = 9;
-    ecParams.ErrorRate = 0.15;
-	ecParams.FMWKmerThreshold = 3;
-	ecParams.numOfNextTarget = 1;
-	ecParams.collectedSeeds = 5;
-    ecParams.PBcoverage = m_params.PBcoverage;
-	ecParams.isSplit = false;
-	ecParams.isFirst = false;
-    ecParams.DebugExtend = false;
-    ecParams.DebugSeed = false;
-	ecParams.maxSeedInterval = 500;
-	PacBioSelfCorrectionProcess yo(ecParams);
-	PacBioSelfCorrectionResult tmp=yo.PBSelfCorrectionUsedByPBHybridCorrection(workItem);
-	result.merge=tmp.merge;
-	result.correctedPacbioStrs=tmp.correctedPacbioStrs;
-	return result;
-	
-	// 以上是給政威debug用
-	
 	// std::cout << workItem.read.id << endl;
 	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
 	std::string readSeq = workItem.read.seq.toString();
@@ -75,29 +49,10 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 	}
 	else
 	{
-			PacBioSelfCorrectionParameters ecParams;
-	ecParams.indices = m_params.PBindices;
-	ecParams.kmerLength = 17;
-	ecParams.maxLeaves = 32;
-	ecParams.minKmerLength = 13;
-    ecParams.idmerLength = 9;
-    ecParams.ErrorRate = 0.15;
-	ecParams.FMWKmerThreshold = 3;
-	ecParams.numOfNextTarget = 1;
-	ecParams.collectedSeeds = 5;
-    ecParams.PBcoverage = m_params.PBcoverage;
-	ecParams.isSplit = false;
-	ecParams.isFirst = false;
-    ecParams.DebugExtend = false;
-    ecParams.DebugSeed = false;
-	ecParams.maxSeedInterval = 500;
-	PacBioSelfCorrectionProcess yo(ecParams);
-	PacBioSelfCorrectionResult tmp=yo.PBSelfCorrectionUsedByPBHybridCorrection(workItem);
-	result.merge=tmp.merge;
-	result.correctedPacbioStrs=tmp.correctedPacbioStrs;
-	return result;
-		result.merge = false;
-		return result;
+		// calling ChengWei's PB Self Correction if no seed.
+		return PBSelfCorrection(workItem);
+		// result.merge = false;
+		// return result;
 	}
 	
 	// FMWalk for each pair of seeds
@@ -166,41 +121,19 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		// 3. exceed depth
 		else
 		{
-			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
-			pacbioCorrectedStrs.back().append(extendedStr);
-			pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
-			pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
-			pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
-			pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
-			pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
-			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
-			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
-			result.correctedLen += extendedStr.length();
-			// pacbioCorrectedStrs.push_back(seedTarget);
-			// result.correctedLen += seedTarget.seedLength;
+			// string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
+			// pacbioCorrectedStrs.back().append(extendedStr);
+			// pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
+			// pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
+			// pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
+			// pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
+			// pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
+			// pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
+			// pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
+			// result.correctedLen += extendedStr.length();
 			
-			// cout << pacbioCorrectedStrs[0].seedStr << "\n";
-	PacBioSelfCorrectionParameters ecParams;
-	ecParams.indices = m_params.PBindices;
-	ecParams.kmerLength = 17;
-	ecParams.maxLeaves = 32;
-	ecParams.minKmerLength = 13;
-    ecParams.idmerLength = 9;
-    ecParams.ErrorRate = 0.15;
-	ecParams.FMWKmerThreshold = 3;
-	ecParams.numOfNextTarget = 1;
-	ecParams.collectedSeeds = 5;
-    ecParams.PBcoverage = m_params.PBcoverage;
-	ecParams.isSplit = false;
-	ecParams.isFirst = false;
-    ecParams.DebugExtend = false;
-    ecParams.DebugSeed = false;
-	ecParams.maxSeedInterval = 500;
-	PacBioSelfCorrectionProcess yo(ecParams);
-	PacBioSelfCorrectionResult tmp=yo.PBSelfCorrectionUsedByPBHybridCorrection(workItem);
-	result.merge=tmp.merge;
-	result.correctedPacbioStrs=tmp.correctedPacbioStrs;
-	return result;
+			// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
+			return PBSelfCorrection(workItem);
 		}
 		
 		// output information
@@ -222,6 +155,33 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
 		
 	return result;
+}
+
+// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
+PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBSelfCorrection(const SequenceWorkItem& workItem)
+{
+	PacBioSelfCorrectionParameters selfECParams;
+	selfECParams.indices = m_params.PBindices;
+	selfECParams.kmerLength = 17;
+	selfECParams.maxLeaves = 32;
+	selfECParams.minKmerLength = 13;
+    selfECParams.idmerLength = 9;
+    selfECParams.ErrorRate = 0.15;
+	selfECParams.FMWKmerThreshold = 3;
+	selfECParams.numOfNextTarget = 1;
+	selfECParams.collectedSeeds = 5;
+    selfECParams.PBcoverage = m_params.PBcoverage;
+	selfECParams.isSplit = false;
+	selfECParams.isFirst = false;
+    selfECParams.DebugExtend = false;
+    selfECParams.DebugSeed = false;
+	selfECParams.maxSeedInterval = 500;
+	PacBioSelfCorrectionProcess processPBSC(selfECParams);
+	PacBioSelfCorrectionResult resultPBSC=processPBSC.PBSelfCorrection(workItem);
+	PacBioHybridCorrectionResult resultPBHC;
+	resultPBHC.merge=resultPBSC.merge;
+	resultPBHC.correctedPacbioStrs=resultPBSC.correctedPacbioStrs;
+	return resultPBHC;
 }
 
 // dynamic seeding from short reads, v20160517 by Ya.

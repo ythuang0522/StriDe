@@ -95,7 +95,6 @@ public:
 	~PacBioHybridCorrectionProcess();
 
 	// PacBio correction by Ya, v20150305.
-	PacBioHybridCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
 	PacBioHybridCorrectionResult PBHybridCorrection(const SequenceWorkItem& workItem);
 	
 	PacBioHybridCorrectionResult process(const SequenceWorkItem& workItem)
@@ -122,6 +121,7 @@ private:
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
 	bool isLowComplexity(std::string& seq ,const float& ratioThreshold);
 	float GCAndTandemRatio(std::string& seq);
+	PacBioHybridCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
 	
 	PacBioHybridCorrectionParameters m_params;
 };

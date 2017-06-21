@@ -32,74 +32,10 @@ PacBioSelfCorrectionProcess::~PacBioSelfCorrectionProcess()
 }
 
 
-// PacBio Self Correction by Ya and YTH, v20151202.
+// PacBio Self Correction by YTH and ChengWei and Ya, v20170621.
 // 1. Identify highly-accurate seeds within PacBio reads
 // 2. For each pair of seeds, perform kmer extension using local kmer frequency collected by FM-index extension
 PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const SequenceWorkItem& workItem)
-{	
-	// std::cout << workItem.read.id << "\n";
-    m_readid =  workItem.read.id;
-	PacBioSelfCorrectionResult result;
-	
-    Timer* seedTimer = new Timer("Seed Time",true);
-  
-
-	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
-	std::string readSeq = workItem.read.seq.toString();
-
-   // separatebykmer(workItem.read.id,readSeq,m_params.kmerLength);
-   
-	// find seeds using fixed or dynamic kmers depending on 1st round or not
-     
-    seedVec = hybridSeedingFromPB(readSeq);
-    
-    
-   
-     
-    
-	result.Timer_Seed = seedTimer->getElapsedWallTime(); 
-    delete seedTimer;
-	result.totalSeedNum = seedVec.size();
-    
-
-	// push the first seed into pacbioCorrectedStrs, which will be popped later as source seed
-	if(seedVec.size() >= 2)
-	{
-		result.correctedLen += seedVec.at(0).seedStr.length();
-		// if(m_params.isSplit)
-			pacbioCorrectedStrs.push_back(seedVec.at(0));
-		// else
-			// pacbioCorrectedStrs.push_back(readSeq.substr(0, seedVec.at(0).seedEndPos+1));
-		
-		// if(!m_params.isSplit)
-			// pacbioCorrectedStrs.back().seedStr.reserve(readSeq.length()*1.5);
-	}
-	else
-	{
-		// give up reads with less than 2 seeds
-		result.merge = false;
-		return result;
-	}
-	
-
-    // reserve sufficient str length for fast append
-    pacbioCorrectedStrs.back().seedStr.reserve(readSeq.length());
-    initCorrect(readSeq, seedVec, pacbioCorrectedStrs, result);
-
-	
-	result.merge = true;
-	result.totalReadsLen = readSeq.length();
-	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
-		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
-	
-	return result;
-    
-}
-
-// PacBio Self Correction by Ya and YTH, v20151202.
-// 1. Identify highly-accurate seeds within PacBio reads
-// 2. For each pair of seeds, perform kmer extension using local kmer frequency collected by FM-index extension
-PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrectionUsedByPBHybridCorrection(const SequenceWorkItem& workItem)
 {	
 	// std::cout << workItem.read.id << "\n";
     m_readid =  workItem.read.id;

@@ -29,13 +29,9 @@ MultipleAlignment LongReadOverlap::buildMultipleAlignment(const std::string& que
     SequenceOverlapPairVector overlap_vector;
 	retrieveMatches(query, srcKmerLength, min_overlap, min_identity, coverage, indices, false, overlap_vector);
 	size_t srcSize = overlap_vector.size();
-
-	if(srcSize == 0) return multiple_alignment;
-
+	
 	// reverse overlap from target seed
 	retrieveMatches(query, tarKmerLength, min_overlap, min_identity, coverage, indices, true, overlap_vector);
-
-	if(srcSize == overlap_vector.size()) return multiple_alignment;
 	
 	// push into multiple alignment matrix
     for(size_t i = 0; i < srcSize; ++i)
@@ -43,7 +39,7 @@ MultipleAlignment LongReadOverlap::buildMultipleAlignment(const std::string& que
 	
     for(size_t i = srcSize; i < overlap_vector.size(); ++i)
         multiple_alignment.addOverlap("Tar", overlap_vector[i].sequence[1], "", overlap_vector[i].overlap);
-	
+	// std::cout<< query << "|" <<srcSize << "||" <<overlap_vector.size()- srcSize << "kkkkkk\n";
 	// filter low-quality overlap
 	// if(!overlap_vector.empty())
 	// {
@@ -631,10 +627,10 @@ void LongReadOverlap::retrieveStr(const std::string& query, size_t seedSize, siz
 		kmerFreq += fwdInterval.isValid()?rvcInterval.size():0;
 		totalKmerFreq += kmerFreq;
 			
-		// std::cout << seedOffSet << "\t" << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "\n";
+		// std::cout << seedOffSet << "\t" << initKmer << "\t" << reverseComplement(initKmer) << "\t" << fwdInterval.size() << "\t" << rvcInterval.size() << "\t" << kmerFreq << "hihi\n";
 		
 		// skip repeat and low-complexity seeds
-		if(kmerFreq >= coverage*2 || kmerFreq >= 128) return;
+		// if(kmerFreq >= coverage*2 || kmerFreq >= 128) return;
 		
 		// extend each SA index and collect kmers of smallKmerSize along the extension
 		for(int64_t fwdRootIndex = fwdInterval.lower; 
