@@ -95,9 +95,9 @@ public:
 	~PacBioHybridCorrectionProcess();
 
 	// PacBio correction by Ya, v20150305.
-	PacBioHybridCorrectionResult PBHybridCorrection(const SequenceWorkItem& workItem);
+	PacBioHybridCorrectionResult PBHybridCorrection(SequenceWorkItem& workItem);
 	
-	PacBioHybridCorrectionResult process(const SequenceWorkItem& workItem)
+	PacBioHybridCorrectionResult process(SequenceWorkItem& workItem)
 	{
 		return PBHybridCorrection(workItem);
 		PacBioHybridCorrectionResult result;

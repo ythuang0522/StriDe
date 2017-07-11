@@ -30,7 +30,7 @@ PacBioHybridCorrectionProcess::~PacBioHybridCorrectionProcess()
 }
 
 // PacBio Hybrid Correction by Ya, v20170602.
-PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(const SequenceWorkItem& workItem)
+PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(SequenceWorkItem& workItem)
 {
 	PacBioHybridCorrectionResult result;
 	
@@ -74,14 +74,14 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		{
 			seedTarget = seedVec.at(nextFMWalk);
 			extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
-			// cout<< FMWalkReturnType <<"\n";
+			// cout << numFMWalk << ": " <<  FMWResult.typeFMWalkResult <<"\n";
 		}
 		if(FMWResult.typeFMWalkResult > 0)
 			numFMWalk += (tryNext - 1);
 		seedTarget = seedVec.at(numFMWalk);
 		
 		// debug:
-		// string seed = seedVec.at(numFMWalk).seedStr;
+		// string seed = seedVec.at(numFMWalk-1).seedStr;
 		// int fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.indices);
 		// int rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.indices);
 		// int SRSF = fwdSF+rvcSF;
@@ -97,6 +97,18 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		// << ", GC&tandem%:" << (int)(GCAndTandemRatio(seed)*100) << "%"
 		// << ", FMWRT:" << FMWResult.typeFMWalkResult << ".\n"
 		// << seed << endl;
+		// if(FMWResult.typeFMWalkResult==1)
+		// {
+			// cout << "raw length: "
+			// << seedTarget.seedStartPos-seedSource.seedEndPos-1
+			// << ", corrected length: "
+			// << FMWResult.mergedSeq.substr(seedSource.seedLength).length()-seedTarget.seedLength
+			// << "\n"
+			// << readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos)
+			// << "\n"
+			// << FMWResult.mergedSeq.substr(seedSource.seedLength)
+			// << "\n";
+		// }
 		
 		// record corrected pacbio reads string--
 		// result.seedDis += target.seedStartPos-source.seedEndPos-1;
@@ -121,19 +133,19 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 		// 3. exceed depth
 		else
 		{
-			// string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
-			// pacbioCorrectedStrs.back().append(extendedStr);
-			// pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
-			// pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
-			// pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
-			// pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
-			// pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
-			// pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
-			// pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
-			// result.correctedLen += extendedStr.length();
+			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
+			pacbioCorrectedStrs.back().append(extendedStr);
+			pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
+			result.correctedLen += extendedStr.length();
 			
 			// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
-			return PBSelfCorrection(workItem);
+			// return PBSelfCorrection(workItem);
 		}
 		
 		// output information
@@ -154,7 +166,11 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(c
 	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
 		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
 		
-	return result;
+	// return result;
+	
+	workItem.read.seqPBHC = result.correctedPacbioStrs.at(0);
+	// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
+	return PBSelfCorrection(workItem);
 }
 
 // calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
@@ -638,7 +654,8 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	{
 		FMWParams.strSourceSeed = reverseComplement(seedTarget.seedStr);
 		FMWParams.strTargetSeed = reverseComplement(seedSource.seedStr);
-		FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
+		// cout << FMWParams.strSourceSeed << "\n";
+		// cout << FMWParams.strTargetSeed << "\n";
 		SAIntervalPBHybridCTree SAITree2(FMWParams);
 		SAITree2.mergeTwoSeeds(FMWResult);
 		if(FMWResult.typeFMWalkResult==1)
@@ -651,8 +668,8 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	// FMWalk 3rd: MSA Correction
 	const std::string query = 
 		readSeq.substr(seedSource.seedEndPos-m_params.PBKmerLength+1,
-			seedTarget.seedEndPos-seedSource.seedEndPos-1+m_params.PBKmerLength);
-	
+			seedTarget.seedEndPos-seedSource.seedEndPos+m_params.PBKmerLength);
+
 	// Self correction by aligning all reads having seeds with query
 	MultipleAlignment maquery = LongReadOverlap::buildMultipleAlignment(query,
 												m_params.PBKmerLength, 

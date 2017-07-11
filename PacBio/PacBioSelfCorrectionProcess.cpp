@@ -45,7 +45,7 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
   
 
 	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
-	std::string readSeq = workItem.read.seq.toString();
+	std::string readSeq = workItem.read.seqPBHC.toString();
 
    // separatebykmer(workItem.read.id,readSeq,m_params.kmerLength);
    

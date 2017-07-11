@@ -73,7 +73,7 @@ class SAIntervalPBHybridCTree
         void removeLeavesByRepeatKmer();
 		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
 
-	void pruneLeavesByAlignment();
+		void pruneLeavesByAlignment();
 
         //
         // Data

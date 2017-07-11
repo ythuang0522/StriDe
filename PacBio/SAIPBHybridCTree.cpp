@@ -46,12 +46,21 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
 	m_MinLength = (0.8*(m_disBetweenSrcTarget-20))+endingkmer.length()+m_currentLength;
-	//std::cout << m_MaxLength << ":\t" << m_MinLength;
-
+	
+	// Errors were characterized by comparison to the known reference sequences, 
+	// showing that the primary error mode was insertions at 12%, 
+	// followed by deletions at 2%,  
+	// and apparent mismatch errors at 1%. 
+	// ref: https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-13-375
+	m_expectedLength = (0.9*m_disBetweenSrcTarget)+endingkmer.length()+m_currentLength;
+	
+	// cout << m_MaxLength << ":\t" << m_MinLength;
+	// cout << "*" << m_disBetweenSrcTarget+endingkmer.length()+m_currentLength << "\n";
+	// cout << "**" << m_minOverlap << "\n";
+	
 	m_fwdTerminatedInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));
 	m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
 
-	//m_expectedLength = m_pSourceSeed->length() + m_disBetweenSrcTarget + m_targetSeed.length();
 	m_iniMinSAThreshold = parameters.SAThreshold;
 	
 	if(m_debugMode)
@@ -87,8 +96,10 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 			extendLeaves_v2();
 		
 		// see if terminating string is reached
-		if(m_currentLength >= m_MinLength && isTerminated(results))
-			break;
+		if(m_currentLength >= m_MinLength)
+			isTerminated(results);
+		// if(m_currentLength >= m_MinLength && isTerminated(results))
+			// break;
 		
 		// if(m_debugMode)
 		// {	
@@ -114,12 +125,28 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 	// reach the terminal kmer
 	if(results.size() > 0)
 	{
-		FMWResult.typeFMWalkResult = 1;
+		int minLengthDiff = 100000;
+		for (size_t i = 0 ; i < results.size() ;i++)
+		{
+			std::string tmpseq=results[i].thread;
+			
+			int currLengthDiff = std::abs((int)tmpseq.length()-(int)m_expectedLength);
+			bool isLengthDiffBetter = currLengthDiff < minLengthDiff;
+			if(isLengthDiffBetter)
+			{
+				minLengthDiff = currLengthDiff;
+				FMWResult.mergedSeq = tmpseq;
+				// cout << (int)tmpseq.length() << " " << (int)m_expectedLength << "\n";
+			}
+		}
 		// bug fix: m_targetSeed may be shorter than m_minOverlap
 		if(m_strTargetSeed.length() > m_minOverlap)
-			FMWResult.mergedSeq = results.at(0).thread + m_strTargetSeed.substr(m_minOverlap);
+			FMWResult.mergedSeq = FMWResult.mergedSeq + m_strTargetSeed.substr(m_minOverlap);
 		else
-			FMWResult.mergedSeq = results.at(0).thread;
+			FMWResult.mergedSeq = FMWResult.mergedSeq;
+		// cout << results.size() << endl;
+		
+		FMWResult.typeFMWalkResult = 1;
 		return;
 		
 		// find the path with maximum match percent or kmer coverage

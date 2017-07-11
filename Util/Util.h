@@ -126,6 +126,9 @@ struct SeqRecord
     std::string id;
     DNAString seq;
     std::string qual;
+	
+	// using by PBHC, by Ya v20170627.
+	DNAString seqPBHC;
 };
 typedef std::vector<SeqRecord> SeqRecordVector;
 
