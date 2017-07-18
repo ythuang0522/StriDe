@@ -16,6 +16,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	m_pStrSourceSeed(&parameters.strSourceSeed),
 	m_strTargetSeed(parameters.strTargetSeed),
 	m_disBetweenSrcTarget(parameters.disBetweenSrcTarget), 
+	m_rawPBStrBetweenSrcTargetWith2Minoverlap(parameters.rawPBStrBetweenSrcTargetWith2Minoverlap),
 	m_minOverlap(parameters.minOverlap), 
 	m_maxOverlap(parameters.maxOverlap), 
 	m_MaxLeaves(parameters.maxLeaves), 
@@ -52,11 +53,12 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	// followed by deletions at 2%,  
 	// and apparent mismatch errors at 1%. 
 	// ref: https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-13-375
-	m_expectedLength = (0.9*m_disBetweenSrcTarget)+endingkmer.length()+m_currentLength;
+	// m_expectedLength = (0.9*m_disBetweenSrcTarget)+endingkmer.length()+m_currentLength;
 	
 	// cout << m_MaxLength << ":\t" << m_MinLength;
 	// cout << "*" << m_disBetweenSrcTarget+endingkmer.length()+m_currentLength << "\n";
 	// cout << "**" << m_minOverlap << "\n";
+	// cout << "raw PB sequence + 2*minOverlp: " << m_rawPBStrBetweenSrcTargetWith2Minoverlap << " " << m_minOverlap << "\n";
 	
 	m_fwdTerminatedInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));
 	m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
@@ -106,11 +108,11 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 			// std::cout << "----m_currentKmerSize: " << m_currentKmerSize
 			// << ", m_leaves.size(): " << m_leaves.size()
 			// << ", result: " << results.size() << "----\n";
-			// std::cout << "TATCAGCATATAAGTAAGCAGAGGATATGTCCAGCTGTGTGATATAATAGTCGTTGTCTAATGCGATTGACAGTGACGTCATCAGTGCATAGTGATGTACGGTATTGGATTGCATATCAGAATCATATGTATCGGGGTGTTGAATGTCGCCTCTTGCAACAAATCTAGCTTTGTGTGTACCATCACGTTTCTTGTTAAATATAAACATTGAGTTTATTACTTTTTTAGGATCTATGTCATTTCTATCATAATATTTGTTTGTATCCCAAGTGTTCATTTTCAATAGTTGGCTAATTTCTTTATGATAAGCTTCAACATATCTGTCTTTTTCTTTGTTGTCTTTATTATATGTAATTGCTTCATCATATCTTAAGGTCGTTCGAACTGGTTTGATCGATTTCACTCCTTTTATTGCTGCAATTAAATTTATGCGTTTCTTCGATCTTGGTGGTTCCAGACTTCTCATATTCTTATTATTCCATGTGTCTCGGGATACCTCAATTTCAGTTTCATTATCTTCTAATGATCTTTTCTTACTTTTGGTAGTAGTCAGAACATTAGAATCATCCATACCACCCAAACTGGAATTAGTCTGACGAGAGTGTATGTGTGGAATATCTTTTGAAACATCAGAAGTG" << endl;
+			// std::cout << "CGGGCCTTGTACACACCGCCCGTCACACCATGGGAGTGGGTTGCAAAAGAAGTAGGTAGCTTAACCTTCGGGAGGGCGCTTACCACTTTGTGATTCATGACTGGGGTGAAGTCGTAACAAGGTAACCGTAGGGGAACCTGCGGTTGGATCACCTCCTTACCTTAAAGAAGCGTACTTTGTAGTGCTCACACAGATTGTCTGATAGAAAGTGAAAAGCAAGGCGTTTACGCGTTGGGAGTGAGGCTGAAGAGAATAAGGCCGTTCGCTTTCTATTAATGAAAGCTCACCCTACACGAAAATATCACGCAACGCGTGATAAGCAATTTTCGTGTCCCCTTCGTCTAGAGGCCCAGGACACCGCCCTTTCACGGCGGTAACAGGGGTTCGAATCCCCTAGGGGACGCCACTTGCTGGTTTGTGAGTGAAAGTCGCCGACCTTAATATCTCAAAACTCATCTTCGGGTGATGTTTGAGATATTTGCTCTTTAAAAATCTGGATCAAGCTGAAAATTGAAACACTGAACAACGAGAGTTGTTCGTGAGTCTCTCAAATTTTCGCAACACGATGATGAATCGAAAGAAACATCTTCGGGTTGTGAGGTTAAGCGACTAAGCGTACACGGTGGATGCCCTGGCAGTCAGAGGCGATGAAGGA" << endl;
 			// for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
 			// {
-				// std::cout << (*iter)->getSuffix(m_currentLength-m_pSourceSeed->length()) << " ";
-				// std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << "\n";
+				// std::cout << (*iter)->getSuffix(m_currentLength-m_pStrSourceSeed->length()) << " ";
+				// std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << " " << (*iter)->getKmerCount() << "\n";
 			// }
 		// }
 		
@@ -122,40 +124,13 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 	// if(m_debugMode)
 		// std::cout << results.size() << "\n";
 	
-	// reach the terminal kmer
 	if(results.size() > 0)
 	{
-		int minLengthDiff = 100000;
-		for (size_t i = 0 ; i < results.size() ;i++)
-		{
-			std::string tmpseq=results[i].thread;
-			
-			int currLengthDiff = std::abs((int)tmpseq.length()-(int)m_expectedLength);
-			bool isLengthDiffBetter = currLengthDiff < minLengthDiff;
-			if(isLengthDiffBetter)
-			{
-				minLengthDiff = currLengthDiff;
-				FMWResult.mergedSeq = tmpseq;
-				// cout << (int)tmpseq.length() << " " << (int)m_expectedLength << "\n";
-			}
-		}
-		// bug fix: m_targetSeed may be shorter than m_minOverlap
-		if(m_strTargetSeed.length() > m_minOverlap)
-			FMWResult.mergedSeq = FMWResult.mergedSeq + m_strTargetSeed.substr(m_minOverlap);
-		else
-			FMWResult.mergedSeq = FMWResult.mergedSeq;
-		// cout << results.size() << endl;
-		
-		FMWResult.typeFMWalkResult = 1;
-		return;
-		
 		// find the path with maximum match percent or kmer coverage
-		// return findTheBestPath(results, FMWResult);
+		return findTheBestPath(results, FMWResult);
 	}
-	
-	// std::cout << m_currentLength << ":" << m_MaxLength << "\n";
-	
-    // Did not reach the terminal kmer
+
+    // did not reach the terminal kmer
     if(m_leaves.empty())
         FMWResult.typeFMWalkResult = -1;	//high error
     else if(m_currentLength > m_MaxLength)
@@ -174,8 +149,69 @@ void SAIntervalPBHybridCTree::printAll()
     m_pRootNode->printAllStrings("");
 }
 
-// Extend each leaf node
+void SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult)
+{
+	int maxAlgScore = -100;
+	// size_t maxKmerCoverage = 0;
+	
+	for (size_t i = 0 ; i < results.size() ; i++)
+	{
+		std::string candidateSeq = results.at(i).thread;
+		std::string pathBetweenSrcTargetWith2Minoverlap = 
+			candidateSeq.substr(m_pStrSourceSeed->length()-m_minOverlap);
+		
+		// find the path with maximum alignment score
+		AlnAln *aln_global;
+		aln_global = aln_stdaln(m_rawPBStrBetweenSrcTargetWith2Minoverlap.c_str(), pathBetweenSrcTargetWith2Minoverlap.c_str(), &aln_param_pacbio, 1, 1);
+		
+		// if(m_debugMode)
+		// {
+			// std::cout << ">pathBetweenSrcTargetWith2Minoverlap:" << i+1 << ",len:" << pathBetweenSrcTargetWith2Minoverlap.length() 
+				// <<  ",identity:" << matchPercent 
+				// << ",alnScore:" << aln_global->score << ",kmerFreq:" << results.at(i).SAICoverage <<"\n";
+			// std::cout << pathBetweenSrcTargetWith2Minoverlap << "\n";
+			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
+		// }
 
+		bool isAlgScoreBetter = maxAlgScore < aln_global->score;
+		// bool isAlgScoreBetter = maxKmerCoverage < results.at(i).SAICoverage;
+		if(isAlgScoreBetter)
+		{
+			maxAlgScore = aln_global->score;
+			// maxKmerCoverage = results.at(i).SAICoverage;
+			FMWResult.alnScore = maxAlgScore;
+			// FMWResult.kmerFreq = maxKmerCoverage;
+			FMWResult.mergedSeq = candidateSeq;
+		}
+		
+		aln_free_AlnAln(aln_global);
+	}
+
+	if(FMWResult.mergedSeq.length() != 0)
+	{	
+		// if(m_debugMode)
+		// {
+			// std::cout << ">resultStr:YO,len:" << FMWResult.mergedSeq.length() 
+				// <<  ",identity:" << matchPercent 
+				// << ",alnScore:" << FMWResult.alnScore << "\n";
+				// << ",kmerFreq:" << FMWResult.kmerFreq << "\n";
+			// std::cout << FMWResult.mergedSeq << "\n";
+			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
+		// }
+		
+		// bug fix: m_targetSeed may be shorter than m_minOverlap
+		if(m_strTargetSeed.length() > m_minOverlap)
+			FMWResult.mergedSeq = FMWResult.mergedSeq + m_strTargetSeed.substr(m_minOverlap);
+		
+		FMWResult.typeFMWalkResult = 1;
+		return;
+	}
+	
+	FMWResult.typeFMWalkResult = -4;
+		return;
+}
+
+// Extend each leaf node
 void SAIntervalPBHybridCTree::attempToExtend(STNodePtrList &newLeaves)
 {
     for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)

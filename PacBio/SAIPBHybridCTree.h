@@ -21,6 +21,7 @@ struct FMWalkParameters
 	std::string strSourceSeed;
 	std::string strTargetSeed;
     int disBetweenSrcTarget;
+	std::string rawPBStrBetweenSrcTargetWith2Minoverlap;
 	size_t maxLeaves=256;
 	int minOverlap;
 	int maxOverlap;
@@ -71,7 +72,7 @@ class SAIntervalPBHybridCTree
         size_t calculateKmerCoverage (const std::string & seq , size_t kmerLength , const BWT* pBWT);
 
         void removeLeavesByRepeatKmer();
-		int findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
+		void findTheBestPath(SAIntervalNodeResultVector results, FMWalkResult &FMWResult);
 
 		void pruneLeavesByAlignment();
 
@@ -81,6 +82,7 @@ class SAIntervalPBHybridCTree
         const std::string* m_pStrSourceSeed;
 		std::string m_strTargetSeed;
 		int m_disBetweenSrcTarget;
+		std::string m_rawPBStrBetweenSrcTargetWith2Minoverlap;
         size_t m_minOverlap;
 		size_t m_maxOverlap;
         int m_MaxLength;

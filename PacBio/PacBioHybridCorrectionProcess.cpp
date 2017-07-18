@@ -640,6 +640,8 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	FMWParams.strSourceSeed = seedSource.seedStr;
 	FMWParams.strTargetSeed = seedTarget.seedStr;
 	FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;
+	FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = 
+		readSeq.substr(seedSource.seedEndPos+1-FMWParams.minOverlap, FMWParams.disBetweenSrcTarget+2*FMWParams.minOverlap);
 	
 	// FMWalk 1st: Correction by FM-index extension from source to target
 	SAIntervalPBHybridCTree SAITree(FMWParams);
@@ -654,8 +656,7 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	{
 		FMWParams.strSourceSeed = reverseComplement(seedTarget.seedStr);
 		FMWParams.strTargetSeed = reverseComplement(seedSource.seedStr);
-		// cout << FMWParams.strSourceSeed << "\n";
-		// cout << FMWParams.strTargetSeed << "\n";
+		FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap = reverseComplement(FMWParams.rawPBStrBetweenSrcTargetWith2Minoverlap);
 		SAIntervalPBHybridCTree SAITree2(FMWParams);
 		SAITree2.mergeTwoSeeds(FMWResult);
 		if(FMWResult.typeFMWalkResult==1)
