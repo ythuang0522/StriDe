@@ -171,6 +171,7 @@ void SAIntervalPBHybridCTree::findTheBestPath(SAIntervalNodeResultVector results
 				// << ",alnScore:" << aln_global->score << ",kmerFreq:" << results.at(i).SAICoverage <<"\n";
 			// std::cout << pathBetweenSrcTargetWith2Minoverlap << "\n";
 			// printf("\n%s\n%s\n%s\n", aln_global->out1, aln_global->outm, aln_global->out2);
+			// cout << ">" << i << "\n" << pathBetweenSrcTargetWith2Minoverlap.c_str() << "\n";
 		// }
 
 		bool isAlgScoreBetter = maxAlgScore < aln_global->score;

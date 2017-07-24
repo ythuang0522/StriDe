@@ -250,12 +250,12 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 		size_t dynamicKmerSize=minKmerSize;
 		size_t dynamicKmerThreshold=kmerThresholdVec.at(minKmerSize);
 
-		// if(pos >= 9106) std::cout << pos << ":" << kmerFreqs << ":" << dynamicKmerSize << ":" 
+		// std::cout << pos << ":" << kmerFreqs << ":" << dynamicKmerSize << ":" 
 			// << BWTAlgorithms::countSequenceOccurrencesSingleStrand(kmer, m_params.indices) << ":" 
 			// << BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(kmer), m_params.indices) << "\n";
 			
-		// if(kmerFreqs<dynamicKmerThreshold)
-		// {
+		if(kmerFreqs<dynamicKmerThreshold)
+		{
 			// In large sequencing gaps (>7kb), no seeds can be found in Illumina index
 			// If no seed is found within PBSearchDepth, 
 			// seeds from PB index will be serached instead
@@ -274,8 +274,8 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 				// cout << seedEndPosVec.size() << endl;
 				// pos=seedEndPosVec.back();
 			// }
-			// continue;
-		// }
+			continue;
+		}
 		
 		size_t seedStartPos=pos;
 		size_t maxKmerFreq=kmerFreqs;
@@ -309,6 +309,8 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 				break;
 			}
 		}
+		
+		// cout << dynamicKmerSize << "\n";
 		
 		// small-sized seed has 50% chance of errors in C elegans, 
 		// skip only if there is another seed nearby 30bp
@@ -516,6 +518,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::filterErrorSRSeeds(std::
 {
 	if(seedVec.size() < 3)
 		return seedVec;
+	
 	std::vector<SeedFeature> newSeedVec;
 	std::vector<float> seedFreqsVec;
 	
@@ -524,7 +527,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::filterErrorSRSeeds(std::
 	int allSeedsKmerFreqs=0, count=0;
 	for(int i=0 ; i<seedVec.size() ; i++)
 	{
-		// cout << i << "-- ";
+		// cout << i << "-- " << seedVec.at(i).seedStartPos << "\n";
 		
 		// seeds from short reads.
 		if(!seedVec.at(i).isPBSeed)

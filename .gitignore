@@ -11,6 +11,9 @@ config.status
 config.log
 config.h
 config.h.in
-autom4te.cache/requests
+autom4te.cache
 *.o
 *.a
+*.Po
+*.dirstamp
+StriDe/stride
