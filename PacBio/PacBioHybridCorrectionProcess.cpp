@@ -36,6 +36,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	
 	// std::cout << workItem.read.id << endl;
 	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
+	std::vector<bool> isPBPosCorrectedByHybridCorrection;
 	std::string readSeq = workItem.read.seq.toString();
 	seedVec = dynamicSeedingFromSR(readSeq);
 	seedVec = filterErrorSRSeeds(seedVec);
@@ -46,6 +47,8 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	{
 		result.correctedLen += seedVec.at(0).seedLength;
 		pacbioCorrectedStrs.push_back(seedVec.at(0));
+		for(int i=0; i<seedVec.at(0).seedLength; i++)
+			isPBPosCorrectedByHybridCorrection.push_back(true);
 	}
 	else
 	{
@@ -126,6 +129,8 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
 			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
 			result.correctedLen += extendedStr.length();
+			for(int i=0; i<extendedStr.length(); i++)
+				isPBPosCorrectedByHybridCorrection.push_back(true);
 		}
 		// B. FMWalk failure: 
 		// 1. high error 
@@ -143,7 +148,10 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
 			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
 			result.correctedLen += extendedStr.length();
-			
+			for(int i=0; i<(seedTarget.seedStartPos-seedSource.seedEndPos-1); i++)
+				isPBPosCorrectedByHybridCorrection.push_back(false);
+			for(int i=0; i<seedTarget.seedLength; i++)
+				isPBPosCorrectedByHybridCorrection.push_back(true);
 			// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
 			// return PBSelfCorrection(workItem);
 		}
@@ -168,7 +176,10 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 		
 	// return result;
 	
+	assert(pacbioCorrectedStrs[0].seedLength==isPBPosCorrectedByHybridCorrection.size());
+	
 	workItem.read.seqPBHC = result.correctedPacbioStrs.at(0);
+	workItem.read.isPBPosCorrectedByHybridCorrection = isPBPosCorrectedByHybridCorrection;
 	// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
 	return PBSelfCorrection(workItem);
 }
@@ -668,6 +679,8 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 			return;
 		}
 	}
+	
+	return;
 
 	// FMWalk 3rd: MSA Correction
 	const std::string query = 

@@ -84,7 +84,7 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
 
     // reserve sufficient str length for fast append
     pacbioCorrectedStrs.back().seedStr.reserve(readSeq.length());
-    initCorrect(readSeq, seedVec, pacbioCorrectedStrs, result);
+    initCorrect(readSeq, seedVec, workItem.read.isPBPosCorrectedByHybridCorrection, pacbioCorrectedStrs, result);
 
 	
 	result.merge = true;
@@ -114,16 +114,24 @@ void PacBioSelfCorrectionProcess::separatebykmer(std::string readid,std::string 
     
 }
 
-void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<SeedFeature>& seedVec, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result)
+void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<SeedFeature>& seedVec, const std::vector<bool> isPBPosCorrectedByHybridCorrection, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result)
 {
-
-
+	
+		// for(int i=0;i<isPBPosCorrectedByHybridCorrection.size();i++)
+		// {
+			// string s(1, readSeq[i]);
+			// if(isPBPosCorrectedByHybridCorrection.at(i))
+				// cout << i << ":" << reverseComplement(s) << ":1\n";
+			// else
+				// cout << i << ":" << reverseComplement(s) << ":0\n";
+		// }
+		
     m_total_FMtime = 0;
     m_total_DPtime = 0;
     FMextendParameters FMextendParameter(m_params.indices,m_params.idmerLength,m_params.maxLeaves,m_params.minKmerLength,m_params.PBcoverage,m_params.ErrorRate,m_params.DebugExtend);
     
 	for(size_t targetSeed = 1 ; targetSeed < seedVec.size() ; targetSeed++)
-	{				
+	{			
 		// number of trials of extension to the same target seed
 		// size_t numOfTrials = 0;
 		
@@ -132,13 +140,32 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 		
 		// source is increasing because no split in the 1st round, this is slow, better replace with pointer
 		SeedFeature source = pacbioCorrectedStrs.back();
-		SeedFeature target =  seedVec.at(targetSeed);
-
+		SeedFeature target = seedVec.at(targetSeed);
+	
+		// cout << "------" << targetSeed << " " << seedVec.at(targetSeed-1).seedEndPos+1 << " " << target.seedStartPos <<  "\n";
+		assert((isPBPosCorrectedByHybridCorrection.size()==0)||
+			(readSeq.length()==isPBPosCorrectedByHybridCorrection.size()));
+		bool isRegionCorrectedByHybrid=true;
+		for(int posPBCorrectedByHybridCorrection=seedVec.at(targetSeed-1).seedEndPos+1 ;
+			posPBCorrectedByHybridCorrection<target.seedStartPos ;
+			posPBCorrectedByHybridCorrection++)
+		{
+				
+			// string s(1, readSeq[posPBCorrectedByHybridCorrection]);
+			// if(isPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection))
+				// cout << posPBCorrectedByHybridCorrection << ":" << reverseComplement(s) << ":1\n";
+			// else
+				// cout << posPBCorrectedByHybridCorrection << ":" << reverseComplement(s) << ":0\n";
+			
+			if(isPBPosCorrectedByHybridCorrection.size()==0||
+				isPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
+				isRegionCorrectedByHybrid=false;
+		}
+			
 		// extension kmer is used for extension using local kmer hashtable collected from overlapping reads
 		// default: smaller beset kmer size from both seeds -2
 		size_t extendKmerSize = std::min(source.endBestKmerSize, seedVec.at(targetSeed).startBestKmerSize) - 2;
-			
-            
+
 		// Multiple targets will be tested for FM-index walk from source to target, if target is error seed, until m_params.numOfNextTarget times.
 		for(int nextTargetSeed = 0 ; nextTargetSeed < (int)m_params.numOfNextTarget && targetSeed + nextTargetSeed < seedVec.size() ; nextTargetSeed++)
 		{
@@ -159,16 +186,25 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 			// skip seeds with large distance in between for speedup
 			// if(dis_between_src_target >= (int)m_params.maxSeedInterval&& m_params.PBcoverage >=50) 
 				// break;
-
-            
             
 			// extension using local kmer hashtable collected from overlapping reads
 			std::string mergedseq;
 			FMWalkReturnType = extendBetweenSeeds(source, target, readSeq, mergedseq, extendKmerSize, dis_between_src_target,FMextendParameter);
             if(m_params.DebugExtend)
-            std::cout<< targetSeed << " \t" <<FMWalkReturnType<< " result of extension\n"<< mergedseq << "\n"; //debugch
-            // outfile << targetSeed << " \t" <<FMWalkReturnType << "\n";
-			if(FMWalkReturnType > 0)
+				std::cout<< targetSeed << " \t" <<FMWalkReturnType<< " result of extension\n"<< mergedseq << "\n"; //debugch
+            // if(isRegionCorrectedByHybrid)
+				// cout << "no";
+			// else
+				// cout << "yes";
+			
+			// std::cout << ">" << targetSeed
+			// << ", pos:" << target.seedStartPos
+			// << ", len:" << target.seedLength
+			// << "\n" << target.seedStr << "\n";
+			
+			// outfile << targetSeed << " \t" <<FMWalkReturnType << "\n";
+			if(isRegionCorrectedByHybrid==false && FMWalkReturnType > 0)
+			// if(FMWalkReturnType > 0)
 			{
 				// FMWalk success
 				// size_t extendStartPos = source.seedLength;
@@ -213,50 +249,49 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 				}
 			}
            */
-
-			// prevFMWalkReturnType = FMWalkReturnType;
-		}// end of next target seed
-		
-		// All targets failure: 
-		// 0: seed inter-distance too large
-		// -1: kmer extension failed at later stage close to target
-		// -4: kmer extension failed at early stage close to source
-		// -2: exceed depth
-		// -3: exceed leaves
-		if(FMWalkReturnType <= 0)
-		{
-			// push seedVec[targetSeed] into results, which will become new source in the next iteration
-			result.seedDis += seedVec[targetSeed].seedStartPos - seedVec[targetSeed-1].seedStartPos - seedVec[targetSeed-1].seedStr.length();
-			result.correctedLen += seedVec[targetSeed].seedStr.length();
-
-			// retain uncorrected parts of reads
-			if(!m_params.isSplit)
-			{
-				size_t startPos = seedVec[targetSeed-1].seedStartPos + seedVec[targetSeed-1].seedStr.length();
-				size_t extendedLen = seedVec[targetSeed].seedStartPos + seedVec[targetSeed].seedStr.length() - startPos;
-
-				pacbioCorrectedStrs.back().append(readSeq.substr(startPos,extendedLen));
-				pacbioCorrectedStrs.back().endBestKmerSize = seedVec.at(targetSeed).endBestKmerSize;
-				pacbioCorrectedStrs.back().isRepeat = seedVec.at(targetSeed).isRepeat;
-			}
 			else
 			{
-				// split original read into seeds and discard uncorrected parts of reads
-				pacbioCorrectedStrs.push_back(seedVec[targetSeed]);
+				// All targets failure: 
+				// 0: seed inter-distance too large
+				// -1: kmer extension failed at later stage close to target
+				// -4: kmer extension failed at early stage close to source
+				// -2: exceed depth
+				// -3: exceed leaves
+				// if(FMWalkReturnType <= 0)
+				{
+					// push seedVec[targetSeed] into results, which will become new source in the next iteration
+					result.seedDis += seedVec[targetSeed].seedStartPos - seedVec[targetSeed-1].seedStartPos - seedVec[targetSeed-1].seedStr.length();
+					result.correctedLen += seedVec[targetSeed].seedStr.length();
+
+					// retain uncorrected parts of reads
+					if(!m_params.isSplit)
+					{
+						size_t startPos = seedVec[targetSeed-1].seedStartPos + seedVec[targetSeed-1].seedStr.length();
+						size_t extendedLen = seedVec[targetSeed].seedStartPos + seedVec[targetSeed].seedStr.length() - startPos;
+
+						pacbioCorrectedStrs.back().append(readSeq.substr(startPos,extendedLen));
+						pacbioCorrectedStrs.back().endBestKmerSize = seedVec.at(targetSeed).endBestKmerSize;
+						pacbioCorrectedStrs.back().isRepeat = seedVec.at(targetSeed).isRepeat;
+					}
+					else
+					{
+						// split original read into seeds and discard uncorrected parts of reads
+						pacbioCorrectedStrs.push_back(seedVec[targetSeed]);
+					}
+					
+					// statistics of FM extension
+					if(FMWalkReturnType == -1 || FMWalkReturnType == -4)
+						result.highErrorNum++;
+					else if(FMWalkReturnType == -2)
+						result.exceedDepthNum++;
+					else if(FMWalkReturnType == -3)
+						result.exceedLeaveNum++;
+					if(FMWalkReturnType != 0)
+					result.totalWalkNum++;
+				}
 			}
-			
-			// statistics of FM extension
-			if(FMWalkReturnType == -1 || FMWalkReturnType == -4)
-				result.highErrorNum++;
-			else if(FMWalkReturnType == -2)
-				result.exceedDepthNum++;
-			else if(FMWalkReturnType == -3)
-				result.exceedLeaveNum++;
-            if(FMWalkReturnType != 0)
-            result.totalWalkNum++;
-		}
-		
-		
+			// prevFMWalkReturnType = FMWalkReturnType;
+		}// end of next target seed		
 	}// end of each target seed
     
     result.Timer_FM = m_total_FMtime;

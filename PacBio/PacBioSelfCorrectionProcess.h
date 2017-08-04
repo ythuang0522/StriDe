@@ -124,7 +124,7 @@ private:
 
     std::vector<SeedFeature> hybridSeedingFromPB(const std::string& readSeq);
     
-	void initCorrect(std::string& readSeq, std::vector<SeedFeature>& seeds, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result);
+	void initCorrect(std::string& readSeq, std::vector<SeedFeature>& seedVec, const std::vector<bool> isPBPosCorrectedByHybridCorrection, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result);
 	
 	void realCorrect(std::string& readSeq, std::vector<SeedFeature>& seeds, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result);
 	int checkseedcorrect(std::vector<SeedFeature> seeds,std::string currseed,size_t currseedStartpos);
