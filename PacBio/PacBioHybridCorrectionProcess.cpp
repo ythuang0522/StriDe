@@ -650,7 +650,8 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	// compute minOverlap from min of seedLength and maxOverlap
 	FMWParams.minOverlap = std::min(seedSource.seedLength, seedTarget.seedLength);
 	FMWParams.minOverlap = std::min(FMWParams.minOverlap, m_params.maxOverlap);
-
+	FMWParams.minOverlap = std::min(FMWParams.minOverlap, (int)seedSource.seedEndPos+1);
+	
 	FMWParams.strSourceSeed = seedSource.seedStr;
 	FMWParams.strTargetSeed = seedTarget.seedStr;
 	FMWParams.disBetweenSrcTarget = seedTarget.seedStartPos-seedSource.seedEndPos-1;

@@ -171,6 +171,7 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 		{
 			// std::cout << "======= " << result.totalWalkNum << " =======\n";
 			
+					
 			// extendKmerSize should be large for repeat seeds
 			if((source.isRepeat || target.isRepeat) )
 			{
@@ -186,24 +187,29 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 			// skip seeds with large distance in between for speedup
 			// if(dis_between_src_target >= (int)m_params.maxSeedInterval&& m_params.PBcoverage >=50) 
 				// break;
-            
+			
 			// extension using local kmer hashtable collected from overlapping reads
 			std::string mergedseq;
-			FMWalkReturnType = extendBetweenSeeds(source, target, readSeq, mergedseq, extendKmerSize, dis_between_src_target,FMextendParameter);
-            if(m_params.DebugExtend)
-				std::cout<< targetSeed << " \t" <<FMWalkReturnType<< " result of extension\n"<< mergedseq << "\n"; //debugch
-            // if(isRegionCorrectedByHybrid)
-				// cout << "no";
-			// else
-				// cout << "yes";
 			
-			// std::cout << ">" << targetSeed
-			// << ", pos:" << target.seedStartPos
-			// << ", len:" << target.seedLength
-			// << "\n" << target.seedStr << "\n";
+			if(isRegionCorrectedByHybrid==false)
+			{	
+				FMWalkReturnType = extendBetweenSeeds(source, target, readSeq, mergedseq, extendKmerSize, dis_between_src_target,FMextendParameter);
+				if(m_params.DebugExtend)
+					std::cout<< targetSeed << " \t" <<FMWalkReturnType<< " result of extension\n"<< mergedseq << "\n"; //debugch
+				// if(isRegionCorrectedByHybrid)
+					// cout << "no";
+				// else
+					// cout << "yes";
+				
+				// std::cout << ">" << targetSeed
+				// << ", pos:" << target.seedStartPos
+				// << ", len:" << target.seedLength
+				// << "\n" << target.seedStr << "\n";
+				
+				// outfile << targetSeed << " \t" <<FMWalkReturnType << "\n";
+			}
 			
-			// outfile << targetSeed << " \t" <<FMWalkReturnType << "\n";
-			if(isRegionCorrectedByHybrid==false && FMWalkReturnType > 0)
+			if(FMWalkReturnType > 0)
 			// if(FMWalkReturnType > 0)
 			{
 				// FMWalk success
