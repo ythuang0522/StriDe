@@ -86,12 +86,26 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
     pacbioCorrectedStrs.back().seedStr.reserve(readSeq.length());
     initCorrect(readSeq, seedVec, workItem.read.isPBPosCorrectedByHybridCorrection, pacbioCorrectedStrs, result);
 
-	
 	result.merge = true;
 	result.totalReadsLen = readSeq.length();
-	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
-		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
+	// for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
+		// result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
 	
+	// append the front (before the first seed)
+	// and the back-end (after the last seed) sequence to self corrected PB as final corrected PB, 
+	// because the two sequence were corrected by hybrid correction.
+	string correctedPBSequence =
+		(seedVec.front().seedStartPos==0?"":readSeq.substr(0,seedVec.front().seedStartPos))+
+		pacbioCorrectedStrs[0].seedStr+
+		(seedVec.back().seedEndPos==(readSeq.length()-1)?"":readSeq.substr(seedVec.back().seedEndPos+1));
+	result.correctedPacbioStrs.push_back(correctedPBSequence);
+	
+	// debug: 5' and 3' region between hybrid corrected PB and final corrected PB must be same.
+	// assert(readSeq.substr(0,seedVec.front().seedEndPos)==correctedPBSequence.substr(0,seedVec.front().seedEndPos));
+	// assert(readSeq.substr(seedVec.back().seedStartPos)
+		// ==correctedPBSequence.substr(correctedPBSequence.length()-
+			// readSeq.substr(seedVec.back().seedStartPos).length()));
+			
 	return result;
     
 }

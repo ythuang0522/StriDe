@@ -252,7 +252,7 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 	}
 	
 	// search for solid kmers as seeds
-	for(size_t pos=0 ; pos+minKmerSize<readSeq.length() ; pos++)
+	for(size_t pos=0 ; pos+minKmerSize<=readSeq.length() ; pos++)
 	{
 		string kmer=readSeq.substr(pos,minKmerSize);
 		BWTInterval fwdInterval=BWTAlgorithms::findInterval(m_params.indices.pRBWT, reverse(kmer));
@@ -650,6 +650,7 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 	// compute minOverlap from min of seedLength and maxOverlap
 	FMWParams.minOverlap = std::min(seedSource.seedLength, seedTarget.seedLength);
 	FMWParams.minOverlap = std::min(FMWParams.minOverlap, m_params.maxOverlap);
+	// fix a bug, corrected PB pos may more short than raw PB.
 	FMWParams.minOverlap = std::min(FMWParams.minOverlap, (int)seedSource.seedEndPos+1);
 	
 	FMWParams.strSourceSeed = seedSource.seedStr;
