@@ -35,34 +35,32 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	PacBioHybridCorrectionResult result;
 	
 	// std::cout << workItem.read.id << endl;
-	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
+	std::vector<SeedFeature> seedVec;
+	SeedFeature pacbioCorrectedStrs;
 	std::vector<bool> isPBPosCorrectedByHybridCorrection;
 	std::string readSeq = workItem.read.seq.toString();
 	seedVec = dynamicSeedingFromSR(readSeq);
 	seedVec = filterErrorSRSeeds(seedVec);
-	// for(int i=0 ; i<seedVec.size() ; i++)=
-		// cout << i << ": " << seedVec.at(i).seedStr << endl;
 	
 	if(seedVec.size() >= 2)
 	{
 		result.correctedLen += seedVec.at(0).seedLength;
-		pacbioCorrectedStrs.push_back(seedVec.at(0));
+		pacbioCorrectedStrs = seedVec.at(0);
+		// record position of PBHC read whether is corrected.
+		// for(int i=0; i<seedVec.at(0).seedStartPos; i++)
+			// isPBPosCorrectedByHybridCorrection.push_back(false);
 		for(int i=0; i<seedVec.at(0).seedLength; i++)
 			isPBPosCorrectedByHybridCorrection.push_back(true);
 	}
 	else
-	{
 		// calling ChengWei's PB Self Correction if no seed.
 		return PBSelfCorrection(workItem);
-		// result.merge = false;
-		// return result;
-	}
 	
 	// FMWalk for each pair of seeds
 	for(size_t numFMWalk = 1 ; numFMWalk < seedVec.size() ; numFMWalk++)
 	{
 		FMWalkResult FMWResult;
-		SeedFeature seedSource = pacbioCorrectedStrs.back(),
+		SeedFeature seedSource = pacbioCorrectedStrs,
 			seedTarget = seedVec.at(numFMWalk);
 
 		// in order to escape the error seed target potentially, 
@@ -120,15 +118,17 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 		{
 			assert(FMWResult.mergedSeq.length() > seedSource.seedLength);
 			string extendedStr = FMWResult.mergedSeq.substr(seedSource.seedLength);
-			pacbioCorrectedStrs.back().append(extendedStr);
-			pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
-			pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
-			pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
-			pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
-			pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
-			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
-			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
+			pacbioCorrectedStrs.append(extendedStr);
+			pacbioCorrectedStrs.seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
 			result.correctedLen += extendedStr.length();
+			
+			// record position of PBHC read whether is corrected.
 			for(int i=0; i<extendedStr.length(); i++)
 				isPBPosCorrectedByHybridCorrection.push_back(true);
 		}
@@ -139,21 +139,21 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 		else
 		{
 			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
-			pacbioCorrectedStrs.back().append(extendedStr);
-			pacbioCorrectedStrs.back().seedStartPos = seedTarget.seedStartPos;
-			pacbioCorrectedStrs.back().seedEndPos = seedTarget.seedEndPos;
-			pacbioCorrectedStrs.back().isRepeat = seedTarget.isRepeat;
-			pacbioCorrectedStrs.back().isPBSeed = seedTarget.isPBSeed;
-			pacbioCorrectedStrs.back().isNextRepeat = seedTarget.isNextRepeat;
-			pacbioCorrectedStrs.back().startBestKmerSize = seedTarget.startBestKmerSize;
-			pacbioCorrectedStrs.back().endBestKmerSize = seedTarget.endBestKmerSize;
+			pacbioCorrectedStrs.append(extendedStr);
+			pacbioCorrectedStrs.seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
 			result.correctedLen += extendedStr.length();
+			
+			// record position of PBHC read whether is corrected.
 			for(int i=0; i<(seedTarget.seedStartPos-seedSource.seedEndPos-1); i++)
 				isPBPosCorrectedByHybridCorrection.push_back(false);
 			for(int i=0; i<seedTarget.seedLength; i++)
 				isPBPosCorrectedByHybridCorrection.push_back(true);
-			// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
-			// return PBSelfCorrection(workItem);
 		}
 		
 		// output information
@@ -168,17 +168,24 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 			// result.exceedLeaveNum++;
 	}
 	
+	// result.strPBHC =
+		// (seedVec.front().seedStartPos==0?"":readSeq.substr(0,seedVec.front().seedStartPos))+
+		// pacbioCorrectedStrs.seedStr+
+		// (seedVec.back().seedEndPos==(readSeq.length()-1)?"":readSeq.substr(seedVec.back().seedEndPos+1));
+	// record position of PBHC read whether is corrected.
+	// for(int i=seedVec.back().seedEndPos+1; i<readSeq.length(); i++)
+			// isPBPosCorrectedByHybridCorrection.push_back(false);
+
+	result.strPBHC = pacbioCorrectedStrs.seedStr;
 	result.totalSeedNum = seedVec.size();
 	result.totalReadsLen = readSeq.length();
 	result.merge = true;
-	for(size_t result_count = 0 ; result_count < pacbioCorrectedStrs.size() ; result_count++)
-		result.correctedPacbioStrs.push_back(pacbioCorrectedStrs[result_count].seedStr);
-		
+	
 	// return result;
 	
-	assert(pacbioCorrectedStrs[0].seedLength==isPBPosCorrectedByHybridCorrection.size());
+	assert(result.strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
 	
-	workItem.read.seqPBHC = result.correctedPacbioStrs.at(0);
+	workItem.read.seqPBHC = result.strPBHC;
 	workItem.read.isPBPosCorrectedByHybridCorrection = isPBPosCorrectedByHybridCorrection;
 	// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
 	return PBSelfCorrection(workItem);
@@ -207,7 +214,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBSelfCorrection(con
 	PacBioSelfCorrectionResult resultPBSC=processPBSC.PBSelfCorrection(workItem);
 	PacBioHybridCorrectionResult resultPBHC;
 	resultPBHC.merge=resultPBSC.merge;
-	resultPBHC.correctedPacbioStrs=resultPBSC.correctedPacbioStrs;
+	resultPBHC.strPBHC=resultPBSC.strPBSC;
 	return resultPBHC;
 }
 
@@ -1039,13 +1046,13 @@ void PacBioHybridCorrectionPostProcess::process(const SequenceWorkItem& item, co
 		m_exceedLeaveNum += result.exceedLeaveNum;
 		m_seedDis += result.seedDis;
 		
-		for(size_t i = 0 ; i < result.correctedPacbioStrs.size() ; i++)
+		// for(size_t i = 0 ; i < result.correctedPacbioStrs.size() ; i++)
 		{
 			SeqItem mergeRecord;
 			std::stringstream ss;
-			ss << item.read.id << "_" << i << "_" << result.correctedPacbioStrs[i].toString().length();
+			ss << item.read.id << "_" << "_" << result.strPBHC.toString().length();
 			mergeRecord.id = ss.str();
-			mergeRecord.seq = result.correctedPacbioStrs[i];
+			mergeRecord.seq = result.strPBHC;
 			mergeRecord.write(*m_pCorrectedWriter);
 		}
 	}

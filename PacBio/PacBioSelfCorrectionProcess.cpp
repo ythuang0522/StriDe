@@ -98,7 +98,7 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
 		(seedVec.front().seedStartPos==0?"":readSeq.substr(0,seedVec.front().seedStartPos))+
 		pacbioCorrectedStrs[0].seedStr+
 		(seedVec.back().seedEndPos==(readSeq.length()-1)?"":readSeq.substr(seedVec.back().seedEndPos+1));
-	result.correctedPacbioStrs.push_back(correctedPBSequence);
+	result.strPBSC = correctedPBSequence;
 	
 	// debug: 5' and 3' region between hybrid corrected PB and final corrected PB must be same.
 	// assert(readSeq.substr(0,seedVec.front().seedEndPos)==correctedPBSequence.substr(0,seedVec.front().seedEndPos));
@@ -971,15 +971,15 @@ void PacBioSelfCorrectionPostProcess::process(const SequenceWorkItem& item, cons
 		mergeRecord.seq = result.correctSequence;
 		mergeRecord.write(*m_pCorrectedWriter);*/
 		
-		for(size_t i = 0 ; i < result.correctedPacbioStrs.size() ; i++)
-		{
-			SeqItem mergeRecord2;
-			std::stringstream ss2;
-			ss2 << item.read.id << "_" << i << "_" << result.correctedPacbioStrs[i].toString().length();
-			mergeRecord2.id = ss2.str();
-			mergeRecord2.seq = result.correctedPacbioStrs[i];
-			mergeRecord2.write(*m_pCorrectedWriter);
-		}
+		// for(size_t i = 0 ; i < result.correctedPacbioStrs.size() ; i++)
+		// {
+			// SeqItem mergeRecord2;
+			// std::stringstream ss2;
+			// ss2 << item.read.id << "_" << i << "_" << result.correctedPacbioStrs[i].toString().length();
+			// mergeRecord2.id = ss2.str();
+			// mergeRecord2.seq = result.correctedPacbioStrs[i];
+			// mergeRecord2.write(*m_pCorrectedWriter);
+		// }
 	}
 	else
 	{

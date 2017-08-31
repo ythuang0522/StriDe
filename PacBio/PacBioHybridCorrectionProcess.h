@@ -74,7 +74,7 @@ public:
 	size_t kmerLength;
 
 	// PacBio reads correction by Ya, v20151001.
-	std::vector<DNAString> correctedPacbioStrs;
+	DNAString strPBHC;
 	int64_t totalReadsLen;
 	int64_t correctedLen;
 	int64_t totalSeedNum;
