@@ -45,7 +45,7 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	std::string endingkmer = m_strTargetSeed.substr(0, m_minOverlap);
 
 	// PacBio reads are longer than real length due to insertions
-	m_MaxLength = (1.1*(m_disBetweenSrcTarget+10))+endingkmer.length()+m_currentLength;
+	m_MaxLength = (1.18*(m_disBetweenSrcTarget+18))+endingkmer.length()+m_currentLength;
 	m_MinLength = (0.8*(m_disBetweenSrcTarget-20))+endingkmer.length()+m_currentLength;
 	
 	// Errors were characterized by comparison to the known reference sequences, 
@@ -54,11 +54,6 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	// and apparent mismatch errors at 1%. 
 	// ref: https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-13-375
 	// m_expectedLength = (0.9*m_disBetweenSrcTarget)+endingkmer.length()+m_currentLength;
-	
-	// cout << m_MaxLength << ":\t" << m_MinLength;
-	// cout << "*" << m_disBetweenSrcTarget+endingkmer.length()+m_currentLength << "\n";
-	// cout << "**" << m_minOverlap << "\n";
-	// cout << "raw PB sequence + 2*minOverlp: " << m_rawPBStrBetweenSrcTargetWith2Minoverlap << " " << m_minOverlap << "\n";
 	
 	m_fwdTerminatedInterval = BWTAlgorithms::findInterval(m_pRBWT, reverse(endingkmer));
 	m_rvcTerminatedInterval = BWTAlgorithms::findInterval(m_pBWT, reverseComplement(endingkmer));
@@ -103,18 +98,18 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		// if(m_currentLength >= m_MinLength && isTerminated(results))
 			// break;
 		
-		// if(m_debugMode)
-		// {	
-			// std::cout << "----m_currentKmerSize: " << m_currentKmerSize
-			// << ", m_leaves.size(): " << m_leaves.size()
-			// << ", result: " << results.size() << "----\n";
-			// std::cout << "GGGCTGAAAATTCGGTGATGCTGCCAACTTACTGATTTAGTGTATGATGGTGTTTTTGAGGTGCT" << endl;
-			// for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
-			// {
-				// std::cout << (*iter)->getSuffix(m_currentLength-m_pStrSourceSeed->length()) << " ";
-				// std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << " " << (*iter)->getKmerCount() << "\n";
-			// }
-		// }
+		if(m_debugMode)
+		{	
+			std::cout << "----m_currentKmerSize: " << m_currentKmerSize
+			<< ", m_leaves.size(): " << m_leaves.size()
+			<< ", result: " << results.size() << "----\n";
+			std::cout << "GATAGCGAACGCCCACTTTCACGCTCAAACAATAACCAAGAACCTGTGCTATGGAATTTTAAATCACTAGCAAACAATTTCAACGTTAGGTTTACGTACCATTTTCACGCCACATCGTCATCCTCTAAGATTGAGACGTATTTTCAGTTTCTAAACGATTATCTAGCGGAAAACCTATACAAGTGCATCAACATTTTTCATGATGACTGTAATGGGTTGACGAAGCCAGTTATTCATGAACAATTTA-TTAAT-TACGTCTTACAACCCATTAGGGATAAAGTAAGATCCACCCTATTTCAAAACGATTTGAAAACTTTGATCGTCCTAATTTCCCAAATCCTGGCTACAGACAAAAATTTATTGAATTCTTTTCATTACCATGGGCTAGGTTTGGTGTCGTTAATTTCCGATGAAGTATGGGAGAAATGGATCAACTATGAAGTTGAAATGGCCAATAGGCAATTCATCAATATAACTAAAAATCCGGAAGATTTCCCAAAATCTTCTCAGAATTTTGTCAAATTAATCAATAAAATTTACGATTATT" << endl;
+			for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
+			{
+				std::cout << (*iter)->getSuffix(m_currentLength-m_pStrSourceSeed->length()) << " ";
+				std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << " " << (*iter)->getKmerCount() << "\n";
+			}
+		}
 		
 		if(m_leaves.size() > m_maxUsedLeaves)
 			m_maxUsedLeaves = m_leaves.size();

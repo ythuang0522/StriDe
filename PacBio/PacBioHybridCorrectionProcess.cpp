@@ -649,6 +649,8 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 {
 	// FMWalk params initialized
 	FMWalkParameters FMWParams;
+	// if(seedTarget.seedStr == "ATTAATCAATAAAATTTACGATTATT")
+		// FMWParams.debugMode=true;
 	FMWParams.indices = m_params.indices;
 	FMWParams.maxOverlap = m_params.maxOverlap;
 	FMWParams.SAThreshold = m_params.FMWKmerThreshold;
@@ -1050,7 +1052,7 @@ void PacBioHybridCorrectionPostProcess::process(const SequenceWorkItem& item, co
 		{
 			SeqItem mergeRecord;
 			std::stringstream ss;
-			ss << item.read.id << "_" << "_" << result.strPBHC.toString().length();
+			ss << item.read.id << "_" << item.read.seq.length() << "_" << result.strPBHC.toString().length();
 			mergeRecord.id = ss.str();
 			mergeRecord.seq = result.strPBHC;
 			mergeRecord.write(*m_pCorrectedWriter);
