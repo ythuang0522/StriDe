@@ -96,6 +96,7 @@ public:
 
 	// PacBio correction by Ya, v20150305.
 	PacBioHybridCorrectionResult PBHybridCorrection(SequenceWorkItem& workItem);
+	PacBioHybridCorrectionResult PBHybridCorrectionRun2(SequenceWorkItem& workItem);
 	
 	PacBioHybridCorrectionResult process(SequenceWorkItem& workItem)
 	{
@@ -107,9 +108,9 @@ public:
 private:
 
 	// identify seeds
-	std::vector<SeedFeature> dynamicSeedingFromSR(const std::string& readSeq);
+	std::vector<SeedFeature> dynamicSeedingFromSR(const std::string& readSeq, int mode);
 	bool dynamicSeedingFromPB(const std::string& readSeq, std::vector<SeedFeature>& seedVec, std::vector<int>& seedEndPosVec, size_t prevEndPos);
-	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec);
+	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec, int mode);
 	
 	// replace raw sequence by correct sequence
 	void extendBetweenSeeds(std::string& readSeq, SeedFeature& source, SeedFeature& target, FMWalkResult& FMWResult);

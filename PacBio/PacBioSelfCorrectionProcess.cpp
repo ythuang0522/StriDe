@@ -52,16 +52,11 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
 	// find seeds using fixed or dynamic kmers depending on 1st round or not
      
     seedVec = hybridSeedingFromPB(readSeq);
-    
-    
-   
-     
-    
+        
 	result.Timer_Seed = seedTimer->getElapsedWallTime(); 
     delete seedTimer;
 	result.totalSeedNum = seedVec.size();
     
-
 	// push the first seed into pacbioCorrectedStrs, which will be popped later as source seed
 	if(seedVec.size() >= 2)
 	{
@@ -81,7 +76,6 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
 		return result;
 	}
 	
-
     // reserve sufficient str length for fast append
     pacbioCorrectedStrs.back().seedStr.reserve(readSeq.length());
     initCorrect(readSeq, seedVec, workItem.read.isPBPosCorrectedByHybridCorrection, pacbioCorrectedStrs, result);

@@ -47,7 +47,8 @@ SAIntervalPBHybridCTree::SAIntervalPBHybridCTree(FMWalkParameters& parameters):
 	// PacBio reads are longer than real length due to insertions
 	m_MaxLength = (1.18*(m_disBetweenSrcTarget+18))+endingkmer.length()+m_currentLength;
 	m_MinLength = (0.8*(m_disBetweenSrcTarget-20))+endingkmer.length()+m_currentLength;
-	
+	if(m_debugMode)
+		cout << m_disBetweenSrcTarget << "\n" << m_rawPBStrBetweenSrcTargetWith2Minoverlap << endl;
 	// Errors were characterized by comparison to the known reference sequences, 
 	// showing that the primary error mode was insertions at 12%, 
 	// followed by deletions at 2%,  
