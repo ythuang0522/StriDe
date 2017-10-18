@@ -173,7 +173,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 }
 
 // PacBio Hybrid Multiple Correction by Ya, v20170602.
-// using shorted kmer size to identify seeds in PacBio Hybrid Correction
+// using shorted kmer size to identify seeds in PacBio Hybrid Multiple Correction
 // because distance between seeds is too far (>1800 bp) using large kmer size.
 void PacBioHybridCorrectionProcess::PBHybridCorrection_decreaseKmerSize(string& strPBHC, vector<bool>& prevIsPBPosCorrectedByHybridCorrection)
 {
