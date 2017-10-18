@@ -39,235 +39,66 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	SeedFeature pacbioCorrectedStrs;
 	std::vector<bool> isPBPosCorrectedByHybridCorrection;
 	std::string readSeq = workItem.read.seq.toString();
+	
+	// dynamicSeedingFromSR(readSeq, mode);
+	// mode 0 is for the first PacBio Hybrid Correction.
+	// mode 1 is for multiple (decreaseKmerSize) PacBio Hybrid Correction.
 	seedVec = dynamicSeedingFromSR(readSeq, 0);
-	seedVec = filterErrorSRSeeds(seedVec, 0);
+	seedVec = filterErrorSRSeeds(seedVec);
 	
 	if(seedVec.size() >= 2)
 	{
-		result.correctedLen += seedVec.at(0).seedLength;
 		pacbioCorrectedStrs = seedVec.at(0);
 		// record position of PBHC read whether is corrected.
-		// for(int i=0; i<seedVec.at(0).seedStartPos; i++)
-			// isPBPosCorrectedByHybridCorrection.push_back(false);
-		for(int i=0; i<seedVec.at(0).seedLength; i++)
-			isPBPosCorrectedByHybridCorrection.push_back(true);
+		int currCorrectedPBLength = seedVec.at(0).seedLength;
+		isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
 	}
 	else
+	{
+		result.merge = false;
 		// calling ChengWei's PB Self Correction if no seed.
-		return PBSelfCorrection(workItem);
+		return PBSelfCorrection(workItem, result);
+	}
 	
 	// FMWalk for each pair of seeds
 	for(size_t numFMWalk = 1 ; numFMWalk < seedVec.size() ; numFMWalk++)
 	{
 		FMWalkResult FMWResult;
 		SeedFeature seedSource = pacbioCorrectedStrs,
-			seedTarget = seedVec.at(numFMWalk);
+					seedTarget = seedVec.at(numFMWalk);
 
 		// in order to escape the error seed target potentially, 
 		// we try to use the next seed as a new target.
-		int tryNext = 0;
-		for(int nextFMWalk = numFMWalk + tryNext; 
-		// tryNext <= N, N means the maximum try times.
-		tryNext <= 3 && 
+		// tryNext <= N, N means the maximum test times.
+		int tryNext = 0, iniFMWalk = numFMWalk;
+		for(; tryNext <= 3 && 
 		(FMWResult.typeFMWalkResult==-1||FMWResult.typeFMWalkResult==-2) && 
-		nextFMWalk < seedVec.size(); 
-		tryNext++, nextFMWalk = numFMWalk + tryNext)
+		numFMWalk < seedVec.size(); 
+		tryNext++, numFMWalk++)
 		{
-			seedTarget = seedVec.at(nextFMWalk);
+			seedTarget = seedVec.at(numFMWalk);
+			// FMWalk correction using pair of seeds from short reads.
 			extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
 			// cout << numFMWalk << ": " <<  FMWResult.typeFMWalkResult <<"\n";
+			if(FMWResult.typeFMWalkResult > 0)
+				break;
 		}
-		if(FMWResult.typeFMWalkResult > 0)
-			numFMWalk += (tryNext - 1);
+		if(FMWResult.typeFMWalkResult < 0)
+			numFMWalk = iniFMWalk;
 		seedTarget = seedVec.at(numFMWalk);
 		
 		// debug:
-		// string seed = seedVec.at(numFMWalk-1).seedStr;
+		// string seed = seedVec.at(iniFMWalk-1).seedStr;
 		// int fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.indices);
 		// int rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.indices);
 		// int SRSF = fwdSF+rvcSF;
 		// fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.PBindices);
 		// rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.PBindices);
 		// int PBSF = fwdSF+rvcSF;
-		// std::cout << ">" << numFMWalk-1
-		// << ", pos:" << seedVec.at(numFMWalk-1).seedStartPos
-		// << ", len:" << seedVec.at(numFMWalk-1).seedLength
-		// << ", isPB:" << (seedVec.at(numFMWalk-1).isPBSeed?"yes":"no")
-		// << ", SRSF:" << SRSF
-		// << ", PBSF:" << PBSF
-		// << ", GC&tandem%:" << (int)(GCAndTandemRatio(seed)*100) << "%"
-		// << ", FMWRT:" << FMWResult.typeFMWalkResult << ".\n"
-		// << seed << endl;
-		// if(FMWResult.typeFMWalkResult==1)
-		// {
-			// cout << "raw length: "
-			// << seedTarget.seedStartPos-seedSource.seedEndPos-1
-			// << ", corrected length: "
-			// << FMWResult.mergedSeq.substr(seedSource.seedLength).length()-seedTarget.seedLength
-			// << "\n"
-			// << readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos)
-			// << "\n"
-			// << FMWResult.mergedSeq.substr(seedSource.seedLength)
-			// << "\n";
-		// }
-		
-		// record corrected pacbio reads string--
-		// result.seedDis += target.seedStartPos-source.seedEndPos-1;
-		// A. FMWalk success:
-		if(FMWResult.typeFMWalkResult == 1)
-		{
-			assert(FMWResult.mergedSeq.length() > seedSource.seedLength);
-			string extendedStr = FMWResult.mergedSeq.substr(seedSource.seedLength);
-			pacbioCorrectedStrs.append(extendedStr);
-			pacbioCorrectedStrs.seedStartPos = seedTarget.seedStartPos;
-			pacbioCorrectedStrs.seedEndPos = seedTarget.seedEndPos;
-			pacbioCorrectedStrs.isRepeat = seedTarget.isRepeat;
-			pacbioCorrectedStrs.isPBSeed = seedTarget.isPBSeed;
-			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
-			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
-			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
-			result.correctedLen += extendedStr.length();
-			
-			// record position of PBHC read whether is corrected.
-			for(int i=0; i<extendedStr.length(); i++)
-				isPBPosCorrectedByHybridCorrection.push_back(true);
-		}
-		// B. FMWalk failure: 
-		// 1. high error 
-		// 2. exceed leaves
-		// 3. exceed depth
-		else
-		{
-			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
-			pacbioCorrectedStrs.append(extendedStr);
-			pacbioCorrectedStrs.seedStartPos = seedTarget.seedStartPos;
-			pacbioCorrectedStrs.seedEndPos = seedTarget.seedEndPos;
-			pacbioCorrectedStrs.isRepeat = seedTarget.isRepeat;
-			pacbioCorrectedStrs.isPBSeed = seedTarget.isPBSeed;
-			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
-			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
-			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
-			result.correctedLen += extendedStr.length();
-			
-			// record position of PBHC read whether is corrected.
-			for(int i=0; i<(seedTarget.seedStartPos-seedSource.seedEndPos-1); i++)
-				isPBPosCorrectedByHybridCorrection.push_back(false);
-			for(int i=0; i<seedTarget.seedLength; i++)
-				isPBPosCorrectedByHybridCorrection.push_back(true);
-		}
-		
-		// output information
-		result.totalWalkNum++;
-		if(FMWResult.typeFMWalkResult == 1)
-			result.correctedNum++;
-		// else if(FMWalkReturnType == -1)
-			// result.highErrorNum++;
-		// else if(FMWalkReturnType == -2)
-			// result.exceedDepthNum++;
-		// else if(FMWalkReturnType == -3)
-			// result.exceedLeaveNum++;
-	}
-	
-	// result.strPBHC =
-		// (seedVec.front().seedStartPos==0?"":readSeq.substr(0,seedVec.front().seedStartPos))+
-		// pacbioCorrectedStrs.seedStr+
-		// (seedVec.back().seedEndPos==(readSeq.length()-1)?"":readSeq.substr(seedVec.back().seedEndPos+1));
-	// record position of PBHC read whether is corrected.
-	// for(int i=seedVec.back().seedEndPos+1; i<readSeq.length(); i++)
-			// isPBPosCorrectedByHybridCorrection.push_back(false);
-
-	result.strPBHC = pacbioCorrectedStrs.seedStr;
-	result.totalSeedNum = seedVec.size();
-	result.totalReadsLen = readSeq.length();
-	result.merge = true;
-	
-	// return result;
-	
-	assert(result.strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
-	
-	workItem.read.seqPBHC = result.strPBHC;
-	workItem.read.isPBPosCorrectedByHybridCorrection = isPBPosCorrectedByHybridCorrection;
-	// using shorted kmer size to identify seeds in PacBio Hybrid Correction Run Two
-	// because distance between seeds is too far (>1800 bp) using large kmer size.
-	return PBHybridCorrectionRun2(workItem);
-	// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
-	// return PBSelfCorrection(workItem);
-}
-
-// PacBio Hybrid Correction Run Two by Ya, v20170602.
-PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrectionRun2(SequenceWorkItem& workItem)
-{
-	PacBioHybridCorrectionResult result;
-	
-	// std::cout << workItem.read.id << endl;
-	std::vector<SeedFeature> seedVec;
-	SeedFeature pacbioCorrectedStrs;
-	std::vector<bool> isPBPosCorrectedByHybridCorrection;
-	std::string readSeq = workItem.read.seqPBHC.toString();
-	seedVec = dynamicSeedingFromSR(readSeq, 1);
-	seedVec = filterErrorSRSeeds(seedVec, 1);
-
-	if(seedVec.size() >= 2)
-	{
-		result.correctedLen += seedVec.at(0).seedLength;
-		pacbioCorrectedStrs = seedVec.at(0);
-		// record position of PBHC read whether is corrected.
-		// for(int i=0; i<seedVec.at(0).seedStartPos; i++)
-			// isPBPosCorrectedByHybridCorrection.push_back(false);
-		for(int i=0; i<seedVec.at(0).seedLength; i++)
-			isPBPosCorrectedByHybridCorrection.push_back(true);
-	}
-	else
-		// calling ChengWei's PB Self Correction if no seed.
-		return PBSelfCorrection(workItem);
-	
-	// FMWalk for each pair of seeds
-	for(size_t numFMWalk = 1 ; numFMWalk < seedVec.size() ; numFMWalk++)
-	{
-		FMWalkResult FMWResult;
-		SeedFeature seedSource = pacbioCorrectedStrs,
-			seedTarget = seedVec.at(numFMWalk);
-		assert((workItem.read.isPBPosCorrectedByHybridCorrection.size()==0)||
-		(readSeq.length()==workItem.read.isPBPosCorrectedByHybridCorrection.size()));
-		bool isRegionCorrectedByHybridRun1=true;
-		for(int posPBCorrectedByHybridCorrection=seedVec.at(numFMWalk-1).seedEndPos+1 ;
-		posPBCorrectedByHybridCorrection<seedTarget.seedStartPos ;
-		posPBCorrectedByHybridCorrection++)
-			if(workItem.read.isPBPosCorrectedByHybridCorrection.size()==0||
-				workItem.read.isPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
-				isRegionCorrectedByHybridRun1=false;
-		
-		// in order to escape the error seed target potentially, 
-		// we try to use the next seed as a new target.
-		int tryNext = 0;
-		for(int nextFMWalk = numFMWalk + tryNext; 
-		isRegionCorrectedByHybridRun1 == false && 
-		// tryNext <= N, N means the maximum try times.
-		tryNext <= 3 && 
-		(FMWResult.typeFMWalkResult==-1||FMWResult.typeFMWalkResult==-2) && 
-		nextFMWalk < seedVec.size(); 
-		tryNext++, nextFMWalk = numFMWalk + tryNext)
-		{
-			seedTarget = seedVec.at(nextFMWalk);
-			extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
-			// cout << numFMWalk << ": " <<  FMWResult.typeFMWalkResult <<"\n";
-		}
-		if(FMWResult.typeFMWalkResult > 0)
-			numFMWalk += (tryNext - 1);
-		seedTarget = seedVec.at(numFMWalk);
-		
-		// debug:
-		// string seed = seedVec.at(numFMWalk-1).seedStr;
-		// int fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.indices);
-		// int rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.indices);
-		// int SRSF = fwdSF+rvcSF;
-		// fwdSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(seed, m_params.PBindices);
-		// rvcSF = BWTAlgorithms::countSequenceOccurrencesSingleStrand(reverseComplement(seed), m_params.PBindices);
-		// int PBSF = fwdSF+rvcSF;
-		// std::cout << ">" << numFMWalk-1
-		// << ", pos:" << seedVec.at(numFMWalk-1).seedStartPos
-		// << ", len:" << seedVec.at(numFMWalk-1).seedLength
-		// << ", isPB:" << (seedVec.at(numFMWalk-1).isPBSeed?"yes":"no")
+		// std::cout << ">" << iniFMWalk-1
+		// << ", pos:" << seedVec.at(iniFMWalk-1).seedStartPos
+		// << ", len:" << seedVec.at(iniFMWalk-1).seedLength
+		// << ", isPB:" << (seedVec.at(iniFMWalk-1).isPBSeed?"yes":"no")
 		// << ", SRSF:" << SRSF
 		// << ", PBSF:" << PBSF
 		// << ", GC&tandem%:" << (int)(GCAndTandemRatio(seed)*100) << "%"
@@ -276,20 +107,18 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrectionRu
 		// << seed << endl;
 		// if(FMWResult.typeFMWalkResult==1)
 		// {
-			// cout << "raw length: "
-			// << seedTarget.seedStartPos-seedSource.seedEndPos-1
-			// << ", corrected length: "
-			// << FMWResult.mergedSeq.substr(seedSource.seedLength).length()-seedTarget.seedLength
-			// << "\n"
-			// << readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos)
-			// << "\n"
-			// << FMWResult.mergedSeq.substr(seedSource.seedLength)
-			// << "\n";
+			// cout << "raw length: " << seedTarget.seedStartPos-seedSource.seedEndPos-1
+			// << ", corrected length: " << FMWResult.mergedSeq.substr(seedSource.seedLength).length()-seedTarget.seedLength << "\n"
+			// << readSeq.substr(seedVec.at(iniFMWalk-1).seedStartPos,seedTarget.seedEndPos-seedVec.at(iniFMWalk-1).seedStartPos+1) << "\n"
+			// << FMWResult.mergedSeq.substr(seedSource.seedLength-seedVec.at(iniFMWalk-1).seedLength) << "\n";
 		// }
 		
-		// record corrected pacbio reads string--
-		// result.seedDis += target.seedStartPos-source.seedEndPos-1;
-		// A. FMWalk success:
+		// FMWalk result--
+		// success: 1,
+		// high error: -1,
+		// exceed leaves: -2,
+		// exceed depth: -3,
+		// no suitably extended path compared as raw PB sequence: -4.
 		if(FMWResult.typeFMWalkResult == 1)
 		{
 			assert(FMWResult.mergedSeq.length() > seedSource.seedLength);
@@ -302,16 +131,11 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrectionRu
 			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
 			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
 			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
-			result.correctedLen += extendedStr.length();
 			
 			// record position of PBHC read whether is corrected.
-			for(int i=0; i<extendedStr.length(); i++)
-				isPBPosCorrectedByHybridCorrection.push_back(true);
+			int currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+extendedStr.length();
+			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
 		}
-		// B. FMWalk failure: 
-		// 1. high error 
-		// 2. exceed leaves
-		// 3. exceed depth
 		else
 		{
 			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
@@ -323,82 +147,174 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrectionRu
 			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
 			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
 			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
-			result.correctedLen += extendedStr.length();
 			
 			// record position of PBHC read whether is corrected.
-			for(int i=0; i<(seedTarget.seedStartPos-seedSource.seedEndPos-1); i++)
-			{
-				if(isRegionCorrectedByHybridRun1 == false)
-					isPBPosCorrectedByHybridCorrection.push_back(false);
-				else
-					isPBPosCorrectedByHybridCorrection.push_back(true);
-			}
-			for(int i=0; i<seedTarget.seedLength; i++)
-				isPBPosCorrectedByHybridCorrection.push_back(true);
+			int currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+(seedTarget.seedStartPos-seedSource.seedEndPos-1);
+			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, false);
+				currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+seedTarget.seedLength;
+			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
 		}
-		
-		// output information
-		result.totalWalkNum++;
-		if(FMWResult.typeFMWalkResult == 1)
-			result.correctedNum++;
-		// else if(FMWalkReturnType == -1)
-			// result.highErrorNum++;
-		// else if(FMWalkReturnType == -2)
-			// result.exceedDepthNum++;
-		// else if(FMWalkReturnType == -3)
-			// result.exceedLeaveNum++;
 	}
 	
-	// result.strPBHC =
-		// (seedVec.front().seedStartPos==0?"":readSeq.substr(0,seedVec.front().seedStartPos))+
-		// pacbioCorrectedStrs.seedStr+
-		// (seedVec.back().seedEndPos==(readSeq.length()-1)?"":readSeq.substr(seedVec.back().seedEndPos+1));
-	// record position of PBHC read whether is corrected.
-	// for(int i=seedVec.back().seedEndPos+1; i<readSeq.length(); i++)
-			// isPBPosCorrectedByHybridCorrection.push_back(false);
-
-	result.strPBHC = pacbioCorrectedStrs.seedStr;
-	result.totalSeedNum = seedVec.size();
-	result.totalReadsLen = readSeq.length();
+	string strPBHC = pacbioCorrectedStrs.seedStr;
+	assert(strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
+	
+	// using shorted kmer size to identify seeds in PacBio Hybrid Correction Run Two
+	// because distance between seeds is too far (>1800 bp) using large kmer size.
+	PBHybridCorrection_decreaseKmerSize(strPBHC, isPBPosCorrectedByHybridCorrection);
+	assert(strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
+	
+	result.strPBHC = strPBHC;
+	result.isPBPosCorrectedByHybridCorrection = isPBPosCorrectedByHybridCorrection;
 	result.merge = true;
 	
-	// return result;
-	
-	assert(result.strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
-	
-	workItem.read.seqPBHC = result.strPBHC;
-	cout << result.strPBHC.toString() << endl;
-	// vector<bool>().swap(workItem.read.isPBPosCorrectedByHybridCorrection);
-	
-	workItem.read.isPBPosCorrectedByHybridCorrection = isPBPosCorrectedByHybridCorrection;
 	// calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
-	return PBSelfCorrection(workItem);
+	return PBSelfCorrection(workItem, result);
+}
+
+// PacBio Hybrid Correction Run Two by Ya, v20170602.
+void PacBioHybridCorrectionProcess::PBHybridCorrection_decreaseKmerSize(string& strPBHC, vector<bool>& prevIsPBPosCorrectedByHybridCorrection)
+{
+	std::vector<SeedFeature> seedVec;
+	SeedFeature pacbioCorrectedStrs;
+	std::vector<bool> isPBPosCorrectedByHybridCorrection;
+	std::string readSeq = strPBHC;
+	
+	// dynamicSeedingFromSR(readSeq, mode);
+	// mode 0 is for the first PacBio Hybrid Correction.
+	// mode 1 is for multiple (decreaseKmerSize) PacBio Hybrid Correction.
+	seedVec = dynamicSeedingFromSR(readSeq, 1);
+	
+	if(seedVec.size() >= 2)
+	{
+		pacbioCorrectedStrs = seedVec.at(0);
+		// record position of PBHC read whether is corrected.
+		int currCorrectedPBLength = seedVec.at(0).seedLength;
+		isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
+	}
+	// else
+		// calling ChengWei's PB Self Correction if no seed.
+		// return PBSelfCorrection(workItem);
+	
+	// FMWalk for each pair of seeds
+	for(size_t numFMWalk = 1 ; numFMWalk < seedVec.size() ; numFMWalk++)
+	{
+		FMWalkResult FMWResult;
+		
+		SeedFeature seedSource = pacbioCorrectedStrs,
+					seedTarget = seedVec.at(numFMWalk);
+		
+		assert((prevIsPBPosCorrectedByHybridCorrection.size()==0)||
+		(readSeq.length()==prevIsPBPosCorrectedByHybridCorrection.size()));
+		
+		// skip the sequence region which has been corrected by previos correction.
+		bool isRegionCorrectedByPrev=true;
+		for(int posPBCorrectedByHybridCorrection=seedVec.at(numFMWalk-1).seedEndPos+1 ;
+		posPBCorrectedByHybridCorrection<seedTarget.seedStartPos ;
+		posPBCorrectedByHybridCorrection++)
+			if(prevIsPBPosCorrectedByHybridCorrection.size()==0||
+				prevIsPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
+				isRegionCorrectedByPrev=false;
+		
+		// in order to escape the error seed target potentially, 
+		// we try to use the next seed as a new target.
+		// tryNext <= N, N means the maximum test times.
+		int tryNext = 0, iniFMWalk = numFMWalk;
+		for(; isRegionCorrectedByPrev == false && 
+		tryNext <= 3 && 
+		(FMWResult.typeFMWalkResult==-1||FMWResult.typeFMWalkResult==-2) && 
+		numFMWalk < seedVec.size(); 
+		tryNext++, numFMWalk++)
+		{
+			seedTarget = seedVec.at(numFMWalk);
+			// FMWalk correction using pair of seeds from short reads.
+			extendBetweenSeeds(readSeq, seedSource, seedTarget, FMWResult);
+			// cout << numFMWalk << ": " <<  FMWResult.typeFMWalkResult <<"\n";
+			if(FMWResult.typeFMWalkResult > 0)
+				break;
+		}
+		if(FMWResult.typeFMWalkResult < 0)
+			numFMWalk = iniFMWalk;
+		seedTarget = seedVec.at(numFMWalk);
+		
+		// FMWalk result--
+		// success: 1,
+		// high error: -1,
+		// exceed leaves: -2,
+		// exceed depth: -3,
+		// no suitably extended path compared as raw PB sequence: -4.
+		if(FMWResult.typeFMWalkResult == 1)
+		{
+			assert(FMWResult.mergedSeq.length() > seedSource.seedLength);
+			string extendedStr = FMWResult.mergedSeq.substr(seedSource.seedLength);
+			pacbioCorrectedStrs.append(extendedStr);
+			pacbioCorrectedStrs.seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
+			
+			// record position of PBHC read whether is corrected.
+			int currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+extendedStr.length();
+			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
+		
+		}
+		else
+		{
+			string extendedStr = readSeq.substr(seedSource.seedEndPos+1,seedTarget.seedEndPos-seedSource.seedEndPos);
+			pacbioCorrectedStrs.append(extendedStr);
+			pacbioCorrectedStrs.seedStartPos = seedTarget.seedStartPos;
+			pacbioCorrectedStrs.seedEndPos = seedTarget.seedEndPos;
+			pacbioCorrectedStrs.isRepeat = seedTarget.isRepeat;
+			pacbioCorrectedStrs.isPBSeed = seedTarget.isPBSeed;
+			pacbioCorrectedStrs.isNextRepeat = seedTarget.isNextRepeat;
+			pacbioCorrectedStrs.startBestKmerSize = seedTarget.startBestKmerSize;
+			pacbioCorrectedStrs.endBestKmerSize = seedTarget.endBestKmerSize;
+			
+			// record position of PBHC read whether is corrected.
+			int currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+(seedTarget.seedStartPos-seedSource.seedEndPos-1);
+			if(isRegionCorrectedByPrev == false)
+				isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, false);
+			else
+				isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
+				currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+seedTarget.seedLength;
+			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
+		}
+	}
+	strPBHC = pacbioCorrectedStrs.seedStr;
+	prevIsPBPosCorrectedByHybridCorrection = isPBPosCorrectedByHybridCorrection;
+	
+	assert(strPBHC.length()==prevIsPBPosCorrectedByHybridCorrection.size());
+	return;
 }
 
 // calling ChengWei's PB Self Correction to solve FMWalk failed in PB Hybrid Correction.
-PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBSelfCorrection(const SequenceWorkItem& workItem)
+PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBSelfCorrection(const SequenceWorkItem& workItem, const PacBioHybridCorrectionResult result)
 {
 	PacBioSelfCorrectionParameters selfECParams;
+	selfECParams.resultPBHC = result;
 	selfECParams.indices = m_params.PBindices;
 	selfECParams.kmerLength = 17;
 	selfECParams.maxLeaves = 32;
 	selfECParams.minKmerLength = 13;
-    selfECParams.idmerLength = 9;
-    selfECParams.ErrorRate = 0.15;
+	selfECParams.idmerLength = 9;
+	selfECParams.ErrorRate = 0.15;
 	selfECParams.FMWKmerThreshold = 3;
 	selfECParams.numOfNextTarget = 1;
 	selfECParams.collectedSeeds = 5;
-    selfECParams.PBcoverage = m_params.PBcoverage;
+	selfECParams.PBcoverage = m_params.PBcoverage;
 	selfECParams.isSplit = false;
 	selfECParams.isFirst = false;
-    selfECParams.DebugExtend = false;
-    selfECParams.DebugSeed = false;
+	selfECParams.DebugExtend = false;
+	selfECParams.DebugSeed = false;
 	selfECParams.maxSeedInterval = 500;
 	PacBioSelfCorrectionProcess processPBSC(selfECParams);
 	PacBioSelfCorrectionResult resultPBSC=processPBSC.PBSelfCorrection(workItem);
 	PacBioHybridCorrectionResult resultPBHC;
 	resultPBHC.merge=resultPBSC.merge;
-	resultPBHC.strPBHC=resultPBSC.strPBSC;
+	resultPBHC.strPBHC=resultPBSC.strPBSC.toString();
 	return resultPBHC;
 }
 
@@ -411,6 +327,8 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 	std::vector<SeedFeature> seedVec;
 	std::vector<int> seedEndPosVec;
 	size_t maxKmerSize=m_params.kmerLength;
+	// mode 0 is for first PacBio Hybrid Correction.
+	// mode 1 is for multiple (decreaseKmerSize) PacBio Hybrid Correction.
 	size_t minKmerSize=mode==1?m_params.minKmerLength*4/5:m_params.minKmerLength;
 	
 	// YTH
@@ -716,14 +634,14 @@ bool PacBioHybridCorrectionProcess::dynamicSeedingFromPB(const string& readSeq, 
 // seed frequency: average k-mer frequency in a seed.
 // if seed frequency in short reads FM-index is below all average k-mer frequency 
 // and is between high frequency seeds , the seed will be deleted.
-std::vector<SeedFeature> PacBioHybridCorrectionProcess::filterErrorSRSeeds(std::vector<SeedFeature>& seedVec, int mode)
+std::vector<SeedFeature> PacBioHybridCorrectionProcess::filterErrorSRSeeds(std::vector<SeedFeature>& seedVec)
 {
 	if(seedVec.size() < 3)
 		return seedVec;
 	
 	std::vector<SeedFeature> newSeedVec;
 	std::vector<float> seedFreqsVec;
-	size_t minKmerSize=mode==1?m_params.minKmerLength*4/5:m_params.minKmerLength;
+	size_t minKmerSize=m_params.minKmerLength;
 	
 	// caculate all average k-mer frequency
 	float allSeedsAvgKmerFreqs=0;
@@ -834,7 +752,7 @@ void PacBioHybridCorrectionProcess::extendBetweenSeeds(std::string& readSeq, See
 {
 	// FMWalk params initialized
 	FMWalkParameters FMWParams;
-	// if(seedTarget.seedStr == "ATTAATCAATAAAATTTACGATTATT")
+	// if(seedTarget.seedStr == "TTGATATTTGATTTCTAA")
 		// FMWParams.debugMode=true;
 	FMWParams.indices = m_params.indices;
 	FMWParams.maxOverlap = m_params.maxOverlap;
@@ -1200,21 +1118,21 @@ PacBioHybridCorrectionPostProcess::PacBioHybridCorrectionPostProcess(std::ostrea
 //
 PacBioHybridCorrectionPostProcess::~PacBioHybridCorrectionPostProcess()
 {	
-	if(m_totalWalkNum>0 && m_totalReadsLen>0)
-	{
-		std::cout << std::endl;
-		std::cout << "totalReadsLen: " << m_totalReadsLen << ", ";
-		std::cout << "correctedLen: " << m_correctedLen << ", ratio: " 
-			<< (float)(m_correctedLen*100)/m_totalReadsLen << "%." << std::endl;
-		std::cout << "totalSeedNum: " << m_totalSeedNum << "." << std::endl;
-		std::cout << "totalWalkNum: " << m_totalWalkNum << ", ";
-		std::cout << "correctedNum: " << m_correctedNum << ", ratio: " 
-			<< (float)(m_correctedNum*100)/m_totalWalkNum << "%." << std::endl;
-		std::cout << "seedDis: " << (float)(m_seedDis)/m_totalWalkNum << "." << std::endl;
+	// if(m_totalWalkNum>0 && m_totalReadsLen>0)
+	// {
+		// std::cout << std::endl;
+		// std::cout << "totalReadsLen: " << m_totalReadsLen << ", ";
+		// std::cout << "correctedLen: " << m_correctedLen << ", ratio: " 
+			// << (float)(m_correctedLen*100)/m_totalReadsLen << "%." << std::endl;
+		// std::cout << "totalSeedNum: " << m_totalSeedNum << "." << std::endl;
+		// std::cout << "totalWalkNum: " << m_totalWalkNum << ", ";
+		// std::cout << "correctedNum: " << m_correctedNum << ", ratio: " 
+			// << (float)(m_correctedNum*100)/m_totalWalkNum << "%." << std::endl;
+		// std::cout << "seedDis: " << (float)(m_seedDis)/m_totalWalkNum << "." << std::endl;
 		//std::cout << "highErrorNum: " << m_highErrorNum << ", ratio: " << (float)(m_highErrorNum*100)/m_totalWalkNum << "%." << std::endl;
 		//std::cout << "exceedDepthNum: " << m_exceedDepthNum << ", ratio: " << (float)(m_exceedDepthNum*100)/m_totalWalkNum << "%." << std::endl;
 		//std::cout << "exceedLeaveNum: " << m_exceedLeaveNum << ", ratio: " << (float)(m_exceedLeaveNum*100)/m_totalWalkNum << "%." << std::endl;
-	}
+	// }
 }
 
 
@@ -1237,7 +1155,7 @@ void PacBioHybridCorrectionPostProcess::process(const SequenceWorkItem& item, co
 		{
 			SeqItem mergeRecord;
 			std::stringstream ss;
-			ss << item.read.id << "_" << item.read.seq.length() << "_" << result.strPBHC.toString().length();
+			ss << item.read.id << "_" << item.read.seq.length() << "_" << result.strPBHC.length();
 			mergeRecord.id = ss.str();
 			mergeRecord.seq = result.strPBHC;
 			mergeRecord.write(*m_pCorrectedWriter);

@@ -74,7 +74,7 @@ public:
 	size_t kmerLength;
 
 	// PacBio reads correction by Ya, v20151001.
-	DNAString strPBHC;
+	std::string strPBHC;
 	int64_t totalReadsLen;
 	int64_t correctedLen;
 	int64_t totalSeedNum;
@@ -84,6 +84,8 @@ public:
 	int64_t exceedDepthNum;
 	int64_t exceedLeaveNum;
 	int64_t seedDis;
+	
+	std::vector<bool> isPBPosCorrectedByHybridCorrection;
 };
 
 //
@@ -96,7 +98,6 @@ public:
 
 	// PacBio correction by Ya, v20150305.
 	PacBioHybridCorrectionResult PBHybridCorrection(SequenceWorkItem& workItem);
-	PacBioHybridCorrectionResult PBHybridCorrectionRun2(SequenceWorkItem& workItem);
 	
 	PacBioHybridCorrectionResult process(SequenceWorkItem& workItem)
 	{
@@ -110,7 +111,7 @@ private:
 	// identify seeds
 	std::vector<SeedFeature> dynamicSeedingFromSR(const std::string& readSeq, int mode);
 	bool dynamicSeedingFromPB(const std::string& readSeq, std::vector<SeedFeature>& seedVec, std::vector<int>& seedEndPosVec, size_t prevEndPos);
-	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec, int mode);
+	std::vector<SeedFeature> filterErrorSRSeeds(std::vector<SeedFeature>& seedVec);
 	
 	// replace raw sequence by correct sequence
 	void extendBetweenSeeds(std::string& readSeq, SeedFeature& source, SeedFeature& target, FMWalkResult& FMWResult);
@@ -122,7 +123,10 @@ private:
 	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
 	bool isLowComplexity(std::string& seq ,const float& ratioThreshold);
 	float GCAndTandemRatio(std::string& seq);
-	PacBioHybridCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem);
+	
+	// multiple correction
+	void PBHybridCorrection_decreaseKmerSize(std::string& strPBHC, std::vector<bool>& prevIsPBPosCorrectedByHybridCorrection);
+	PacBioHybridCorrectionResult PBSelfCorrection(const SequenceWorkItem& workItem, PacBioHybridCorrectionResult result);
 	
 	PacBioHybridCorrectionParameters m_params;
 };

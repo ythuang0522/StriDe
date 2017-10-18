@@ -129,7 +129,7 @@ struct SeqRecord
 	
 	// using by PBHC, by Ya v20170627.
 	DNAString seqPBHC;
-	std::vector<bool> isPBPosCorrectedByHybridCorrection;
+	// std::vector<bool> isPBPosCorrectedByHybridCorrection;
 };
 typedef std::vector<SeqRecord> SeqRecordVector;
 

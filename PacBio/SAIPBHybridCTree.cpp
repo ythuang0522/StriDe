@@ -99,18 +99,18 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 		// if(m_currentLength >= m_MinLength && isTerminated(results))
 			// break;
 		
-		if(m_debugMode)
-		{	
-			std::cout << "----m_currentKmerSize: " << m_currentKmerSize
-			<< ", m_leaves.size(): " << m_leaves.size()
-			<< ", result: " << results.size() << "----\n";
-			std::cout << "GATAGCGAACGCCCACTTTCACGCTCAAACAATAACCAAGAACCTGTGCTATGGAATTTTAAATCACTAGCAAACAATTTCAACGTTAGGTTTACGTACCATTTTCACGCCACATCGTCATCCTCTAAGATTGAGACGTATTTTCAGTTTCTAAACGATTATCTAGCGGAAAACCTATACAAGTGCATCAACATTTTTCATGATGACTGTAATGGGTTGACGAAGCCAGTTATTCATGAACAATTTA-TTAAT-TACGTCTTACAACCCATTAGGGATAAAGTAAGATCCACCCTATTTCAAAACGATTTGAAAACTTTGATCGTCCTAATTTCCCAAATCCTGGCTACAGACAAAAATTTATTGAATTCTTTTCATTACCATGGGCTAGGTTTGGTGTCGTTAATTTCCGATGAAGTATGGGAGAAATGGATCAACTATGAAGTTGAAATGGCCAATAGGCAATTCATCAATATAACTAAAAATCCGGAAGATTTCCCAAAATCTTCTCAGAATTTTGTCAAATTAATCAATAAAATTTACGATTATT" << endl;
-			for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
-			{
-				std::cout << (*iter)->getSuffix(m_currentLength-m_pStrSourceSeed->length()) << " ";
-				std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << " " << (*iter)->getKmerCount() << "\n";
-			}
-		}
+		// if(m_debugMode)
+		// {	
+			// std::cout << "----m_currentKmerSize: " << m_currentKmerSize
+			// << ", m_leaves.size(): " << m_leaves.size()
+			// << ", result: " << results.size() << "----\n";
+			// std::cout << "GATAGCGAACGCCCACTTTCACGCTCAAACAATAACCAAGAACCTGTGCTATGGAATTTTAAATCACTAGCAAACAATTTCAACGTTAGGTTTACGTACCATTTTCACGCCACATCGTCATCCTCTAAGATTGAGACGTATTTTCAGTTTCTAAACGATTATCTAGCGGAAAACCTATACAAGTGCATCAACATTTTTCATGATGACTGTAATGGGTTGACGAAGCCAGTTATTCATGAACAATTTA-TTAAT-TACGTCTTACAACCCATTAGGGATAAAGTAAGATCCACCCTATTTCAAAACGATTTGAAAACTTTGATCGTCCTAATTTCCCAAATCCTGGCTACAGACAAAAATTTATTGAATTCTTTTCATTACCATGGGCTAGGTTTGGTGTCGTTAATTTCCGATGAAGTATGGGAGAAATGGATCAACTATGAAGTTGAAATGGCCAATAGGCAATTCATCAATATAACTAAAAATCCGGAAGATTTCCCAAAATCTTCTCAGAATTTTGTCAAATTAATCAATAAAATTTACGATTATT" << endl;
+			// for(STNodePtrList::iterator iter = m_leaves.begin(); iter != m_leaves.end(); ++iter)
+			// {
+				// std::cout << (*iter)->getSuffix(m_currentLength-m_pStrSourceSeed->length()) << " ";
+				// std::cout << m_currentLength << " " << (*iter)->fwdInterval.size()+(*iter)->rvcInterval.size() << " " << (*iter)->getKmerCount() << "\n";
+			// }
+		// }
 		
 		if(m_leaves.size() > m_maxUsedLeaves)
 			m_maxUsedLeaves = m_leaves.size();
@@ -128,13 +128,13 @@ void SAIntervalPBHybridCTree::mergeTwoSeeds(FMWalkResult &FMWResult)
 
     // did not reach the terminal kmer
     if(m_leaves.empty())
-        FMWResult.typeFMWalkResult = -1;	//high error
+        FMWResult.typeFMWalkResult = -1;	// high error
     else if(m_currentLength > m_MaxLength)
-        FMWResult.typeFMWalkResult = -2;	//exceed search depth
+        FMWResult.typeFMWalkResult = -2;	// exceed search depth
     else if(m_leaves.size() > m_MaxLeaves)
-        FMWResult.typeFMWalkResult = -3;	//too much repeats
+        FMWResult.typeFMWalkResult = -3;	// too much repeats
 	else
-		FMWResult.typeFMWalkResult = -4;
+		FMWResult.typeFMWalkResult = -4;	// no suitably extended path compared as raw PB sequence
 	return;
 }
 

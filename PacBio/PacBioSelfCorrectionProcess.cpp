@@ -45,7 +45,7 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
   
 
 	std::vector<SeedFeature> seedVec, pacbioCorrectedStrs;
-	std::string readSeq = workItem.read.seqPBHC.toString();
+	std::string readSeq = m_params.resultPBHC.strPBHC;
 
    // separatebykmer(workItem.read.id,readSeq,m_params.kmerLength);
    
@@ -72,13 +72,19 @@ PacBioSelfCorrectionResult PacBioSelfCorrectionProcess::PBSelfCorrection(const S
 	else
 	{
 		// give up reads with less than 2 seeds
-		result.merge = false;
+		if(m_params.resultPBHC.merge==false)
+			result.merge = false;
+		else
+		{
+			result.strPBSC = m_params.resultPBHC.strPBHC;
+			result.merge = true;
+		}
 		return result;
 	}
 	
     // reserve sufficient str length for fast append
     pacbioCorrectedStrs.back().seedStr.reserve(readSeq.length());
-    initCorrect(readSeq, seedVec, workItem.read.isPBPosCorrectedByHybridCorrection, pacbioCorrectedStrs, result);
+    initCorrect(readSeq, seedVec, pacbioCorrectedStrs, result);
 
 	result.merge = true;
 	result.totalReadsLen = readSeq.length();
@@ -122,18 +128,8 @@ void PacBioSelfCorrectionProcess::separatebykmer(std::string readid,std::string 
     
 }
 
-void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<SeedFeature>& seedVec, const std::vector<bool> isPBPosCorrectedByHybridCorrection, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result)
+void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<SeedFeature>& seedVec, std::vector<SeedFeature>& pacbioCorrectedStrs, PacBioSelfCorrectionResult& result)
 {
-	
-		// for(int i=0;i<isPBPosCorrectedByHybridCorrection.size();i++)
-		// {
-			// string s(1, readSeq[i]);
-			// if(isPBPosCorrectedByHybridCorrection.at(i))
-				// cout << i << ":" << reverseComplement(s) << ":1\n";
-			// else
-				// cout << i << ":" << reverseComplement(s) << ":0\n";
-		// }
-		
     m_total_FMtime = 0;
     m_total_DPtime = 0;
     FMextendParameters FMextendParameter(m_params.indices,m_params.idmerLength,m_params.maxLeaves,m_params.minKmerLength,m_params.PBcoverage,m_params.ErrorRate,m_params.DebugExtend);
@@ -151,24 +147,18 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 		SeedFeature target = seedVec.at(targetSeed);
 	
 		// cout << "------" << targetSeed << " " << seedVec.at(targetSeed-1).seedEndPos+1 << " " << target.seedStartPos <<  "\n";
-		assert((isPBPosCorrectedByHybridCorrection.size()==0)||
-			(readSeq.length()==isPBPosCorrectedByHybridCorrection.size()));
+		
+		// skip the sequence region which has been corrected by previos correction.
+		std::vector<bool> prevIsPBPosCorrectedByHybridCorrection = m_params.resultPBHC.isPBPosCorrectedByHybridCorrection;
+		assert((prevIsPBPosCorrectedByHybridCorrection.size()==0)||
+			(readSeq.length()==prevIsPBPosCorrectedByHybridCorrection.size()));
 		bool isRegionCorrectedByHybrid=true;
 		for(int posPBCorrectedByHybridCorrection=seedVec.at(targetSeed-1).seedEndPos+1 ;
 			posPBCorrectedByHybridCorrection<target.seedStartPos ;
 			posPBCorrectedByHybridCorrection++)
-		{
-				
-			// string s(1, readSeq[posPBCorrectedByHybridCorrection]);
-			// if(isPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection))
-				// cout << posPBCorrectedByHybridCorrection << ":" << reverseComplement(s) << ":1\n";
-			// else
-				// cout << posPBCorrectedByHybridCorrection << ":" << reverseComplement(s) << ":0\n";
-			
-			if(isPBPosCorrectedByHybridCorrection.size()==0||
-				isPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
+			if(prevIsPBPosCorrectedByHybridCorrection.size()==0||
+				prevIsPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
 				isRegionCorrectedByHybrid=false;
-		}
 			
 		// extension kmer is used for extension using local kmer hashtable collected from overlapping reads
 		// default: smaller beset kmer size from both seeds -2
@@ -204,11 +194,7 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 				FMWalkReturnType = extendBetweenSeeds(source, target, readSeq, mergedseq, extendKmerSize, dis_between_src_target,FMextendParameter);
 				if(m_params.DebugExtend)
 					std::cout<< targetSeed << " \t" <<FMWalkReturnType<< " result of extension\n"<< mergedseq << "\n"; //debugch
-				// if(isRegionCorrectedByHybrid)
-					// cout << "no";
-				// else
-					// cout << "yes";
-				
+
 				// std::cout << ">" << targetSeed
 				// << ", pos:" << target.seedStartPos
 				// << ", len:" << target.seedLength
