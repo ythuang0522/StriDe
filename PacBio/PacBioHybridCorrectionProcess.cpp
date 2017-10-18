@@ -151,7 +151,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 			// record position of PBHC read whether is corrected.
 			int currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+(seedTarget.seedStartPos-seedSource.seedEndPos-1);
 			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, false);
-				currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+seedTarget.seedLength;
+			currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+seedTarget.seedLength;
 			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
 		}
 	}
@@ -159,7 +159,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	string strPBHC = pacbioCorrectedStrs.seedStr;
 	assert(strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
 	
-	// using shorted kmer size to identify seeds in PacBio Hybrid Correction Run Two
+	// using shorted kmer size to identify seeds in PacBio Hybrid Multiple Correction
 	// because distance between seeds is too far (>1800 bp) using large kmer size.
 	PBHybridCorrection_decreaseKmerSize(strPBHC, isPBPosCorrectedByHybridCorrection);
 	assert(strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
@@ -172,7 +172,9 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	return PBSelfCorrection(workItem, result);
 }
 
-// PacBio Hybrid Correction Run Two by Ya, v20170602.
+// PacBio Hybrid Multiple Correction by Ya, v20170602.
+// using shorted kmer size to identify seeds in PacBio Hybrid Correction
+// because distance between seeds is too far (>1800 bp) using large kmer size.
 void PacBioHybridCorrectionProcess::PBHybridCorrection_decreaseKmerSize(string& strPBHC, vector<bool>& prevIsPBPosCorrectedByHybridCorrection)
 {
 	std::vector<SeedFeature> seedVec;
@@ -202,7 +204,7 @@ void PacBioHybridCorrectionProcess::PBHybridCorrection_decreaseKmerSize(string& 
 		FMWalkResult FMWResult;
 		
 		SeedFeature seedSource = pacbioCorrectedStrs,
-					seedTarget = seedVec.at(numFMWalk);
+			seedTarget = seedVec.at(numFMWalk);
 		
 		assert((prevIsPBPosCorrectedByHybridCorrection.size()==0)||
 		(readSeq.length()==prevIsPBPosCorrectedByHybridCorrection.size()));
@@ -279,7 +281,7 @@ void PacBioHybridCorrectionProcess::PBHybridCorrection_decreaseKmerSize(string& 
 				isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, false);
 			else
 				isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
-				currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+seedTarget.seedLength;
+			currCorrectedPBLength = isPBPosCorrectedByHybridCorrection.size()+seedTarget.seedLength;
 			isPBPosCorrectedByHybridCorrection.resize(currCorrectedPBLength, true);
 		}
 	}
