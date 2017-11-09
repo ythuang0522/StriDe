@@ -24,7 +24,8 @@ struct BWTInterval
 
     inline bool isValid() const { return lower <= upper; }
     inline int64_t size() const { return upper - lower + 1; }
-
+	inline int64_t getFreqs() const { return (isValid() ? size() : 0); }
+	
     static inline bool compare(const BWTInterval& a, const BWTInterval& b)
     {
         if(a.lower == b.lower)
@@ -73,7 +74,8 @@ struct BWTIntervalPair
     // Functions
     BWTInterval& get(unsigned int idx) { return interval[idx]; }
     bool isValid() const { return interval[0].isValid() && interval[1].isValid(); }
-
+	int64_t getFreqs() const { return (interval[0].getFreqs() + interval[1].getFreqs()); }
+	
     friend bool operator==(const BWTIntervalPair& a, const BWTIntervalPair& b)
     {
         return BWTInterval::equal(a.interval[0], b.interval[0]) && 

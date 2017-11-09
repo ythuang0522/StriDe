@@ -120,7 +120,7 @@ private:
 	int MSACorrection(FMWalkParameters FMWParams, std::string& readSeq, SeedFeature& source, SeedFeature& target, bool& isSequencingGap, FMWalkResult& FMWResult);
 	
 	// subfunction
-	void trimRepeatSeed(const std::string& readSeq, size_t coverage, size_t& seedStartPos, size_t& seedEndPos);
+	void trimRepeatSeed(const std::string& readSeq, size_t coverage, int& seedStartPos, int& seedEndPos);
 	bool isLowComplexity(std::string& seq ,const float& ratioThreshold);
 	float GCAndTandemRatio(std::string& seq);
 	

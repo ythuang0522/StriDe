@@ -51,7 +51,8 @@ class SAINode
 
         size_t getKmerCount(){return m_kmerCount;};
         void addKmerCount(size_t kmercount){ m_kmerCount+=kmercount; };
-
+		
+		
     private:
 
         //
@@ -96,6 +97,8 @@ class SAIntervalNode : public SAINode
 
         BWTInterval fwdInterval;
         BWTInterval rvcInterval;
+		int DPScore;
+
 
 };
 
