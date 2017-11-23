@@ -66,6 +66,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	}
 	else
 	{
+		result.strPBHC = readSeq;
 		result.merge = false;
 		// calling ChengWei's PB Self Correction if no seed.
 		return PBSelfCorrection(workItem, result);
@@ -180,7 +181,7 @@ PacBioHybridCorrectionResult PacBioHybridCorrectionProcess::PBHybridCorrection(S
 	assert(strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
 	
 	// using shorted kmer size to identify seeds in PacBio Hybrid Multiple Correction
-	// because distance between seeds is too far (>1800 bp) using large kmer size.
+	// because distance between seeds is too far (>1800 bp) by large kmer size.
 	PBHybridCorrection_decreaseKmerSize(strPBHC, isPBPosCorrectedByHybridCorrection);
 	assert(strPBHC.length()==isPBPosCorrectedByHybridCorrection.size());
 	
@@ -442,41 +443,34 @@ std::vector<SeedFeature> PacBioHybridCorrectionProcess::dynamicSeedingFromSR(con
 			continue;
 		
 		// There are more strictly relative kmer frequency requirements for the seeds of the repeat region
-		// Set a range (e.g., 200bp)
+		// Set a range (e.g., 600bp)
 		// Record the range of the highest frequency of the kmer frequency
 		// The seed of the kmer frequency is the highest kmer frequency in this range
 		// The gap can not be too large
 		// It can simply filter out those low frequency error seeds
-		// if(mode == 0)
-		{
-			int avgKmerFreqIn1000bp = 0, numKmer = 0;
-			for(int i=-300; i<=300 ; i++)
-			{
-				if(pos+i<0)
-					continue;
-				else if(pos+i+minKmerSize>=readSeq.length())
-					break;
+		//	int avgKmerFreqIn600bp = 0, numKmer = 0;
+		//	for(int i=-300; i<=300 ; i++)
+		//	{
+		//		if(pos+i<0)
+		//			continue;
+		//		else if(pos+i+minKmerSize>=readSeq.length())
+		//			break;
+		//		
+		//		int posKmerFreq = minKmerInterval.at(pos+i).getFreqs();
 				
-				int posKmerFreq = minKmerInterval.at(pos+i).getFreqs();
+		//		if(posKmerFreq<dynamicKmerThreshold)
+		//			continue;
 				
-				// if(posKmerFreq>maxKmerFreqIn200bp)
-					// maxKmerFreqIn200bp=posKmerFreq;
-				
-				if(posKmerFreq<dynamicKmerThreshold)
-					continue;
-				
-				avgKmerFreqIn1000bp+=posKmerFreq;
-				numKmer++;
-			}
+		//		avgKmerFreqIn600bp+=posKmerFreq;
+		//		numKmer++;
+		//	}
 			
-			if(numKmer > 0)
-			{
-				avgKmerFreqIn1000bp=avgKmerFreqIn1000bp/numKmer;
-				// cout << "*" << minKmerInterval.at(pos).getFreqs() << " " << avgKmerFreqIn1000bp << endl;
-				if((float)kmerFreqs/(float)avgKmerFreqIn1000bp < 0.46)
-					continue;
-			}
-		}
+		//	if(numKmer > 0)
+		//	{
+		//		avgKmerFreqIn600bp=avgKmerFreqIn600bp/numKmer;
+		//		if((float)kmerFreqs/(float)avgKmerFreqIn600bp < 0.46)
+		//			continue;
+		//	}
 		
 		int seedStartPos=pos;
 		int maxKmerFreq=kmerFreqs;

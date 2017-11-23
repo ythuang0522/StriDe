@@ -152,14 +152,17 @@ void PacBioSelfCorrectionProcess::initCorrect(std::string& readSeq, std::vector<
 		std::vector<bool> prevIsPBPosCorrectedByHybridCorrection = m_params.resultPBHC.isPBPosCorrectedByHybridCorrection;
 		assert((prevIsPBPosCorrectedByHybridCorrection.size()==0)||
 			(readSeq.length()==prevIsPBPosCorrectedByHybridCorrection.size()));
-		bool isRegionCorrectedByHybrid=true;
-		for(int posPBCorrectedByHybridCorrection=seedVec.at(targetSeed-1).seedEndPos+1 ;
-			posPBCorrectedByHybridCorrection<target.seedStartPos ;
-			posPBCorrectedByHybridCorrection++)
-			if(prevIsPBPosCorrectedByHybridCorrection.size()==0||
-				prevIsPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
-				isRegionCorrectedByHybrid=false;
-			
+		bool isRegionCorrectedByHybrid=false;
+		if(prevIsPBPosCorrectedByHybridCorrection.size()!=0)
+		{
+			isRegionCorrectedByHybrid=true;
+			for(int posPBCorrectedByHybridCorrection=seedVec.at(targetSeed-1).seedEndPos+1 ;
+				posPBCorrectedByHybridCorrection<target.seedStartPos ;
+				posPBCorrectedByHybridCorrection++)
+				if(prevIsPBPosCorrectedByHybridCorrection.at(posPBCorrectedByHybridCorrection)==false)
+					isRegionCorrectedByHybrid=false;
+		}
+	
 		// extension kmer is used for extension using local kmer hashtable collected from overlapping reads
 		// default: smaller beset kmer size from both seeds -2
 		size_t extendKmerSize = std::min(source.endBestKmerSize, seedVec.at(targetSeed).startBestKmerSize) - 2;
